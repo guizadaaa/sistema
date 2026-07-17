@@ -1,0 +1,25 @@
+-- ============================================================================
+-- Sistema de Gestão de Casos Operacionais — CVC
+-- Migration: corrige vazamento de RLS em status_historico_com_duracao
+--
+-- A view foi criada sem `security_invoker = true` (disponível desde o
+-- Postgres 15), então o Postgres avalia os privilégios de acesso à tabela
+-- base — RLS incluída — usando o DONO da view (quem rodou as migrations,
+-- que bypassa RLS), não o role de quem consulta. Na prática, qualquer
+-- usuário autenticado que consultasse a view via API via a anon/authenticated
+-- key (não precisa passar pelo app Next.js) enxergava a linha do tempo de
+-- status de TODOS os casos do sistema, de qualquer filial/vendedor — não só
+-- os que a policy status_historico_select libera para ele.
+--
+-- Confirmado empiricamente: um vendedor da filial 1710 via SELECT direto em
+-- status_historico corretamente só via a própria linha (RLS funcionando),
+-- mas via a view via_duracao aparecia também a linha de um caso de outro
+-- vendedor de outra filial.
+--
+-- security_invoker = true faz a view rodar as checagens de permissão (RLS
+-- incluída) como o role que efetivamente consulta, fechando o vazamento —
+-- authenticated já tem GRANT SELECT direto em status_historico (ver
+-- 20260717000003_grants.sql), então a policy passa a ser aplicada de verdade.
+-- ============================================================================
+
+alter view public.status_historico_com_duracao set (security_invoker = true);
