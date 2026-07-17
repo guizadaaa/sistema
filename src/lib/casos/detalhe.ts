@@ -7,6 +7,7 @@ type CasoRow = Database["public"]["Tables"]["casos"]["Row"];
 type AnexoRow = Database["public"]["Tables"]["anexos"]["Row"];
 type StatusHistoricoComDuracaoRow = Database["public"]["Views"]["status_historico_com_duracao"]["Row"];
 type DesfechoVisivelRow = Database["public"]["Views"]["desfechos_visivel"]["Row"];
+type ImplicacaoRow = Database["public"]["Tables"]["implicacoes"]["Row"];
 
 export type HistoricoComNome = StatusHistoricoComDuracaoRow & { alteradoPorNome: string };
 
@@ -17,6 +18,7 @@ export type DetalheCaso = {
   historico: HistoricoComNome[];
   anexos: AnexoRow[];
   desfechos: DesfechoVisivelRow[];
+  implicacao: ImplicacaoRow | null;
 };
 
 /**
@@ -34,20 +36,26 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
   if (casoError) throw casoError;
   if (!caso) return null;
 
-  const [{ data: historico, error: historicoError }, { data: anexos, error: anexosError }, { data: desfechos, error: desfechosError }] =
-    await Promise.all([
-      supabase
-        .from("status_historico_com_duracao")
-        .select("*")
-        .eq("caso_id", id)
-        .order("entrou_em", { ascending: true }),
-      supabase.from("anexos").select("*").eq("caso_id", id).order("enviado_em", { ascending: false }),
-      supabase.from("desfechos_visivel").select("*").eq("caso_id", id).order("criado_em", { ascending: false }),
-    ]);
+  const [
+    { data: historico, error: historicoError },
+    { data: anexos, error: anexosError },
+    { data: desfechos, error: desfechosError },
+    { data: implicacao, error: implicacaoError },
+  ] = await Promise.all([
+    supabase
+      .from("status_historico_com_duracao")
+      .select("*")
+      .eq("caso_id", id)
+      .order("entrou_em", { ascending: true }),
+    supabase.from("anexos").select("*").eq("caso_id", id).order("enviado_em", { ascending: false }),
+    supabase.from("desfechos_visivel").select("*").eq("caso_id", id).order("criado_em", { ascending: false }),
+    supabase.from("implicacoes").select("*").eq("caso_id", id).maybeSingle(),
+  ]);
 
   if (historicoError) throw historicoError;
   if (anexosError) throw anexosError;
   if (desfechosError) throw desfechosError;
+  if (implicacaoError) throw implicacaoError;
 
   const idsParaNome = [
     ...new Set([caso.vendedor_dono, caso.criado_por, ...(historico ?? []).map((h) => h.alterado_por)]),
@@ -67,5 +75,6 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
     historico: (historico ?? []).map((h) => ({ ...h, alteradoPorNome: nomesPorId.get(h.alterado_por) ?? "—" })),
     anexos: anexos ?? [],
     desfechos: desfechos ?? [],
+    implicacao: implicacao ?? null,
   };
 }

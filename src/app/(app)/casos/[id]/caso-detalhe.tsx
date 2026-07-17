@@ -4,6 +4,7 @@ import type { DetalheCaso } from "@/lib/casos/detalhe";
 import {
   FILIAL_LABELS,
   MOTIVO_LABELS,
+  QUEM_PAGA_LABELS,
   STATUS_LABELS,
   SUBTIPO_REEMBOLSO_LABELS,
   SUBTIPO_REMARCACAO_LABELS,
@@ -13,6 +14,7 @@ import {
 
 import { AnexosSecao } from "./anexos-secao";
 import { DesfechoForm } from "./desfecho-form";
+import { ImplicacaoForm } from "./implicacao-form";
 import { StatusAcoes } from "./status-acoes";
 import { Timeline } from "./timeline";
 
@@ -33,7 +35,7 @@ export function CasoDetalhe({
   podeConduzirFluxo: boolean;
   ehAdmin: boolean;
 }) {
-  const { caso, donoNome, criadoPorNome, historico, anexos, desfechos } = detalhe;
+  const { caso, donoNome, criadoPorNome, historico, anexos, desfechos, implicacao } = detalhe;
 
   return (
     <div className="flex flex-col gap-4">
@@ -164,6 +166,51 @@ export function CasoDetalhe({
       {podeConduzirFluxo && (
         <DesfechoForm casoId={caso.id} tiposAnexosExistentes={anexos.map((a) => a.tipo_documento)} />
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Implicações financeiras</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {implicacao ? (
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Multa contratual</dt>
+              <dd>{formatarMoeda(implicacao.multa_contratual_valor)}</dd>
+
+              <dt className="text-muted-foreground">Multa do fornecedor</dt>
+              <dd>{formatarMoeda(implicacao.multa_fornecedor_valor)}</dd>
+
+              <dt className="text-muted-foreground">Quem paga</dt>
+              <dd>{QUEM_PAGA_LABELS[implicacao.quem_paga]}</dd>
+
+              {implicacao.quem_paga === "vendedor" && implicacao.reducao_markup && (
+                <>
+                  <dt className="text-muted-foreground">Redução de markup</dt>
+                  <dd>Sim</dd>
+                </>
+              )}
+
+              {implicacao.quem_paga === "vendedor" && implicacao.reducao_comissao && (
+                <>
+                  <dt className="text-muted-foreground">Redução de comissão</dt>
+                  <dd>{formatarMoeda(implicacao.reducao_comissao_valor ?? 0)}</dd>
+                </>
+              )}
+
+              {implicacao.quem_paga === "vendedor" && implicacao.utilizacao_cortesia && (
+                <>
+                  <dt className="text-muted-foreground">Cortesia utilizada</dt>
+                  <dd>{formatarMoeda(implicacao.utilizacao_cortesia_valor ?? 0)}</dd>
+                </>
+              )}
+            </dl>
+          ) : (
+            <p className="text-muted-foreground text-sm">Nenhuma implicação financeira registrada ainda.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {podeConduzirFluxo && <ImplicacaoForm casoId={caso.id} implicacaoExistente={implicacao} />}
     </div>
   );
 }
