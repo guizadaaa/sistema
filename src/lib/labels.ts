@@ -2,7 +2,12 @@ import type {
   FilialCvc,
   MotivoCaso,
   PerfilUsuario,
+  QuemPagaMulta,
+  StatusCaso,
+  SubtipoReembolso,
+  SubtipoRemarcacao,
   TipoCaso,
+  TipoDesfecho,
   TipoDocumentoAnexo,
 } from "@/lib/supabase/types";
 
@@ -37,4 +42,35 @@ export const ANEXO_TIPO_LABELS: Record<TipoDocumentoAnexo, string> = {
   atestado_saude: "Atestado de saúde",
   certidao_obito: "Certidão de óbito",
   outro: "Outro",
+};
+
+export const STATUS_LABELS: Record<StatusCaso, string> = {
+  inicial: "Inicial",
+  recepcionado: "Recepcionado",
+  em_andamento_interno: "Em andamento interno",
+  reavaliacao: "Reavaliação",
+  resolvido: "Resolvido",
+  ouvidoria: "Ouvidoria",
+};
+
+export const TIPO_DESFECHO_LABELS: Record<TipoDesfecho, string> = {
+  reembolso: "Reembolso",
+  remarcacao: "Remarcação",
+  carta_credito: "Carta de crédito",
+};
+
+export const SUBTIPO_REEMBOLSO_LABELS: Record<SubtipoReembolso, string> = {
+  integral: "Integral",
+  parcial: "Parcial",
+  sem_reembolso: "Sem reembolso",
+};
+
+export const SUBTIPO_REMARCACAO_LABELS: Record<SubtipoRemarcacao, string> = {
+  sem_custo: "Sem custo (fornecedor)",
+  com_custo: "Com custo (saúde)",
+};
+
+export const QUEM_PAGA_LABELS: Record<QuemPagaMulta, string> = {
+  cliente: "Cliente",
+  vendedor: "Vendedor",
 };

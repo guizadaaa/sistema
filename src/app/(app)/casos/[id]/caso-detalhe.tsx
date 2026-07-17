@@ -1,0 +1,148 @@
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { DetalheCaso } from "@/lib/casos/detalhe";
+import {
+  FILIAL_LABELS,
+  MOTIVO_LABELS,
+  STATUS_LABELS,
+  SUBTIPO_REEMBOLSO_LABELS,
+  SUBTIPO_REMARCACAO_LABELS,
+  TIPO_CASO_LABELS,
+  TIPO_DESFECHO_LABELS,
+} from "@/lib/labels";
+
+import { AnexosSecao } from "./anexos-secao";
+import { Timeline } from "./timeline";
+
+function formatarData(data: string) {
+  return new Date(`${data}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+function formatarMoeda(valor: number) {
+  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+export function CasoDetalhe({ detalhe }: { detalhe: DetalheCaso }) {
+  const { caso, donoNome, criadoPorNome, historico, anexos, desfechos } = detalhe;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <h1 className="text-xl font-semibold">Protocolo #{caso.protocolo}</h1>
+        <Badge variant="secondary">{STATUS_LABELS[caso.status_atual]}</Badge>
+        {caso.elegivel_ouvidoria && <Badge variant="outline">Elegível a Ouvidoria</Badge>}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Dados do caso</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Tipo</dt>
+              <dd>{TIPO_CASO_LABELS[caso.tipo_caso]}</dd>
+
+              <dt className="text-muted-foreground">Filial</dt>
+              <dd>{FILIAL_LABELS[caso.filial]}</dd>
+
+              <dt className="text-muted-foreground">Dono do caso</dt>
+              <dd>{donoNome}</dd>
+
+              <dt className="text-muted-foreground">Registrado por</dt>
+              <dd>{criadoPorNome}</dd>
+
+              <dt className="text-muted-foreground">Contrato</dt>
+              <dd>{caso.contrato_numero}</dd>
+
+              <dt className="text-muted-foreground">Cliente</dt>
+              <dd>{caso.cliente_nome}</dd>
+
+              <dt className="text-muted-foreground">CPF</dt>
+              <dd>{caso.cliente_cpf}</dd>
+
+              <dt className="text-muted-foreground">Prazo de vigência</dt>
+              <dd>{formatarData(caso.prazo_vigencia)}</dd>
+
+              {caso.motivo && (
+                <>
+                  <dt className="text-muted-foreground">Motivo</dt>
+                  <dd>{MOTIVO_LABELS[caso.motivo]}</dd>
+                </>
+              )}
+
+              {caso.parcelas_em_aberto !== null && (
+                <>
+                  <dt className="text-muted-foreground">Parcelas em aberto</dt>
+                  <dd>{caso.parcelas_em_aberto}</dd>
+                </>
+              )}
+
+              {caso.data_cancelamento && (
+                <>
+                  <dt className="text-muted-foreground">Data de cancelamento</dt>
+                  <dd>{formatarData(caso.data_cancelamento)}</dd>
+                </>
+              )}
+            </dl>
+
+            {caso.descricao && (
+              <div className="mt-3 flex flex-col gap-1">
+                <span className="text-muted-foreground text-sm">Descrição</span>
+                <p className="text-sm">{caso.descricao}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Linha do tempo</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Timeline historico={historico} />
+          </CardContent>
+        </Card>
+      </div>
+
+      <AnexosSecao casoId={caso.id} anexos={anexos} />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Desfechos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {desfechos.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Nenhum desfecho registrado ainda.</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {desfechos.map((d) => (
+                <li key={d.id} className="rounded-md border p-3 text-sm">
+                  <div className="font-medium">{TIPO_DESFECHO_LABELS[d.tipo]}</div>
+                  {d.tipo === "reembolso" && d.subtipo_reembolso && (
+                    <div className="text-muted-foreground">
+                      {SUBTIPO_REEMBOLSO_LABELS[d.subtipo_reembolso]}
+                      {d.valor !== null && ` · ${formatarMoeda(d.valor)}`}
+                      {d.banco_nome_completo && ` · ${d.banco_nome_completo}`}
+                    </div>
+                  )}
+                  {d.tipo === "remarcacao" && d.subtipo_remarcacao && (
+                    <div className="text-muted-foreground">
+                      {SUBTIPO_REMARCACAO_LABELS[d.subtipo_remarcacao]}
+                      {d.valor_taxas !== null && ` · Taxas: ${formatarMoeda(d.valor_taxas)}`}
+                      {d.valor_diferenca_tarifaria !== null &&
+                        ` · Diferença: ${formatarMoeda(d.valor_diferenca_tarifaria)}`}
+                    </div>
+                  )}
+                  {d.tipo === "carta_credito" && d.valor !== null && (
+                    <div className="text-muted-foreground">{formatarMoeda(d.valor)}</div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
