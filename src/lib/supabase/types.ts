@@ -27,6 +27,7 @@ export type TipoDocumentoAnexo =
   | "atestado_saude"
   | "certidao_obito"
   | "outro";
+export type AcaoAuditoria = "insert" | "update" | "delete" | "download_signed_url";
 
 export interface Database {
   public: {
@@ -246,6 +247,29 @@ export interface Database {
         }>;
         Relationships: [];
       };
+      auditoria: {
+        Row: {
+          id: string;
+          tabela: string;
+          registro_id: string;
+          acao: AcaoAuditoria;
+          dados_antigos: Record<string, unknown> | null;
+          dados_novos: Record<string, unknown> | null;
+          realizado_por: string;
+          realizado_em: string;
+        };
+        // Nunca inserido pelo client — só via triggers e log_anexo_signed_url.
+        Insert: Partial<{
+          tabela: string;
+          registro_id: string;
+          acao: AcaoAuditoria;
+          realizado_por: string;
+        }>;
+        Update: Partial<{
+          tabela: string;
+        }>;
+        Relationships: [];
+      };
     };
     Views: {
       status_historico_com_duracao: {
@@ -260,7 +284,35 @@ export interface Database {
         };
         Relationships: [];
       };
+      // Única via de leitura de desfechos: SELECT na tabela crua é revogado
+      // de authenticated (ver 20260717000002_desfechos_mascara_bancaria.sql).
+      // Campos banco_* vêm null quando o viewer não é dono do caso nem admin.
+      desfechos_visivel: {
+        Row: {
+          id: string;
+          caso_id: string;
+          tipo: TipoDesfecho;
+          subtipo_reembolso: SubtipoReembolso | null;
+          origem_reembolso_integral: OrigemReembolsoIntegral | null;
+          banco_nome_completo: string | null;
+          banco_agencia: string | null;
+          banco_conta: string | null;
+          banco_cpf: string | null;
+          valor: number | null;
+          subtipo_remarcacao: SubtipoRemarcacao | null;
+          valor_taxas: number | null;
+          valor_diferenca_tarifaria: number | null;
+          criado_por: string;
+          criado_em: string;
+        };
+        Relationships: [];
+      };
     };
-    Functions: Record<string, never>;
+    Functions: {
+      log_anexo_signed_url: {
+        Args: { p_anexo_id: string };
+        Returns: void;
+      };
+    };
   };
 }

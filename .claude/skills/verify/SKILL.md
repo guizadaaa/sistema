@@ -78,3 +78,45 @@ tripping that same guard).
 - `shadcn@latest init` needs `ui.shadcn.com`, which this environment's
   proxy blocks — install the underlying Radix/Tailwind/cva packages via npm
   directly and hand-write components in the shadcn "new-york" style instead.
+- Docker daemon cannot start in this sandbox (`ulimit`/nested-container
+  restrictions), so a full local Supabase stack (`supabase start`) isn't
+  reachable here — only Postgres-level RLS testing (above) works locally.
+- **Server processes from a previous verification round can outlive a
+  `pkill`** (pattern mismatch, or the process was already zombied) and keep
+  holding the port. `npm run start` then fails silently in the background
+  with `EADDRINUSE` while curl/Playwright happily hit the *old* process
+  serving a `.next` build that may no longer match the source (or was
+  deleted out from under it). Symptom: a page renders but is missing
+  content you just added, or looks unstyled. Always check the actual
+  server log after starting (`cat` it, don't just `sleep` and assume), and
+  `ps aux | grep next-server` to confirm only one instance is up before
+  trusting any Playwright result. `pkill -9 -f next-server` is more
+  reliable than `pkill -f "next start"` (matches the actual server process,
+  not the wrapper script).
+
+### Verifying a page gated by `requireCurrentUser()` without a live Supabase project
+
+Since there's no real Supabase Auth to sign in against, any Server
+Component/Action behind `requireCurrentUser()` redirects to `/login`. To
+still drive the actual new UI code (not just build/typecheck it):
+
+1. Add a temporary route *outside* `(app)` (a leading-underscore folder like
+   `_verify` is invisible to Next's router — use a plain name, e.g.
+   `verify-harness-temp`) that renders the client component directly with
+   mock props, bypassing `requireCurrentUser()` entirely.
+2. Temporarily add that path to `PUBLIC_PATHS` in
+   `src/lib/supabase/middleware.ts` so the proxy doesn't redirect it away.
+3. Drive it with Playwright. Note: submitting a form whose Server Action
+   itself calls `requireCurrentUser()` will *still* redirect to `/login`
+   once the action runs (the harness only bypassed the middleware, not the
+   action's own auth check) — that's correct, expected behavior, not a bug.
+   It means the true submit-to-DB path stays unverified until a real
+   Supabase project exists; say so explicitly rather than claiming full
+   coverage.
+4. Revert step 2 and delete the harness route + any verification scripts
+   before considering the change done — `git status` should show none of it.
+
+Radix `Select` renders a hidden native `<select>` alongside the visible
+custom listbox (for form association) — a Playwright `text=` locator will
+match the hidden `<option>` first and hang waiting for it to become
+visible. Click the trigger, then target `[role="option"]:has-text(...)`.
