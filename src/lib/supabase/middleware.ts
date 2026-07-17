@@ -3,7 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { supabaseAnonKey, supabaseUrl } from "./env";
 
-const PUBLIC_PATHS = ["/login"];
+// /auth/confirm e /forgot-password precisam ser acessíveis sem sessão (é
+// justamente o que estabelecem). /set-password fica de fora de propósito:
+// exige a sessão que /auth/confirm acabou de criar via verifyOtp.
+const PUBLIC_PATHS = ["/login", "/auth/confirm", "/forgot-password"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

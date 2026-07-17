@@ -4,21 +4,12 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
-
-// Só aceita caminhos relativos internos (começando com uma única "/"), nunca
-// URLs absolutas ou protocol-relative ("//evil.com") — evita open redirect
-// via ?redirectTo= manipulado num link enviado à vítima.
-const safeRedirectPath = z
-  .string()
-  .optional()
-  .transform((value) =>
-    value && /^\/(?!\/|\\)/.test(value) && !value.includes("://") ? value : undefined
-  );
+import { caminhoRedirectSeguro } from "@/lib/validation/redirect-path";
 
 const loginSchema = z.object({
   email: z.string().trim().email("E-mail inválido"),
   senha: z.string().min(6, "A senha deve ter pelo menos 6 caracteres"),
-  redirectTo: safeRedirectPath,
+  redirectTo: caminhoRedirectSeguro,
 });
 
 export type LoginState = {
