@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { login, type LoginState } from "./actions";
 const ERRO_MENSAGENS: Record<string, string> = {
   conta_desativada: "Sua conta foi desativada. Fale com o administrador do sistema.",
   perfil_nao_encontrado: "Não encontramos um perfil vinculado a este login. Fale com o administrador.",
+  link_invalido: "Este link expirou ou já foi usado. Solicite um novo.",
 };
 
 const initialState: LoginState = {};
@@ -44,6 +46,10 @@ export function LoginForm() {
       <Button type="submit" disabled={isPending} className="mt-2">
         {isPending ? "Entrando..." : "Entrar"}
       </Button>
+
+      <Link href="/forgot-password" className="text-muted-foreground text-center text-sm hover:underline">
+        Esqueci minha senha
+      </Link>
     </form>
   );
 }
