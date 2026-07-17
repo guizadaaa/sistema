@@ -12,6 +12,8 @@ import {
 } from "@/lib/labels";
 
 import { AnexosSecao } from "./anexos-secao";
+import { DesfechoForm } from "./desfecho-form";
+import { StatusAcoes } from "./status-acoes";
 import { Timeline } from "./timeline";
 
 function formatarData(data: string) {
@@ -22,7 +24,15 @@ function formatarMoeda(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function CasoDetalhe({ detalhe }: { detalhe: DetalheCaso }) {
+export function CasoDetalhe({
+  detalhe,
+  podeConduzirFluxo,
+  ehAdmin,
+}: {
+  detalhe: DetalheCaso;
+  podeConduzirFluxo: boolean;
+  ehAdmin: boolean;
+}) {
   const { caso, donoNome, criadoPorNome, historico, anexos, desfechos } = detalhe;
 
   return (
@@ -99,8 +109,15 @@ export function CasoDetalhe({ detalhe }: { detalhe: DetalheCaso }) {
           <CardHeader>
             <CardTitle>Linha do tempo</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-4">
             <Timeline historico={historico} />
+            <StatusAcoes
+              casoId={caso.id}
+              statusAtual={caso.status_atual}
+              elegivelOuvidoria={caso.elegivel_ouvidoria}
+              podeConduzirFluxo={podeConduzirFluxo}
+              ehAdmin={ehAdmin}
+            />
           </CardContent>
         </Card>
       </div>
@@ -143,6 +160,10 @@ export function CasoDetalhe({ detalhe }: { detalhe: DetalheCaso }) {
           )}
         </CardContent>
       </Card>
+
+      {podeConduzirFluxo && (
+        <DesfechoForm casoId={caso.id} tiposAnexosExistentes={anexos.map((a) => a.tipo_documento)} />
+      )}
     </div>
   );
 }

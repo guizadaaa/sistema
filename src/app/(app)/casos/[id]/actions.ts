@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { validarEEnviarAnexos } from "@/lib/casos/anexos";
 import { createClient } from "@/lib/supabase/server";
+import { anexoObrigatorioFaltando, desfechoSchema } from "@/lib/validation/desfecho";
+import { ANEXO_TIPO_LABELS } from "@/lib/labels";
+import type { StatusCaso } from "@/lib/supabase/types";
 
 export type EnviarAnexoState = {
   avisos?: string[];
@@ -50,4 +53,125 @@ export async function gerarUrlAssinadaAnexo(
   }
 
   return { url: data.signedUrl };
+}
+
+/**
+ * A RLS de status_historico é a autoridade real sobre quem pode inserir o
+ * quê (admin, ou gerente com delegação ativa restrito à própria filial, e
+ * Ouvidoria só admin) — este action não reimplementa essa checagem, só
+ * repassa o erro do Postgres de forma legível quando ela rejeitar.
+ */
+export async function avancarStatus(casoId: string, novoStatus: StatusCaso): Promise<{ error?: string }> {
+  await requireCurrentUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("status_historico").insert({ caso_id: casoId, status: novoStatus });
+
+  if (error) {
+    console.error("Erro ao avançar status:", error);
+    return { error: "Não foi possível avançar o status. Verifique se você tem permissão para esta ação." };
+  }
+
+  revalidatePath(`/casos/${casoId}`);
+  return {};
+}
+
+export async function marcarElegivelOuvidoria(casoId: string): Promise<{ error?: string }> {
+  await requireCurrentUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("casos").update({ elegivel_ouvidoria: true }).eq("id", casoId);
+
+  if (error) {
+    console.error("Erro ao marcar elegível a Ouvidoria:", error);
+    return { error: "Não foi possível marcar o caso como elegível a Ouvidoria." };
+  }
+
+  revalidatePath(`/casos/${casoId}`);
+  return {};
+}
+
+export type RegistrarDesfechoState = {
+  error?: string;
+};
+
+/**
+ * A exigência de anexo (seção 3: remarcação com_custo exige atestado de
+ * saúde; reembolso integral por saúde exige atestado ou certidão de óbito)
+ * é revalidada aqui contra o banco, nunca contra o que o client alega ter
+ * carregado — o mesmo princípio de "nunca confiar só no client" que já
+ * aplicamos a CPF e ao tipo/tamanho de arquivo.
+ */
+export async function registrarDesfecho(
+  casoId: string,
+  _prevState: RegistrarDesfechoState,
+  formData: FormData
+): Promise<RegistrarDesfechoState> {
+  await requireCurrentUser();
+
+  const tipo = formData.get("tipo");
+  const raw =
+    tipo === "reembolso"
+      ? {
+          tipo,
+          subtipoReembolso: formData.get("subtipoReembolso") || undefined,
+          origemReembolsoIntegral: formData.get("origemReembolsoIntegral") || undefined,
+          bancoNomeCompleto: formData.get("bancoNomeCompleto") || undefined,
+          bancoAgencia: formData.get("bancoAgencia") || undefined,
+          bancoConta: formData.get("bancoConta") || undefined,
+          bancoCpf: formData.get("bancoCpf") || undefined,
+          valor: formData.get("valor") || undefined,
+        }
+      : tipo === "remarcacao"
+        ? {
+            tipo,
+            subtipoRemarcacao: formData.get("subtipoRemarcacao") || undefined,
+            valorTaxas: formData.get("valorTaxas") || undefined,
+            valorDiferencaTarifaria: formData.get("valorDiferencaTarifaria") || undefined,
+          }
+        : { tipo, valor: formData.get("valor") || undefined };
+
+  const parsed = desfechoSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const dados = parsed.data;
+  const supabase = await createClient();
+
+  const { data: anexosAtuais, error: anexosError } = await supabase
+    .from("anexos")
+    .select("tipo_documento")
+    .eq("caso_id", casoId);
+  if (anexosError) throw anexosError;
+
+  const tiposFaltando = anexoObrigatorioFaltando(dados, (anexosAtuais ?? []).map((a) => a.tipo_documento));
+  if (tiposFaltando) {
+    return {
+      error: `Anexe ${tiposFaltando.map((t) => ANEXO_TIPO_LABELS[t]).join(" ou ")} ao caso antes de registrar este desfecho.`,
+    };
+  }
+
+  const { error } = await supabase.from("desfechos").insert({
+    caso_id: casoId,
+    tipo: dados.tipo,
+    subtipo_reembolso: "subtipoReembolso" in dados ? dados.subtipoReembolso : null,
+    origem_reembolso_integral: "origemReembolsoIntegral" in dados ? (dados.origemReembolsoIntegral ?? null) : null,
+    banco_nome_completo: "bancoNomeCompleto" in dados ? (dados.bancoNomeCompleto ?? null) : null,
+    banco_agencia: "bancoAgencia" in dados ? (dados.bancoAgencia ?? null) : null,
+    banco_conta: "bancoConta" in dados ? (dados.bancoConta ?? null) : null,
+    banco_cpf: "bancoCpf" in dados ? (dados.bancoCpf ?? null) : null,
+    valor: "valor" in dados ? (dados.valor ?? null) : null,
+    subtipo_remarcacao: "subtipoRemarcacao" in dados ? dados.subtipoRemarcacao : null,
+    valor_taxas: "valorTaxas" in dados ? (dados.valorTaxas ?? null) : null,
+    valor_diferenca_tarifaria: "valorDiferencaTarifaria" in dados ? (dados.valorDiferencaTarifaria ?? null) : null,
+  });
+
+  if (error) {
+    console.error("Erro ao registrar desfecho:", error);
+    return { error: "Não foi possível registrar o desfecho. Verifique se você tem permissão para esta ação." };
+  }
+
+  revalidatePath(`/casos/${casoId}`);
+  return {};
 }
