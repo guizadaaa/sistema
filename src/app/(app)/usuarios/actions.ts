@@ -92,6 +92,12 @@ export async function atualizarUsuario(
 
   if (error) {
     console.error("Erro ao atualizar usuário:", error);
+    // reatribuir_casos_ao_desativar_usuario (seção 7) levanta essa exceção
+    // quando a filial não tem exatamente 1 gerente ativo para receber os
+    // casos do vendedor desativado — mensagem já pronta para o usuário final.
+    if (error.message.includes("gerente(s) ativo(s)")) {
+      return { error: error.message };
+    }
     return { error: "Não foi possível atualizar o usuário. Verifique se você tem permissão para esta ação." };
   }
 
