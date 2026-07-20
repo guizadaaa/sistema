@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId, useState, type FormEvent } from "react";
+import { useActionState, useId, useState, type FocusEvent, type FormEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -16,14 +16,17 @@ import {
   ANEXO_MIME_TYPES,
   ANEXO_TAMANHO_MAXIMO_BYTES,
   ANEXO_TIPOS_DOCUMENTO,
+  FILIAIS,
   MOTIVOS_CASO,
   TIPOS_CASO,
 } from "@/lib/validation/caso";
 import type { TipoCaso } from "@/lib/supabase/types";
 
-import { criarCaso, type CriarCasoState } from "./actions";
+import { criarCaso, type CasoFormValores, type CriarCasoState } from "./actions";
 
 const initialState: CriarCasoState = {};
+
+const FILIAIS_VALIDAS: readonly string[] = FILIAIS;
 
 function FieldError({ mensagem }: { mensagem?: string }) {
   if (!mensagem) return null;
@@ -97,6 +100,8 @@ export function CasoForm({ donosElegiveis }: { donosElegiveis: DonoElegivel[] })
   );
 }
 
+type CampoObrigatorio = keyof CasoFormValores;
+
 function CasoFormCampos({
   state,
   formAction,
@@ -111,15 +116,20 @@ function CasoFormCampos({
   const [tipoCaso, setTipoCaso] = useState<TipoCaso | "">(
     (state.valores?.tipoCaso as TipoCaso | undefined) ?? ""
   );
+  const [vendedorDonoId, setVendedorDonoId] = useState(
+    state.valores?.vendedorDono ?? donosElegiveis[0]?.id ?? ""
+  );
   const [cpfMascarado, setCpfMascarado] = useState(formatarCpf(state.valores?.clienteCpf ?? ""));
   const [contratoNumero, setContratoNumero] = useState(
     somenteDigitos(state.valores?.contratoNumero ?? "").slice(0, 14)
   );
-  const [cpfError, setCpfError] = useState<string | undefined>();
-  const [contratoError, setContratoError] = useState<string | undefined>();
+  const [errosLocais, setErrosLocais] = useState<Partial<Record<CampoObrigatorio, string>>>({});
   const [anexoRows, setAnexoRows] = useState<string[]>([]);
   const [anexoErros, setAnexoErros] = useState<Record<string, string | undefined>>({});
   const anexoIdBase = useId();
+
+  const setErroLocal = (campo: CampoObrigatorio, mensagem: string | undefined) =>
+    setErrosLocais((prev) => ({ ...prev, [campo]: mensagem }));
 
   const adicionarAnexoRow = () =>
     setAnexoRows((prev) => [...prev, `${anexoIdBase}-${prev.length}-${Date.now()}`]);
@@ -132,6 +142,50 @@ function CasoFormCampos({
     });
   };
 
+  // Dono sem filial própria (adm/adm_master): a filial do caso é derivada do
+  // prefixo do contrato (ver set_caso_defaults no banco), então o contrato
+  // só é válido se os 4 primeiros dígitos forem um código de filial real.
+  const donoSelecionado = donosElegiveis.find((d) => d.id === vendedorDonoId);
+  const donoSemFilial = donoSelecionado ? donoSelecionado.filial === null : false;
+
+  const validarContrato = (valor: string, semFilial: boolean): string | undefined => {
+    if (valor.length === 0) return undefined;
+    if (valor.length < 14) return "Contrato deve ter exatamente 14 números";
+    if (semFilial && !FILIAIS_VALIDAS.includes(valor.slice(0, 4))) {
+      return "O número de contrato não começa com um código de filial válido (1710, 1714 ou 1730).";
+    }
+    return undefined;
+  };
+
+  const validarCpf = (valorMascarado: string): string | undefined => {
+    const digitos = somenteDigitos(valorMascarado);
+    if (digitos.length === 0) return undefined;
+    if (digitos.length < 11) return "CPF deve ter 11 dígitos";
+    if (!cpfValido(valorMascarado)) return "CPF inválido";
+    return undefined;
+  };
+
+  // Validação por campo assim que o usuário sai dele (blur) — feedback
+  // imediato sem esperar o submit do formulário inteiro. O server action
+  // continua validando de novo (zod + constraints do banco); isto é só UX.
+  const validarObrigatorioAoSair =
+    (campo: CampoObrigatorio, mensagem: string) => (event: FocusEvent<HTMLElement>) => {
+      const valor = (event.target as HTMLInputElement | HTMLTextAreaElement).value;
+      setErroLocal(campo, valor.trim() === "" ? mensagem : undefined);
+    };
+
+  const validarContratoAoSair = () => {
+    setErroLocal(
+      "contratoNumero",
+      contratoNumero.length === 0 ? "Informe o número do contrato" : validarContrato(contratoNumero, donoSemFilial)
+    );
+  };
+
+  const validarCpfAoSair = () => {
+    const digitos = somenteDigitos(cpfMascarado);
+    setErroLocal("clienteCpf", digitos.length === 0 ? "Informe o CPF do cliente" : validarCpf(cpfMascarado));
+  };
+
   // Feedback imediato (CPF, contrato e anexos) sem esperar o round-trip do
   // server action — que continua validando de novo do lado do servidor
   // (nunca confiar só na validação do client num sistema que guarda CPF e
@@ -140,17 +194,18 @@ function CasoFormCampos({
     const cpf = String(new FormData(event.currentTarget).get("clienteCpf") ?? "");
     if (!cpfValido(cpf)) {
       event.preventDefault();
-      setCpfError("CPF inválido");
+      setErroLocal("clienteCpf", "CPF inválido");
       return;
     }
-    setCpfError(undefined);
+    setErroLocal("clienteCpf", undefined);
 
-    if (contratoNumero.length !== 14) {
+    const erroContrato = validarContrato(contratoNumero, donoSemFilial);
+    if (contratoNumero.length !== 14 || erroContrato) {
       event.preventDefault();
-      setContratoError("Contrato deve ter exatamente 14 números");
+      setErroLocal("contratoNumero", erroContrato ?? "Contrato deve ter exatamente 14 números");
       return;
     }
-    setContratoError(undefined);
+    setErroLocal("contratoNumero", undefined);
 
     if (Object.values(anexoErros).some(Boolean)) {
       event.preventDefault();
@@ -168,7 +223,16 @@ function CasoFormCampos({
           <Label htmlFor="vendedorDono">Dono do caso</Label>
           <Select
             name="vendedorDono"
-            defaultValue={state.valores?.vendedorDono ?? donosElegiveis[0]?.id}
+            value={vendedorDonoId}
+            onValueChange={(v) => {
+              setVendedorDonoId(v);
+              const novoDono = donosElegiveis.find((d) => d.id === v);
+              // A troca de dono pode mudar se o contrato precisa ter um
+              // prefixo de filial válido — revalida com o que já foi digitado.
+              if (contratoNumero.length > 0) {
+                setErroLocal("contratoNumero", validarContrato(contratoNumero, novoDono?.filial === null));
+              }
+            }}
             required
           >
             <SelectTrigger id="vendedorDono">
@@ -191,8 +255,19 @@ function CasoFormCampos({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="tipoCaso">Tipo de caso</Label>
-        <Select name="tipoCaso" required value={tipoCaso} onValueChange={(v) => setTipoCaso(v as TipoCaso)}>
-          <SelectTrigger id="tipoCaso">
+        <Select
+          name="tipoCaso"
+          required
+          value={tipoCaso}
+          onValueChange={(v) => {
+            setTipoCaso(v as TipoCaso);
+            setErroLocal("tipoCaso", undefined);
+          }}
+        >
+          <SelectTrigger
+            id="tipoCaso"
+            onBlur={() => setErroLocal("tipoCaso", tipoCaso === "" ? "Selecione o tipo de caso" : undefined)}
+          >
             <SelectValue placeholder="Selecione" />
           </SelectTrigger>
           <SelectContent>
@@ -203,7 +278,7 @@ function CasoFormCampos({
             ))}
           </SelectContent>
         </Select>
-        <FieldError mensagem={state.fieldErrors?.tipoCaso} />
+        <FieldError mensagem={errosLocais.tipoCaso ?? state.fieldErrors?.tipoCaso} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -216,13 +291,15 @@ function CasoFormCampos({
             maxLength={14}
             required
             value={contratoNumero}
-            aria-invalid={Boolean(contratoError || state.fieldErrors?.contratoNumero)}
+            aria-invalid={Boolean(errosLocais.contratoNumero || state.fieldErrors?.contratoNumero)}
             onChange={(e) => {
-              setContratoNumero(somenteDigitos(e.target.value).slice(0, 14));
-              setContratoError(undefined);
+              const novoValor = somenteDigitos(e.target.value).slice(0, 14);
+              setContratoNumero(novoValor);
+              setErroLocal("contratoNumero", validarContrato(novoValor, donoSemFilial));
             }}
+            onBlur={validarContratoAoSair}
           />
-          <FieldError mensagem={contratoError ?? state.fieldErrors?.contratoNumero} />
+          <FieldError mensagem={errosLocais.contratoNumero ?? state.fieldErrors?.contratoNumero} />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="prazoVigencia">Prazo de vigência</Label>
@@ -230,11 +307,13 @@ function CasoFormCampos({
             id="prazoVigencia"
             name="prazoVigencia"
             type="date"
+            max="9999-12-31"
             required
             defaultValue={state.valores?.prazoVigencia}
-            aria-invalid={Boolean(state.fieldErrors?.prazoVigencia)}
+            aria-invalid={Boolean(errosLocais.prazoVigencia || state.fieldErrors?.prazoVigencia)}
+            onBlur={validarObrigatorioAoSair("prazoVigencia", "Informe o prazo de vigência")}
           />
-          <FieldError mensagem={state.fieldErrors?.prazoVigencia} />
+          <FieldError mensagem={errosLocais.prazoVigencia ?? state.fieldErrors?.prazoVigencia} />
         </div>
       </div>
 
@@ -246,9 +325,10 @@ function CasoFormCampos({
             name="clienteNome"
             required
             defaultValue={state.valores?.clienteNome}
-            aria-invalid={Boolean(state.fieldErrors?.clienteNome)}
+            aria-invalid={Boolean(errosLocais.clienteNome || state.fieldErrors?.clienteNome)}
+            onBlur={validarObrigatorioAoSair("clienteNome", "Informe o nome completo do contratante")}
           />
-          <FieldError mensagem={state.fieldErrors?.clienteNome} />
+          <FieldError mensagem={errosLocais.clienteNome ?? state.fieldErrors?.clienteNome} />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="clienteCpf">CPF do cliente</Label>
@@ -259,21 +339,38 @@ function CasoFormCampos({
             maxLength={14}
             required
             value={cpfMascarado}
-            aria-invalid={Boolean(cpfError || state.fieldErrors?.clienteCpf)}
+            aria-invalid={Boolean(errosLocais.clienteCpf || state.fieldErrors?.clienteCpf)}
             onChange={(e) => {
-              setCpfMascarado(formatarCpf(e.target.value));
-              if (cpfError) setCpfError(undefined);
+              const novoValor = formatarCpf(e.target.value);
+              setCpfMascarado(novoValor);
+              setErroLocal("clienteCpf", validarCpf(novoValor));
             }}
+            onBlur={validarCpfAoSair}
           />
-          <FieldError mensagem={cpfError ?? state.fieldErrors?.clienteCpf} />
+          <FieldError mensagem={errosLocais.clienteCpf ?? state.fieldErrors?.clienteCpf} />
         </div>
       </div>
 
       {exigeMotivoDescricao && (
         <div className="flex flex-col gap-2">
           <Label htmlFor="motivo">Motivo</Label>
-          <Select name="motivo" required defaultValue={state.valores?.motivo}>
-            <SelectTrigger id="motivo">
+          <Select
+            name="motivo"
+            required
+            defaultValue={state.valores?.motivo}
+            onValueChange={() => setErroLocal("motivo", undefined)}
+          >
+            <SelectTrigger
+              id="motivo"
+              onBlur={(e) =>
+                setErroLocal(
+                  "motivo",
+                  (e.target as HTMLButtonElement).getAttribute("data-placeholder") !== null
+                    ? "Selecione o motivo"
+                    : undefined
+                )
+              }
+            >
               <SelectValue placeholder="Selecione" />
             </SelectTrigger>
             <SelectContent>
@@ -284,7 +381,7 @@ function CasoFormCampos({
               ))}
             </SelectContent>
           </Select>
-          <FieldError mensagem={state.fieldErrors?.motivo} />
+          <FieldError mensagem={errosLocais.motivo ?? state.fieldErrors?.motivo} />
         </div>
       )}
 
@@ -297,9 +394,10 @@ function CasoFormCampos({
             required
             rows={4}
             defaultValue={state.valores?.descricao}
-            aria-invalid={Boolean(state.fieldErrors?.descricao)}
+            aria-invalid={Boolean(errosLocais.descricao || state.fieldErrors?.descricao)}
+            onBlur={validarObrigatorioAoSair("descricao", "Descrição obrigatória")}
           />
-          <FieldError mensagem={state.fieldErrors?.descricao} />
+          <FieldError mensagem={errosLocais.descricao ?? state.fieldErrors?.descricao} />
         </div>
       )}
 
@@ -315,9 +413,10 @@ function CasoFormCampos({
               step={1}
               required
               defaultValue={state.valores?.parcelasEmAberto}
-              aria-invalid={Boolean(state.fieldErrors?.parcelasEmAberto)}
+              aria-invalid={Boolean(errosLocais.parcelasEmAberto || state.fieldErrors?.parcelasEmAberto)}
+              onBlur={validarObrigatorioAoSair("parcelasEmAberto", "Informe as parcelas em aberto")}
             />
-            <FieldError mensagem={state.fieldErrors?.parcelasEmAberto} />
+            <FieldError mensagem={errosLocais.parcelasEmAberto ?? state.fieldErrors?.parcelasEmAberto} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="dataCancelamento">Data de cancelamento</Label>
@@ -325,11 +424,13 @@ function CasoFormCampos({
               id="dataCancelamento"
               name="dataCancelamento"
               type="date"
+              max="9999-12-31"
               required
               defaultValue={state.valores?.dataCancelamento}
-              aria-invalid={Boolean(state.fieldErrors?.dataCancelamento)}
+              aria-invalid={Boolean(errosLocais.dataCancelamento || state.fieldErrors?.dataCancelamento)}
+              onBlur={validarObrigatorioAoSair("dataCancelamento", "Informe a data de cancelamento")}
             />
-            <FieldError mensagem={state.fieldErrors?.dataCancelamento} />
+            <FieldError mensagem={errosLocais.dataCancelamento ?? state.fieldErrors?.dataCancelamento} />
           </div>
         </div>
       )}
