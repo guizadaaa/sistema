@@ -6,6 +6,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { validarEEnviarAnexos } from "@/lib/casos/anexos";
 import { createClient } from "@/lib/supabase/server";
 import { anexoObrigatorioFaltando, desfechoSchema } from "@/lib/validation/desfecho";
+import { implicacaoSchema } from "@/lib/validation/implicacao";
 import { ANEXO_TIPO_LABELS } from "@/lib/labels";
 import type { StatusCaso } from "@/lib/supabase/types";
 
@@ -170,6 +171,77 @@ export async function registrarDesfecho(
   if (error) {
     console.error("Erro ao registrar desfecho:", error);
     return { error: "Não foi possível registrar o desfecho. Verifique se você tem permissão para esta ação." };
+  }
+
+  revalidatePath(`/casos/${casoId}`);
+  return {};
+}
+
+export type RegistrarImplicacaoState = {
+  error?: string;
+};
+
+/**
+ * Upsert por caso_id (unique em implicacoes — um registro por caso): a
+ * mesma condição vale tanto pro INSERT (primeiro lançamento) quanto pro
+ * UPDATE (correção posterior — implicacoes_insert e implicacoes_update têm
+ * a mesma regra de RLS: admin, ou gerente com delegação ativa na própria
+ * filial). Reduções (markup/comissão/cortesia) só existem quando
+ * quem_paga = vendedor — a constraint implicacoes_reducoes_apenas_vendedor
+ * já impede o resto no banco, aqui só evitamos oferecer os campos.
+ */
+export async function registrarImplicacao(
+  casoId: string,
+  _prevState: RegistrarImplicacaoState,
+  formData: FormData
+): Promise<RegistrarImplicacaoState> {
+  await requireCurrentUser();
+
+  const quemPaga = formData.get("quemPaga");
+  const raw =
+    quemPaga === "vendedor"
+      ? {
+          quemPaga,
+          multaContratualValor: formData.get("multaContratualValor"),
+          multaFornecedorValor: formData.get("multaFornecedorValor"),
+          reducaoMarkup: formData.get("reducaoMarkup") === "on",
+          reducaoComissao: formData.get("reducaoComissao") === "on",
+          reducaoComissaoValor: formData.get("reducaoComissaoValor") || undefined,
+          utilizacaoCortesia: formData.get("utilizacaoCortesia") === "on",
+          utilizacaoCortesiaValor: formData.get("utilizacaoCortesiaValor") || undefined,
+        }
+      : {
+          quemPaga,
+          multaContratualValor: formData.get("multaContratualValor"),
+          multaFornecedorValor: formData.get("multaFornecedorValor"),
+        };
+
+  const parsed = implicacaoSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const dados = parsed.data;
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("implicacoes").upsert(
+    {
+      caso_id: casoId,
+      multa_contratual_valor: dados.multaContratualValor,
+      multa_fornecedor_valor: dados.multaFornecedorValor,
+      quem_paga: dados.quemPaga,
+      reducao_markup: "reducaoMarkup" in dados ? dados.reducaoMarkup : false,
+      reducao_comissao: "reducaoComissao" in dados ? dados.reducaoComissao : false,
+      reducao_comissao_valor: "reducaoComissaoValor" in dados ? (dados.reducaoComissaoValor ?? null) : null,
+      utilizacao_cortesia: "utilizacaoCortesia" in dados ? dados.utilizacaoCortesia : false,
+      utilizacao_cortesia_valor: "utilizacaoCortesiaValor" in dados ? (dados.utilizacaoCortesiaValor ?? null) : null,
+    },
+    { onConflict: "caso_id" }
+  );
+
+  if (error) {
+    console.error("Erro ao registrar implicações:", error);
+    return { error: "Não foi possível registrar as implicações. Verifique se você tem permissão para esta ação." };
   }
 
   revalidatePath(`/casos/${casoId}`);
