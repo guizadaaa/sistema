@@ -5,14 +5,50 @@ import { createClient } from "@/lib/supabase/server";
 import { validarEEnviarAnexos } from "@/lib/casos/anexos";
 import { casoSchema } from "@/lib/validation/caso";
 
+export type CasoFormValores = {
+  tipoCaso?: string;
+  vendedorDono?: string;
+  contratoNumero?: string;
+  clienteNome?: string;
+  clienteCpf?: string;
+  prazoVigencia?: string;
+  motivo?: string;
+  descricao?: string;
+  parcelasEmAberto?: string;
+  dataCancelamento?: string;
+};
+
 export type CriarCasoState = {
   error?: string;
+  fieldErrors?: Partial<Record<keyof CasoFormValores, string>>;
+  valores?: CasoFormValores;
   sucesso?: { id: string; protocolo: number; avisosAnexos?: string[] };
 };
+
+/** Para reidratar o formulário após um erro — nunca undefined, mesmo vazio. */
+function comoTexto(valor: FormDataEntryValue | null): string {
+  return typeof valor === "string" ? valor : "";
+}
 
 export async function criarCaso(_prevState: CriarCasoState, formData: FormData): Promise<CriarCasoState> {
   const usuario = await requireCurrentUser();
 
+  const valoresSubmetidos: CasoFormValores = {
+    tipoCaso: comoTexto(formData.get("tipoCaso")),
+    vendedorDono: comoTexto(formData.get("vendedorDono")),
+    contratoNumero: comoTexto(formData.get("contratoNumero")),
+    clienteNome: comoTexto(formData.get("clienteNome")),
+    clienteCpf: comoTexto(formData.get("clienteCpf")),
+    prazoVigencia: comoTexto(formData.get("prazoVigencia")),
+    motivo: comoTexto(formData.get("motivo")),
+    descricao: comoTexto(formData.get("descricao")),
+    parcelasEmAberto: comoTexto(formData.get("parcelasEmAberto")),
+    dataCancelamento: comoTexto(formData.get("dataCancelamento")),
+  };
+
+  // Campos obrigatórios vão para o zod como string (mesmo vazia — a própria
+  // mensagem de "obrigatório" do schema cobre isso); os exclusivos de cada
+  // tipo de caso são omitidos quando ausentes, exatamente como antes.
   const raw = {
     tipoCaso: formData.get("tipoCaso"),
     vendedorDono: formData.get("vendedorDono"),
@@ -28,7 +64,18 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
 
   const parsed = casoSchema.safeParse(raw);
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+    const fieldErrors: CriarCasoState["fieldErrors"] = {};
+    for (const issue of parsed.error.issues) {
+      const campo = issue.path[0];
+      if (typeof campo === "string" && !(campo in fieldErrors)) {
+        fieldErrors[campo as keyof CasoFormValores] = issue.message;
+      }
+    }
+    return {
+      error: parsed.error.issues[0]?.message ?? "Dados inválidos",
+      fieldErrors,
+      valores: valoresSubmetidos,
+    };
   }
 
   const dados = parsed.data;
@@ -54,10 +101,20 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     .single();
 
   if (error) {
-    // RLS/CHECK constraints devolvem mensagens técnicas do Postgres; não
-    // expor isso direto ao usuário final, só logar para diagnóstico.
     console.error("Erro ao criar caso:", error);
-    return { error: "Não foi possível criar o caso. Verifique os dados e tente novamente." };
+
+    // P0001 = "raise exception" no próprio Postgres (ex: trigger de
+    // transferência de casos) — mensagem já escrita para humanos em
+    // português, segura para mostrar direto. Qualquer outro código (RLS,
+    // constraint técnica etc.) continua com a mensagem genérica, para não
+    // vazar texto técnico do Postgres ao usuário final.
+    return {
+      error:
+        error.code === "P0001"
+          ? error.message
+          : "Não foi possível criar o caso. Verifique os dados e tente novamente.",
+      valores: valoresSubmetidos,
+    };
   }
 
   const avisosAnexos = await validarEEnviarAnexos(supabase, data.id, formData);

@@ -14,8 +14,11 @@ export const MOTIVOS_CASO: readonly MotivoCaso[] = ["pedido_cliente", "erro_vend
 
 const camposComuns = {
   vendedorDono: z.string().uuid("Selecione o dono do caso"),
-  contratoNumero: z.string().trim().min(1, "Informe o número do contrato"),
-  clienteNome: z.string().trim().min(1, "Informe o nome do cliente"),
+  contratoNumero: z
+    .string()
+    .transform(somenteDigitos)
+    .refine((v) => v.length === 14, "Contrato deve ter exatamente 14 números"),
+  clienteNome: z.string().trim().min(1, "Informe o nome completo do contratante"),
   clienteCpf: z
     .string()
     .transform(somenteDigitos)
