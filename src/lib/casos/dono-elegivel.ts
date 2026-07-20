@@ -2,10 +2,12 @@ import "server-only";
 
 import type { CurrentUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
+import type { FilialCvc } from "@/lib/supabase/types";
 
 export type DonoElegivel = {
   id: string;
   nome_completo: string;
+  filial: FilialCvc | null;
 };
 
 /**
@@ -17,7 +19,7 @@ export type DonoElegivel = {
  */
 export async function listarDonosElegiveis(usuario: CurrentUser): Promise<DonoElegivel[]> {
   if (usuario.perfil === "vendedor") {
-    return [{ id: usuario.id, nome_completo: usuario.nome_completo }];
+    return [{ id: usuario.id, nome_completo: usuario.nome_completo, filial: usuario.filial }];
   }
 
   const supabase = await createClient();
@@ -32,7 +34,7 @@ export async function listarDonosElegiveis(usuario: CurrentUser): Promise<DonoEl
 
     const { data, error } = await supabase
       .from("usuarios")
-      .select("id, nome_completo")
+      .select("id, nome_completo, filial")
       .eq("filial", usuario.filial)
       .eq("perfil", "vendedor")
       .eq("ativo", true)
@@ -44,13 +46,13 @@ export async function listarDonosElegiveis(usuario: CurrentUser): Promise<DonoEl
     const jaIncluiSelf = vendedores.some((v) => v.id === usuario.id);
     return jaIncluiSelf
       ? vendedores
-      : [{ id: usuario.id, nome_completo: usuario.nome_completo }, ...vendedores];
+      : [{ id: usuario.id, nome_completo: usuario.nome_completo, filial: usuario.filial }, ...vendedores];
   }
 
   // adm / adm_master: qualquer pessoa ativa, qualquer filial.
   const { data, error } = await supabase
     .from("usuarios")
-    .select("id, nome_completo")
+    .select("id, nome_completo, filial")
     .eq("ativo", true)
     .order("nome_completo");
 
@@ -58,5 +60,7 @@ export async function listarDonosElegiveis(usuario: CurrentUser): Promise<DonoEl
 
   const todos = data ?? [];
   const jaIncluiSelf = todos.some((u) => u.id === usuario.id);
-  return jaIncluiSelf ? todos : [{ id: usuario.id, nome_completo: usuario.nome_completo }, ...todos];
+  return jaIncluiSelf
+    ? todos
+    : [{ id: usuario.id, nome_completo: usuario.nome_completo, filial: usuario.filial }, ...todos];
 }

@@ -34,40 +34,62 @@ function comoTexto(valor: FormDataEntryValue | null): string {
 
 const MENSAGEM_GENERICA = "Não foi possível criar o caso. Verifique os dados e tente novamente.";
 
+type ErroAnalisado = {
+  error: string;
+  fieldErrors?: CriarCasoState["fieldErrors"];
+};
+
 /**
  * Traduz os erros de banco mais comuns nesse insert para uma mensagem clara
- * em português, em vez do JSON técnico do Postgres. Cobre só os casos
- * conhecidos deste schema; qualquer coisa fora daqui cai na mensagem
- * genérica, para nunca vazar detalhe técnico não mapeado ao usuário final.
+ * em português, em vez do JSON técnico do Postgres (nunca expondo detalhe
+ * interno como o uuid do dono). Cobre só os casos conhecidos deste schema;
+ * qualquer coisa fora daqui cai na mensagem genérica, para nunca vazar
+ * detalhe técnico não mapeado ao usuário final.
  */
-function mensagemErroCaso(error: PostgrestError): string {
-  // P0001 = "raise exception" de um trigger nosso (ex.: transferência de
-  // casos) — mensagem já escrita para humanos em português, segura para
-  // mostrar direto.
-  if (error.code === "P0001") return error.message;
+function analisarErroCaso(error: PostgrestError): ErroAnalisado {
+  // P0001 = "raise exception" de um trigger nosso.
+  if (error.code === "P0001") {
+    // set_caso_defaults: dono sem filial própria (adm/adm_master) e o
+    // contrato não começa com um código de filial válido — a mensagem
+    // crua do trigger inclui o uuid do dono, técnico demais para o usuário
+    // final; aqui vira uma mensagem direta, presa ao campo Contrato.
+    if (error.message.includes("não tem filial definida")) {
+      const mensagem = "O número de contrato não começa com um código de filial válido (1710, 1714 ou 1730).";
+      return { error: mensagem, fieldErrors: { contratoNumero: mensagem } };
+    }
+    // Outras exceções (ex.: transferência de casos) já vêm escritas para
+    // humanos em português, seguras para mostrar direto.
+    return { error: error.message };
+  }
 
   // 23502 = not_null_violation. O único caso esperado aqui é "filial", que a
   // trigger set_caso_defaults deriva do dono escolhido — só fica nula quando
-  // o dono é um adm/adm_master (que não tem filial própria), cenário ainda
-  // não suportado para criação de caso.
+  // o dono é um adm/adm_master (que não tem filial própria) e o contrato
+  // também não permite derivar uma. Na prática deveria sempre cair no
+  // P0001 acima; este é só um fallback caso a trigger mude no futuro.
   if (error.code === "23502" && error.message.includes('"filial"')) {
-    return "Não é possível registrar o caso: o dono selecionado não tem filial definida. Escolha um vendedor ou gerente como dono do caso.";
+    return {
+      error: "Não é possível registrar o caso: não foi possível determinar a filial. Verifique o dono do caso e o número do contrato.",
+    };
   }
 
   // 23514 = check_violation — cada constraint aqui já é validada em
   // dobro no client/zod antes do insert, então só chega aqui em caso de bug
   // ou uso direto da API; ainda assim vale traduzir as conhecidas.
   if (error.code === "23514") {
-    if (error.message.includes("casos_cpf_formato")) return "CPF do cliente em formato inválido.";
+    if (error.message.includes("casos_cpf_formato")) {
+      return { error: "CPF do cliente em formato inválido.", fieldErrors: { clienteCpf: "CPF inválido." } };
+    }
     if (error.message.includes("casos_contrato_numero_formato")) {
-      return "Contrato deve ter exatamente 14 números.";
+      const mensagem = "Contrato deve ter exatamente 14 números.";
+      return { error: mensagem, fieldErrors: { contratoNumero: mensagem } };
     }
     if (error.message.includes("casos_campos_por_tipo")) {
-      return "Os dados informados não correspondem ao tipo de caso selecionado.";
+      return { error: "Os dados informados não correspondem ao tipo de caso selecionado." };
     }
   }
 
-  return MENSAGEM_GENERICA;
+  return { error: MENSAGEM_GENERICA };
 }
 
 export async function criarCaso(_prevState: CriarCasoState, formData: FormData): Promise<CriarCasoState> {
@@ -142,7 +164,8 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
 
   if (error) {
     console.error("Erro ao criar caso:", error);
-    return { error: mensagemErroCaso(error), valores: valoresSubmetidos };
+    const analisado = analisarErroCaso(error);
+    return { error: analisado.error, fieldErrors: analisado.fieldErrors, valores: valoresSubmetidos };
   }
 
   const avisosAnexos = await validarEEnviarAnexos(supabase, data.id, formData);
