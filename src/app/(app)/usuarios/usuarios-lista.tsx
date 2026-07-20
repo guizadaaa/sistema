@@ -5,6 +5,7 @@ import { useActionState, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,12 +14,65 @@ import type { UsuarioListado } from "@/lib/usuarios/listar";
 import { FILIAIS_USUARIO, PERFIS_USUARIO } from "@/lib/validation/usuario";
 import type { FilialCvc, PerfilUsuario } from "@/lib/supabase/types";
 
-import { atualizarUsuario, convidarUsuario, type ConvidarUsuarioState } from "./actions";
+import { atualizarUsuario, convidarUsuario, gerarLinkAcesso, type ConvidarUsuarioState } from "./actions";
 
 const initialConvidarState: ConvidarUsuarioState = {};
 
 function exigeFilial(perfil: PerfilUsuario) {
   return perfil === "vendedor" || perfil === "gerente";
+}
+
+function GerarLinkBotao({ usuarioId }: { usuarioId: string }) {
+  const [link, setLink] = useState<string | undefined>();
+  const [erro, setErro] = useState<string | undefined>();
+  const [copiado, setCopiado] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const gerar = () => {
+    setErro(undefined);
+    setCopiado(false);
+    startTransition(async () => {
+      const resultado = await gerarLinkAcesso(usuarioId);
+      if (resultado.error) {
+        setErro(resultado.error);
+      } else {
+        setLink(resultado.link);
+      }
+    });
+  };
+
+  const copiar = async () => {
+    if (!link) return;
+    await navigator.clipboard.writeText(link);
+    setCopiado(true);
+  };
+
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={gerar} disabled={isPending}>
+        {isPending ? "Gerando..." : "Gerar link de acesso"}
+      </Button>
+      {erro && <p className="text-destructive text-sm">{erro}</p>}
+
+      <Dialog open={link !== undefined} onOpenChange={(open) => !open && setLink(undefined)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link de acesso gerado</DialogTitle>
+            <DialogDescription>
+              Envie por WhatsApp ou outro canal — a pessoa cai direto na tela de definir senha. Validade
+              limitada; se expirar, gere um novo aqui.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <Input readOnly value={link ?? ""} onFocus={(e) => e.currentTarget.select()} />
+            <Button onClick={copiar} className="w-fit">
+              {copiado ? "Copiado!" : "Copiar link"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
 function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEditar: boolean }) {
@@ -43,9 +97,12 @@ function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEdit
         </td>
         {podeEditar && (
           <td className="py-2 pr-4">
-            <Button size="sm" variant="outline" onClick={() => setEditando(true)}>
-              Editar
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => setEditando(true)}>
+                Editar
+              </Button>
+              <GerarLinkBotao usuarioId={usuario.id} />
+            </div>
           </td>
         )}
       </tr>
