@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -103,4 +104,60 @@ export async function atualizarUsuario(
 
   revalidatePath("/usuarios");
   return {};
+}
+
+export type GerarLinkAcessoState = {
+  link?: string;
+  error?: string;
+};
+
+/**
+ * Alternativa ao convite por e-mail: gera o mesmo link que /auth/confirm já
+ * sabe processar (verifyOtp com token_hash+type — ver rota), mas devolve o
+ * link pronto em vez de tentar enviar e-mail, para o adm_master copiar e
+ * mandar por WhatsApp ou qualquer outro canal quando o envio automático não
+ * for viável (SMTP bloqueado, domínio corporativo filtrando, etc.).
+ *
+ * Sempre usa type=recovery: nesta tela o usuário-alvo já existe em
+ * auth.users (é assim que ele aparece na lista, via o trigger
+ * on_auth_user_created) — recovery funciona igual para quem nunca definiu
+ * senha e para quem só esqueceu, sem a rejeição "email_exists" que o
+ * endpoint de convite dá para quem já foi criado.
+ */
+export async function gerarLinkAcesso(usuarioId: string): Promise<GerarLinkAcessoState> {
+  const usuario = await requireCurrentUser();
+  if (usuario.perfil !== "adm_master") {
+    return { error: "Apenas o adm_master pode gerar links de acesso." };
+  }
+
+  const supabase = await createClient();
+  const { data: alvo, error: alvoError } = await supabase
+    .from("usuarios")
+    .select("email")
+    .eq("id", usuarioId)
+    .single();
+
+  if (alvoError || !alvo) {
+    return { error: "Usuário não encontrado." };
+  }
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "recovery",
+    email: alvo.email,
+  });
+
+  if (error || !data?.properties?.hashed_token) {
+    console.error("Erro ao gerar link de acesso:", error);
+    return { error: "Não foi possível gerar o link de acesso." };
+  }
+
+  const headersList = await headers();
+  const host = headersList.get("x-forwarded-host") ?? headersList.get("host");
+  const protocol = headersList.get("x-forwarded-proto") ?? "https";
+  const origem = `${protocol}://${host}`;
+
+  const link = `${origem}/auth/confirm?token_hash=${data.properties.hashed_token}&type=recovery&next=/set-password`;
+
+  return { link };
 }
