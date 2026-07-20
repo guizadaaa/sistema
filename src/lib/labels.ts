@@ -1,4 +1,5 @@
 import type {
+  AcaoAuditoria,
   FilialCvc,
   MotivoCaso,
   PerfilUsuario,
@@ -73,4 +74,21 @@ export const SUBTIPO_REMARCACAO_LABELS: Record<SubtipoRemarcacao, string> = {
 export const QUEM_PAGA_LABELS: Record<QuemPagaMulta, string> = {
   cliente: "Cliente",
   vendedor: "Vendedor",
+};
+
+export const ACAO_AUDITORIA_LABELS: Record<AcaoAuditoria, string> = {
+  insert: "Criação",
+  update: "Alteração",
+  delete: "Exclusão",
+  download_signed_url: "Download de anexo",
+};
+
+// Nomes das tabelas que os triggers de auditoria realmente gravam (ver
+// log_auditoria em 20260717000001_auditoria.sql) — tg_table_name entrega o
+// nome cru da tabela, aqui só a versão amigável pra exibição.
+export const TABELA_AUDITORIA_LABELS: Record<string, string> = {
+  usuarios: "Usuários",
+  implicacoes: "Implicações financeiras",
+  desfechos: "Desfechos",
+  anexos: "Anexos",
 };

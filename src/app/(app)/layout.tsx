@@ -34,6 +34,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Delegações
               </Link>
             )}
+            {usuario.perfil === "adm_master" && (
+              <Link href="/auditoria" className="hover:underline">
+                Auditoria
+              </Link>
+            )}
           </nav>
         </div>
         <form action={logout}>
