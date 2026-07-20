@@ -3,6 +3,16 @@ export function somenteDigitos(valor: string): string {
   return valor.replace(/\D/g, "");
 }
 
+/** Formata progressivamente enquanto o usuário digita: 000.000.000-00. */
+export function formatarCpf(valor: string): string {
+  const digitos = somenteDigitos(valor).slice(0, 11);
+  let formatado = digitos.slice(0, 3);
+  if (digitos.length > 3) formatado += "." + digitos.slice(3, 6);
+  if (digitos.length > 6) formatado += "." + digitos.slice(6, 9);
+  if (digitos.length > 9) formatado += "-" + digitos.slice(9, 11);
+  return formatado;
+}
+
 /**
  * Validação do dígito verificador do CPF (algoritmo padrão da Receita
  * Federal). O banco só exige o formato (11 dígitos — ver constraint
