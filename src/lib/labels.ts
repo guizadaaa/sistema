@@ -2,6 +2,7 @@ import type {
   AcaoAuditoria,
   FilialCvc,
   MotivoCaso,
+  OrigemRemarcacaoComCusto,
   PerfilUsuario,
   QuemPagaMulta,
   StatusCaso,
@@ -68,7 +69,16 @@ export const SUBTIPO_REEMBOLSO_LABELS: Record<SubtipoReembolso, string> = {
 
 export const SUBTIPO_REMARCACAO_LABELS: Record<SubtipoRemarcacao, string> = {
   sem_custo: "Sem custo (fornecedor)",
-  com_custo: "Com custo (saúde)",
+  com_custo: "Com custo (voluntário)",
+};
+
+// Só se aplica a subtipo_remarcacao = 'com_custo' — mesmo papel de
+// origem_reembolso_integral (fornecedor/saúde): motivo = 'saude' é o único
+// que aciona a exigência automática de atestado_saude (ver
+// anexoObrigatorioFaltando em validation/desfecho.ts).
+export const ORIGEM_REMARCACAO_COM_CUSTO_LABELS: Record<OrigemRemarcacaoComCusto, string> = {
+  saude: "Saúde",
+  outro: "Outro motivo",
 };
 
 export const QUEM_PAGA_LABELS: Record<QuemPagaMulta, string> = {
