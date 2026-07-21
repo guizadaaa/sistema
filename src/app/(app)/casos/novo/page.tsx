@@ -7,5 +7,5 @@ export default async function NovoCasoPage() {
   const usuario = await requireCurrentUser();
   const donosElegiveis = await listarDonosElegiveis(usuario);
 
-  return <CasoForm donosElegiveis={donosElegiveis} />;
+  return <CasoForm donosElegiveis={donosElegiveis} perfilUsuario={usuario.perfil} />;
 }

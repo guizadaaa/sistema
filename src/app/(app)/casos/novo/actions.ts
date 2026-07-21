@@ -5,7 +5,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { validarEEnviarAnexos } from "@/lib/casos/anexos";
-import { casoSchema } from "@/lib/validation/caso";
+import { casoSchema, tiposCasoPermitidos } from "@/lib/validation/caso";
 
 export type CasoFormValores = {
   tipoCaso?: string;
@@ -141,6 +141,15 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
   }
 
   const dados = parsed.data;
+
+  // Defesa em profundidade: a UI já esconde "Cancelamento" para vendedor e a
+  // policy casos_insert (RLS) bloqueia o insert no banco de qualquer forma —
+  // esta checagem só evita um round-trip desnecessário e devolve o erro
+  // preso ao campo, como as demais validações deste action.
+  if (!tiposCasoPermitidos(usuario.perfil).includes(dados.tipoCaso)) {
+    const mensagem = "Você não tem permissão para criar um caso deste tipo.";
+    return { error: mensagem, fieldErrors: { tipoCaso: mensagem }, valores: valoresSubmetidos };
+  }
 
   const supabase = await createClient();
 

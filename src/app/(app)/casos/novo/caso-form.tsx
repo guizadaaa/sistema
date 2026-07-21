@@ -18,9 +18,9 @@ import {
   ANEXO_TIPOS_DOCUMENTO,
   FILIAIS,
   MOTIVOS_CASO,
-  TIPOS_CASO,
+  tiposCasoPermitidos,
 } from "@/lib/validation/caso";
-import type { TipoCaso } from "@/lib/supabase/types";
+import type { PerfilUsuario, TipoCaso } from "@/lib/supabase/types";
 
 import { criarCaso, type CasoFormValores, type CriarCasoState } from "./actions";
 
@@ -43,7 +43,13 @@ function validarArquivoAnexo(arquivo: File): string | undefined {
   return undefined;
 }
 
-export function CasoForm({ donosElegiveis }: { donosElegiveis: DonoElegivel[] }) {
+export function CasoForm({
+  donosElegiveis,
+  perfilUsuario,
+}: {
+  donosElegiveis: DonoElegivel[];
+  perfilUsuario: PerfilUsuario;
+}) {
   const [state, formAction, isPending] = useActionState(criarCaso, initialState);
 
   if (state.sucesso) {
@@ -94,6 +100,7 @@ export function CasoForm({ donosElegiveis }: { donosElegiveis: DonoElegivel[] })
           formAction={formAction}
           isPending={isPending}
           donosElegiveis={donosElegiveis}
+          perfilUsuario={perfilUsuario}
         />
       </CardContent>
     </Card>
@@ -107,14 +114,22 @@ function CasoFormCampos({
   formAction,
   isPending,
   donosElegiveis,
+  perfilUsuario,
 }: {
   state: CriarCasoState;
   formAction: (formData: FormData) => void;
   isPending: boolean;
   donosElegiveis: DonoElegivel[];
+  perfilUsuario: PerfilUsuario;
 }) {
+  const tiposDisponiveis = tiposCasoPermitidos(perfilUsuario);
+
+  // Se o valor reidratado (ex.: após um erro do server action) não estiver
+  // mais entre os tipos permitidos para este perfil, não pré-seleciona nada
+  // — evita reexibir "Cancelamento" selecionado para quem não pode escolhê-lo.
+  const tipoCasoInicial = state.valores?.tipoCaso as TipoCaso | undefined;
   const [tipoCaso, setTipoCaso] = useState<TipoCaso | "">(
-    (state.valores?.tipoCaso as TipoCaso | undefined) ?? ""
+    tipoCasoInicial && (tiposDisponiveis as readonly TipoCaso[]).includes(tipoCasoInicial) ? tipoCasoInicial : ""
   );
   const [vendedorDonoId, setVendedorDonoId] = useState(
     state.valores?.vendedorDono ?? donosElegiveis[0]?.id ?? ""
@@ -271,7 +286,7 @@ function CasoFormCampos({
             <SelectValue placeholder="Selecione" />
           </SelectTrigger>
           <SelectContent>
-            {TIPOS_CASO.map((t) => (
+            {tiposDisponiveis.map((t) => (
               <SelectItem key={t} value={t}>
                 {TIPO_CASO_LABELS[t]}
               </SelectItem>
