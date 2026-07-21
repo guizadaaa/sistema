@@ -165,7 +165,6 @@ function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEdit
                 Editar
               </Button>
               <GerarLinkBotao usuarioId={usuario.id} />
-              {usuario.ativo && <ExcluirUsuarioBotao usuario={usuario} />}
             </div>
           </td>
         )}
@@ -249,7 +248,7 @@ function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEdit
       </td>
       <td className="py-2 pr-4">
         <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={salvar} disabled={isPending}>
               {isPending ? "Salvando..." : "Salvar"}
             </Button>
@@ -269,6 +268,7 @@ function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEdit
             >
               Cancelar
             </Button>
+            {usuario.ativo && <ExcluirUsuarioBotao usuario={usuario} />}
           </div>
           {erro && <p className="text-destructive text-sm">{erro}</p>}
         </div>
@@ -303,7 +303,7 @@ export function UsuariosLista({
             <form action={formAction} className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="nomeCompleto">Nome completo</Label>
+                  <Label htmlFor="nomeCompleto">Nome</Label>
                   <Input id="nomeCompleto" name="nomeCompleto" required />
                 </div>
                 <div className="flex flex-col gap-2">
