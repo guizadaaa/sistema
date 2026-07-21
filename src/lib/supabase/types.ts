@@ -248,6 +248,8 @@ export interface Database {
           fim?: string | null;
         };
         Update: Partial<{
+          gerente_id: string;
+          inicio: string;
           fim: string | null;
           ativa: boolean;
         }>;
