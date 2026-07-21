@@ -1,12 +1,19 @@
 import { z } from "zod";
 
+import { moedaParaNumero } from "./moeda";
 import type { QuemPagaMulta } from "@/lib/supabase/types";
 
 export const QUEM_PAGA_OPCOES: readonly QuemPagaMulta[] = ["cliente", "vendedor"];
 
 const camposComuns = {
-  multaContratualValor: z.coerce.number().min(0, "Deve ser zero ou maior"),
-  multaFornecedorValor: z.coerce.number().min(0, "Deve ser zero ou maior"),
+  multaContratualValor: z
+    .string()
+    .transform(moedaParaNumero)
+    .refine((v) => v >= 0, "Deve ser zero ou maior"),
+  multaFornecedorValor: z
+    .string()
+    .transform(moedaParaNumero)
+    .refine((v) => v >= 0, "Deve ser zero ou maior"),
 };
 
 // Espelha a constraint implicacoes_reducoes_apenas_vendedor (schema.sql):
@@ -25,9 +32,17 @@ const quemPagaVendedorSchema = z
     quemPaga: z.literal("vendedor"),
     reducaoMarkup: z.boolean(),
     reducaoComissao: z.boolean(),
-    reducaoComissaoValor: z.coerce.number().positive("Informe o valor da redução de comissão").optional(),
+    reducaoComissaoValor: z
+      .string()
+      .optional()
+      .transform((v) => (v ? moedaParaNumero(v) : undefined))
+      .refine((v) => v === undefined || v > 0, "Informe o valor da redução de comissão"),
     utilizacaoCortesia: z.boolean(),
-    utilizacaoCortesiaValor: z.coerce.number().positive("Informe o valor da cortesia utilizada").optional(),
+    utilizacaoCortesiaValor: z
+      .string()
+      .optional()
+      .transform((v) => (v ? moedaParaNumero(v) : undefined))
+      .refine((v) => v === undefined || v > 0, "Informe o valor da cortesia utilizada"),
   })
   .superRefine((data, ctx) => {
     if (data.reducaoComissao && data.reducaoComissaoValor === undefined) {

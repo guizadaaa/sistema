@@ -3,9 +3,9 @@
 import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { CampoMoeda } from "@/components/ui/campo-moeda";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QUEM_PAGA_LABELS } from "@/lib/labels";
@@ -42,24 +42,18 @@ export function ImplicacaoForm({
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="multaContratualValor">Multa contratual</Label>
-              <Input
+              <CampoMoeda
                 id="multaContratualValor"
                 name="multaContratualValor"
-                type="number"
-                step="0.01"
-                min="0"
                 required
                 defaultValue={implicacaoExistente?.multa_contratual_valor ?? 0}
               />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="multaFornecedorValor">Multa do fornecedor</Label>
-              <Input
+              <CampoMoeda
                 id="multaFornecedorValor"
                 name="multaFornecedorValor"
-                type="number"
-                step="0.01"
-                min="0"
                 required
                 defaultValue={implicacaoExistente?.multa_fornecedor_valor ?? 0}
               />
@@ -109,12 +103,9 @@ export function ImplicacaoForm({
               {reducaoComissao && (
                 <div className="flex flex-col gap-2 pl-6">
                   <Label htmlFor="reducaoComissaoValor">Valor da redução de comissão</Label>
-                  <Input
+                  <CampoMoeda
                     id="reducaoComissaoValor"
                     name="reducaoComissaoValor"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
                     required
                     className="w-48"
                     defaultValue={implicacaoExistente?.reducao_comissao_valor ?? undefined}
@@ -136,12 +127,9 @@ export function ImplicacaoForm({
               {utilizacaoCortesia && (
                 <div className="flex flex-col gap-2 pl-6">
                   <Label htmlFor="utilizacaoCortesiaValor">Valor da cortesia utilizada</Label>
-                  <Input
+                  <CampoMoeda
                     id="utilizacaoCortesiaValor"
                     name="utilizacaoCortesiaValor"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
                     required
                     className="w-48"
                     defaultValue={implicacaoExistente?.utilizacao_cortesia_valor ?? undefined}

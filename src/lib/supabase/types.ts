@@ -21,6 +21,7 @@ export type TipoDesfecho = "reembolso" | "remarcacao" | "carta_credito";
 export type SubtipoReembolso = "integral" | "parcial" | "sem_reembolso";
 export type OrigemReembolsoIntegral = "fornecedor" | "saude";
 export type SubtipoRemarcacao = "sem_custo" | "com_custo";
+export type OrigemRemarcacaoComCusto = "saude" | "outro";
 export type QuemPagaMulta = "cliente" | "vendedor";
 export type TipoDocumentoAnexo =
   | "carta_cancelamento"
@@ -131,12 +132,14 @@ export interface Database {
           tipo: TipoDesfecho;
           subtipo_reembolso: SubtipoReembolso | null;
           origem_reembolso_integral: OrigemReembolsoIntegral | null;
+          banco_codigo: string | null;
           banco_nome_completo: string | null;
           banco_agencia: string | null;
           banco_conta: string | null;
           banco_cpf: string | null;
           valor: number | null;
           subtipo_remarcacao: SubtipoRemarcacao | null;
+          origem_remarcacao_com_custo: OrigemRemarcacaoComCusto | null;
           valor_taxas: number | null;
           valor_diferenca_tarifaria: number | null;
           criado_por: string;
@@ -145,12 +148,14 @@ export interface Database {
         Insert: Partial<{
           subtipo_reembolso: SubtipoReembolso | null;
           origem_reembolso_integral: OrigemReembolsoIntegral | null;
+          banco_codigo: string | null;
           banco_nome_completo: string | null;
           banco_agencia: string | null;
           banco_conta: string | null;
           banco_cpf: string | null;
           valor: number | null;
           subtipo_remarcacao: SubtipoRemarcacao | null;
+          origem_remarcacao_com_custo: OrigemRemarcacaoComCusto | null;
           valor_taxas: number | null;
           valor_diferenca_tarifaria: number | null;
         }> & {
@@ -313,6 +318,7 @@ export interface Database {
           tipo: TipoDesfecho;
           subtipo_reembolso: SubtipoReembolso | null;
           origem_reembolso_integral: OrigemReembolsoIntegral | null;
+          banco_codigo: string | null;
           banco_nome_completo: string | null;
           banco_agencia: string | null;
           banco_conta: string | null;
@@ -323,6 +329,7 @@ export interface Database {
           valor_diferenca_tarifaria: number | null;
           criado_por: string;
           criado_em: string;
+          origem_remarcacao_com_custo: OrigemRemarcacaoComCusto | null;
         };
         Relationships: [];
       };

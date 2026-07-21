@@ -129,6 +129,10 @@ export function CasoDetalhe({
 
       <AnexosSecao casoId={caso.id} anexos={anexos} />
 
+      {podeConduzirFluxo && (
+        <DesfechoForm casoId={caso.id} tiposAnexosExistentes={anexos.map((a) => a.tipo_documento)} />
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Desfechos</CardTitle>
@@ -151,6 +155,9 @@ export function CasoDetalhe({
                   {d.tipo === "remarcacao" && d.subtipo_remarcacao && (
                     <div className="text-muted-foreground">
                       {SUBTIPO_REMARCACAO_LABELS[d.subtipo_remarcacao]}
+                      {d.origem_remarcacao_com_custo && (
+                        <> · Motivo: {d.origem_remarcacao_com_custo === "saude" ? "Saúde" : "Outro"}</>
+                      )}
                       {d.valor_taxas !== null && ` · Taxas: ${formatarMoeda(d.valor_taxas)}`}
                       {d.valor_diferenca_tarifaria !== null &&
                         ` · Diferença: ${formatarMoeda(d.valor_diferenca_tarifaria)}`}
@@ -165,10 +172,6 @@ export function CasoDetalhe({
           )}
         </CardContent>
       </Card>
-
-      {podeConduzirFluxo && (
-        <DesfechoForm casoId={caso.id} tiposAnexosExistentes={anexos.map((a) => a.tipo_documento)} />
-      )}
 
       <Card>
         <CardHeader>

@@ -6,6 +6,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { validarEEnviarAnexos } from "@/lib/casos/anexos";
 import { validarEInserirContratosAdicionais } from "@/lib/casos/contratos-adicionais";
 import { createClient } from "@/lib/supabase/server";
+import { bancoPorCodigo, CODIGO_BANCO_OUTRO } from "@/lib/validation/bancos";
 import { anexoObrigatorioFaltando, desfechoSchema } from "@/lib/validation/desfecho";
 import { implicacaoSchema } from "@/lib/validation/implicacao";
 import { ANEXO_TIPO_LABELS } from "@/lib/labels";
@@ -136,6 +137,7 @@ export async function registrarDesfecho(
           tipo,
           subtipoReembolso: formData.get("subtipoReembolso") || undefined,
           origemReembolsoIntegral: formData.get("origemReembolsoIntegral") || undefined,
+          bancoCodigo: formData.get("bancoCodigo") || undefined,
           bancoNomeCompleto: formData.get("bancoNomeCompleto") || undefined,
           bancoAgencia: formData.get("bancoAgencia") || undefined,
           bancoConta: formData.get("bancoConta") || undefined,
@@ -146,6 +148,7 @@ export async function registrarDesfecho(
         ? {
             tipo,
             subtipoRemarcacao: formData.get("subtipoRemarcacao") || undefined,
+            origemRemarcacaoComCusto: formData.get("origemRemarcacaoComCusto") || undefined,
             valorTaxas: formData.get("valorTaxas") || undefined,
             valorDiferencaTarifaria: formData.get("valorDiferencaTarifaria") || undefined,
           }
@@ -172,17 +175,29 @@ export async function registrarDesfecho(
     };
   }
 
+  // banco_nome_completo nunca vem direto do que o client digitou para um
+  // código conhecido — é derivado aqui a partir de BANCOS, a mesma lista que
+  // alimentou o <select>. Só em "outro" o texto livre do client é usado.
+  const banco =
+    "bancoCodigo" in dados && dados.bancoCodigo
+      ? dados.bancoCodigo === CODIGO_BANCO_OUTRO
+        ? { banco_codigo: null, banco_nome_completo: dados.bancoNomeCompleto ?? null }
+        : { banco_codigo: dados.bancoCodigo, banco_nome_completo: bancoPorCodigo(dados.bancoCodigo)?.nome ?? null }
+      : { banco_codigo: null, banco_nome_completo: null };
+
   const { error } = await supabase.from("desfechos").insert({
     caso_id: casoId,
     tipo: dados.tipo,
     subtipo_reembolso: "subtipoReembolso" in dados ? dados.subtipoReembolso : null,
     origem_reembolso_integral: "origemReembolsoIntegral" in dados ? (dados.origemReembolsoIntegral ?? null) : null,
-    banco_nome_completo: "bancoNomeCompleto" in dados ? (dados.bancoNomeCompleto ?? null) : null,
+    banco_codigo: banco.banco_codigo,
+    banco_nome_completo: banco.banco_nome_completo,
     banco_agencia: "bancoAgencia" in dados ? (dados.bancoAgencia ?? null) : null,
     banco_conta: "bancoConta" in dados ? (dados.bancoConta ?? null) : null,
     banco_cpf: "bancoCpf" in dados ? (dados.bancoCpf ?? null) : null,
     valor: "valor" in dados ? (dados.valor ?? null) : null,
     subtipo_remarcacao: "subtipoRemarcacao" in dados ? dados.subtipoRemarcacao : null,
+    origem_remarcacao_com_custo: "origemRemarcacaoComCusto" in dados ? (dados.origemRemarcacaoComCusto ?? null) : null,
     valor_taxas: "valorTaxas" in dados ? (dados.valorTaxas ?? null) : null,
     valor_diferenca_tarifaria: "valorDiferencaTarifaria" in dados ? (dados.valorDiferencaTarifaria ?? null) : null,
   });
