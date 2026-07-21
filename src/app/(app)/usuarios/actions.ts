@@ -63,6 +63,8 @@ export async function convidarUsuario(
 }
 
 export type AtualizarUsuarioInput = {
+  nomeCompleto: string;
+  email: string;
   perfil: PerfilUsuario;
   filial: FilialCvc | null;
   ativo: boolean;
@@ -73,6 +75,11 @@ export type AtualizarUsuarioInput = {
  * editar — este action não reimplementa essa checagem, só repassa o erro do
  * Postgres de forma legível quando ela rejeitar (ex.: um "adm" tentando
  * editar, o que a UI já evita mas a API continua bloqueando).
+ *
+ * E-mail é login (fica em auth.users, não só no espelho em public.usuarios)
+ * — trocar o e-mail exige a Admin API. Só chama ela quando o valor muda, e
+ * só grava em public.usuarios depois dela confirmar, pra nunca deixar login
+ * e perfil dessincronizados.
  */
 export async function atualizarUsuario(
   usuarioId: string,
@@ -86,9 +93,38 @@ export async function atualizarUsuario(
   }
 
   const supabase = await createClient();
+
+  const { data: atual, error: atualError } = await supabase
+    .from("usuarios")
+    .select("email")
+    .eq("id", usuarioId)
+    .single();
+
+  if (atualError || !atual) {
+    return { error: "Usuário não encontrado." };
+  }
+
+  if (parsed.data.email !== atual.email) {
+    const admin = createAdminClient();
+    const { error: emailError } = await admin.auth.admin.updateUserById(usuarioId, {
+      email: parsed.data.email,
+    });
+
+    if (emailError) {
+      console.error("Erro ao atualizar e-mail do usuário:", emailError);
+      return { error: "Não foi possível atualizar o e-mail. Verifique se ele já não está em uso." };
+    }
+  }
+
   const { error } = await supabase
     .from("usuarios")
-    .update({ perfil: parsed.data.perfil, filial: parsed.data.filial, ativo: parsed.data.ativo })
+    .update({
+      nome_completo: parsed.data.nomeCompleto,
+      email: parsed.data.email,
+      perfil: parsed.data.perfil,
+      filial: parsed.data.filial,
+      ativo: parsed.data.ativo,
+    })
     .eq("id", usuarioId);
 
   if (error) {

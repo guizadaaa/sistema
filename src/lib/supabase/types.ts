@@ -53,6 +53,7 @@ export interface Database {
         }>;
         Update: Partial<{
           nome_completo: string;
+          email: string;
           perfil: PerfilUsuario;
           filial: FilialCvc | null;
           ativo: boolean;
