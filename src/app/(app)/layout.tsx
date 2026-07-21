@@ -1,13 +1,20 @@
 import Link from "next/link";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
+import { buscarProximaDelegacaoParaAviso } from "@/lib/delegacoes/listar";
 import { FILIAL_LABELS, PERFIL_LABELS } from "@/lib/labels";
 import { Button } from "@/components/ui/button";
 
+import { DelegacaoAvisoBanner } from "./delegacao-aviso-banner";
 import { logout } from "../login/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const usuario = await requireCurrentUser();
+
+  // Só gerente pode ter uma delegação agendada em seu nome (adm_id sempre é
+  // adm_master, gerente_id sempre gerente — ver validate_delegacao).
+  const proximaDelegacao =
+    usuario.perfil === "gerente" ? await buscarProximaDelegacaoParaAviso(usuario.id) : null;
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -47,6 +54,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </Button>
         </form>
       </header>
+      {proximaDelegacao && <DelegacaoAvisoBanner inicio={proximaDelegacao.inicio} />}
       <main className="flex-1 p-4">{children}</main>
     </div>
   );
