@@ -43,11 +43,30 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
     const termo = filtros.busca.trim();
     if (termo) {
       const termoEscapado = termo.replace(/[%,]/g, "");
-      query = query.or(
-        `cliente_nome.ilike.%${termoEscapado}%,contrato_numero.ilike.%${termoEscapado}%,protocolo.eq.${
-          /^\d+$/.test(termoEscapado) ? termoEscapado : "-1"
-        }`
-      );
+
+      // Um vendedor pode receber a ligação com qualquer um dos números do
+      // caso, não só o principal — busca também em casos_contratos_
+      // adicionais (tabela filha, não dá pra filtrar via .or() na mesma
+      // query de `casos`). RLS dessa tabela espelha a de `casos`, então só
+      // volta caso_id de casos que este usuário já pode ver.
+      const { data: contratosAdicionais, error: contratosAdicionaisError } = await supabase
+        .from("casos_contratos_adicionais")
+        .select("caso_id")
+        .ilike("contrato_numero", `%${termoEscapado}%`);
+      if (contratosAdicionaisError) throw contratosAdicionaisError;
+
+      const idsPorContratoAdicional = [...new Set((contratosAdicionais ?? []).map((c) => c.caso_id))];
+
+      const condicoes = [
+        `cliente_nome.ilike.%${termoEscapado}%`,
+        `contrato_numero.ilike.%${termoEscapado}%`,
+        `protocolo.eq.${/^\d+$/.test(termoEscapado) ? termoEscapado : "-1"}`,
+      ];
+      if (idsPorContratoAdicional.length > 0) {
+        condicoes.push(`id.in.(${idsPorContratoAdicional.join(",")})`);
+      }
+
+      query = query.or(condicoes.join(","));
     }
   }
 
