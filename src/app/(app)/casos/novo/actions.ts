@@ -5,6 +5,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { validarEEnviarAnexos } from "@/lib/casos/anexos";
+import { validarEInserirContratosAdicionais } from "@/lib/casos/contratos-adicionais";
 import { casoSchema, tiposCasoPermitidos } from "@/lib/validation/caso";
 
 export type CasoFormValores = {
@@ -24,7 +25,7 @@ export type CriarCasoState = {
   error?: string;
   fieldErrors?: Partial<Record<keyof CasoFormValores, string>>;
   valores?: CasoFormValores;
-  sucesso?: { id: string; protocolo: number; avisosAnexos?: string[] };
+  sucesso?: { id: string; protocolo: number; avisosAnexos?: string[]; avisosContratos?: string[] };
 };
 
 /** Para reidratar o formulário após um erro — nunca undefined, mesmo vazio. */
@@ -178,12 +179,14 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
   }
 
   const avisosAnexos = await validarEEnviarAnexos(supabase, data.id, formData);
+  const avisosContratos = await validarEInserirContratosAdicionais(supabase, data.id, formData);
 
   return {
     sucesso: {
       id: data.id,
       protocolo: data.protocolo,
       avisosAnexos: avisosAnexos.length > 0 ? avisosAnexos : undefined,
+      avisosContratos: avisosContratos.length > 0 ? avisosContratos : undefined,
     },
   };
 }

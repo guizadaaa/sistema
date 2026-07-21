@@ -23,12 +23,18 @@ export function tiposCasoPermitidos(perfil: PerfilUsuario): readonly TipoCaso[] 
 
 export const MOTIVOS_CASO: readonly MotivoCaso[] = ["pedido_cliente", "erro_vendedor", "fornecedor"];
 
+// Mesma regra do contrato principal (casos_contrato_numero_formato) — usada
+// também para os contratos adicionais (casos_contratos_adicionais_formato).
+const contratoNumeroSchema = z
+  .string()
+  .transform(somenteDigitos)
+  .refine((v) => v.length === 14, "Contrato deve ter exatamente 14 números");
+
+export const contratoAdicionalSchema = contratoNumeroSchema;
+
 const camposComuns = {
   vendedorDono: z.string().uuid("Selecione o dono do caso"),
-  contratoNumero: z
-    .string()
-    .transform(somenteDigitos)
-    .refine((v) => v.length === 14, "Contrato deve ter exatamente 14 números"),
+  contratoNumero: contratoNumeroSchema,
   clienteNome: z.string().trim().min(1, "Informe o nome completo do contratante"),
   clienteCpf: z
     .string()

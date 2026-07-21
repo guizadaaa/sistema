@@ -67,6 +67,13 @@ export function CasoForm({
               ))}
             </ul>
           )}
+          {state.sucesso.avisosContratos && (
+            <ul className="text-destructive text-sm list-disc pl-4">
+              {state.sucesso.avisosContratos.map((aviso) => (
+                <li key={aviso}>{aviso}</li>
+              ))}
+            </ul>
+          )}
           <Button onClick={() => window.location.reload()} className="w-fit">
             Registrar outro caso
           </Button>
@@ -142,6 +149,10 @@ function CasoFormCampos({
   const [anexoRows, setAnexoRows] = useState<string[]>([]);
   const [anexoErros, setAnexoErros] = useState<Record<string, string | undefined>>({});
   const anexoIdBase = useId();
+  const [contratoAdicionalRows, setContratoAdicionalRows] = useState<string[]>([]);
+  const [contratoAdicionalValores, setContratoAdicionalValores] = useState<Record<string, string>>({});
+  const [contratoAdicionalErros, setContratoAdicionalErros] = useState<Record<string, string | undefined>>({});
+  const contratoAdicionalIdBase = useId();
 
   const setErroLocal = (campo: CampoObrigatorio, mensagem: string | undefined) =>
     setErrosLocais((prev) => ({ ...prev, [campo]: mensagem }));
@@ -152,6 +163,30 @@ function CasoFormCampos({
   const removerAnexoRow = (rowId: string) => {
     setAnexoRows((prev) => prev.filter((id) => id !== rowId));
     setAnexoErros((prev) => {
+      const { [rowId]: _removido, ...resto } = prev;
+      return resto;
+    });
+  };
+
+  // Contratos adicionais não passam pela derivação de filial (só o contrato
+  // principal faz isso, via set_caso_defaults) — validação é só o formato,
+  // sem checagem de prefixo de filial.
+  const validarContratoAdicional = (valor: string): string | undefined => {
+    if (valor.length === 0) return "Informe o número do contrato ou remova esta linha";
+    if (valor.length < 14) return "Contrato deve ter exatamente 14 números";
+    return undefined;
+  };
+
+  const adicionarContratoAdicionalRow = () =>
+    setContratoAdicionalRows((prev) => [...prev, `${contratoAdicionalIdBase}-${prev.length}-${Date.now()}`]);
+
+  const removerContratoAdicionalRow = (rowId: string) => {
+    setContratoAdicionalRows((prev) => prev.filter((id) => id !== rowId));
+    setContratoAdicionalValores((prev) => {
+      const { [rowId]: _removido, ...resto } = prev;
+      return resto;
+    });
+    setContratoAdicionalErros((prev) => {
       const { [rowId]: _removido, ...resto } = prev;
       return resto;
     });
@@ -223,6 +258,10 @@ function CasoFormCampos({
     setErroLocal("contratoNumero", undefined);
 
     if (Object.values(anexoErros).some(Boolean)) {
+      event.preventDefault();
+    }
+
+    if (Object.values(contratoAdicionalErros).some(Boolean)) {
       event.preventDefault();
     }
   };
@@ -330,6 +369,47 @@ function CasoFormCampos({
           />
           <FieldError mensagem={errosLocais.prazoVigencia ?? state.fieldErrors?.prazoVigencia} />
         </div>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t pt-4">
+        <div className="flex items-center justify-between">
+          <Label>Contratos adicionais (opcional)</Label>
+          <Button type="button" variant="outline" size="sm" onClick={adicionarContratoAdicionalRow}>
+            <Plus /> Adicionar contrato
+          </Button>
+        </div>
+
+        {contratoAdicionalRows.map((rowId) => (
+          <div key={rowId} className="grid grid-cols-[1fr_auto] items-start gap-2">
+            <div className="flex flex-col gap-1">
+              <Input
+                inputMode="numeric"
+                maxLength={14}
+                name="contratoAdicional"
+                placeholder="Número do contrato"
+                value={contratoAdicionalValores[rowId] ?? ""}
+                aria-invalid={Boolean(contratoAdicionalErros[rowId])}
+                onChange={(e) => {
+                  const novoValor = somenteDigitos(e.target.value).slice(0, 14);
+                  setContratoAdicionalValores((prev) => ({ ...prev, [rowId]: novoValor }));
+                  setContratoAdicionalErros((prev) => ({ ...prev, [rowId]: validarContratoAdicional(novoValor) }));
+                }}
+              />
+              {contratoAdicionalErros[rowId] && (
+                <p className="text-destructive text-sm">{contratoAdicionalErros[rowId]}</p>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Remover contrato adicional"
+              onClick={() => removerContratoAdicionalRow(rowId)}
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
