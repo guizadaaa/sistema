@@ -5,7 +5,8 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { validarEEnviarAnexos } from "@/lib/casos/anexos";
-import { casoSchema } from "@/lib/validation/caso";
+import { validarEInserirContratosAdicionais } from "@/lib/casos/contratos-adicionais";
+import { casoSchema, tiposCasoPermitidos } from "@/lib/validation/caso";
 
 export type CasoFormValores = {
   tipoCaso?: string;
@@ -24,7 +25,7 @@ export type CriarCasoState = {
   error?: string;
   fieldErrors?: Partial<Record<keyof CasoFormValores, string>>;
   valores?: CasoFormValores;
-  sucesso?: { id: string; protocolo: number; avisosAnexos?: string[] };
+  sucesso?: { id: string; protocolo: number; avisosAnexos?: string[]; avisosContratos?: string[] };
 };
 
 /** Para reidratar o formulário após um erro — nunca undefined, mesmo vazio. */
@@ -142,6 +143,15 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
 
   const dados = parsed.data;
 
+  // Defesa em profundidade: a UI já esconde "Cancelamento" para vendedor e a
+  // policy casos_insert (RLS) bloqueia o insert no banco de qualquer forma —
+  // esta checagem só evita um round-trip desnecessário e devolve o erro
+  // preso ao campo, como as demais validações deste action.
+  if (!tiposCasoPermitidos(usuario.perfil).includes(dados.tipoCaso)) {
+    const mensagem = "Você não tem permissão para criar um caso deste tipo.";
+    return { error: mensagem, fieldErrors: { tipoCaso: mensagem }, valores: valoresSubmetidos };
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -169,12 +179,14 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
   }
 
   const avisosAnexos = await validarEEnviarAnexos(supabase, data.id, formData);
+  const avisosContratos = await validarEInserirContratosAdicionais(supabase, data.id, formData);
 
   return {
     sucesso: {
       id: data.id,
       protocolo: data.protocolo,
       avisosAnexos: avisosAnexos.length > 0 ? avisosAnexos : undefined,
+      avisosContratos: avisosContratos.length > 0 ? avisosContratos : undefined,
     },
   };
 }

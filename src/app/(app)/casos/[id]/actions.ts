@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { validarEEnviarAnexos } from "@/lib/casos/anexos";
+import { validarEInserirContratosAdicionais } from "@/lib/casos/contratos-adicionais";
 import { createClient } from "@/lib/supabase/server";
 import { anexoObrigatorioFaltando, desfechoSchema } from "@/lib/validation/desfecho";
 import { implicacaoSchema } from "@/lib/validation/implicacao";
@@ -23,6 +24,24 @@ export async function enviarAnexoAoCaso(
   const supabase = await createClient();
 
   const avisos = await validarEEnviarAnexos(supabase, casoId, formData);
+  revalidatePath(`/casos/${casoId}`);
+
+  return { avisos: avisos.length > 0 ? avisos : undefined };
+}
+
+export type AdicionarContratoState = {
+  avisos?: string[];
+};
+
+export async function adicionarContratosAoCaso(
+  casoId: string,
+  _prevState: AdicionarContratoState,
+  formData: FormData
+): Promise<AdicionarContratoState> {
+  await requireCurrentUser();
+  const supabase = await createClient();
+
+  const avisos = await validarEInserirContratosAdicionais(supabase, casoId, formData);
   revalidatePath(`/casos/${casoId}`);
 
   return { avisos: avisos.length > 0 ? avisos : undefined };

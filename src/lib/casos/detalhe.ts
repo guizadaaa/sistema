@@ -5,6 +5,7 @@ import type { Database } from "@/lib/supabase/types";
 
 type CasoRow = Database["public"]["Tables"]["casos"]["Row"];
 type AnexoRow = Database["public"]["Tables"]["anexos"]["Row"];
+type ContratoAdicionalRow = Database["public"]["Tables"]["casos_contratos_adicionais"]["Row"];
 type StatusHistoricoComDuracaoRow = Database["public"]["Views"]["status_historico_com_duracao"]["Row"];
 type DesfechoVisivelRow = Database["public"]["Views"]["desfechos_visivel"]["Row"];
 type ImplicacaoRow = Database["public"]["Tables"]["implicacoes"]["Row"];
@@ -17,6 +18,7 @@ export type DetalheCaso = {
   criadoPorNome: string;
   historico: HistoricoComNome[];
   anexos: AnexoRow[];
+  contratosAdicionais: ContratoAdicionalRow[];
   desfechos: DesfechoVisivelRow[];
   implicacao: ImplicacaoRow | null;
 };
@@ -39,6 +41,7 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
   const [
     { data: historico, error: historicoError },
     { data: anexos, error: anexosError },
+    { data: contratosAdicionais, error: contratosAdicionaisError },
     { data: desfechos, error: desfechosError },
     { data: implicacao, error: implicacaoError },
   ] = await Promise.all([
@@ -48,12 +51,18 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
       .eq("caso_id", id)
       .order("entrou_em", { ascending: true }),
     supabase.from("anexos").select("*").eq("caso_id", id).order("enviado_em", { ascending: false }),
+    supabase
+      .from("casos_contratos_adicionais")
+      .select("*")
+      .eq("caso_id", id)
+      .order("criado_em", { ascending: true }),
     supabase.from("desfechos_visivel").select("*").eq("caso_id", id).order("criado_em", { ascending: false }),
     supabase.from("implicacoes").select("*").eq("caso_id", id).maybeSingle(),
   ]);
 
   if (historicoError) throw historicoError;
   if (anexosError) throw anexosError;
+  if (contratosAdicionaisError) throw contratosAdicionaisError;
   if (desfechosError) throw desfechosError;
   if (implicacaoError) throw implicacaoError;
 
@@ -74,6 +83,7 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
     criadoPorNome: nomesPorId.get(caso.criado_por) ?? "—",
     historico: (historico ?? []).map((h) => ({ ...h, alteradoPorNome: nomesPorId.get(h.alterado_por) ?? "—" })),
     anexos: anexos ?? [],
+    contratosAdicionais: contratosAdicionais ?? [],
     desfechos: desfechos ?? [],
     implicacao: implicacao ?? null,
   };

@@ -13,6 +13,7 @@ import {
 } from "@/lib/labels";
 
 import { AnexosSecao } from "./anexos-secao";
+import { ContratosAdicionaisSecao } from "./contratos-adicionais-secao";
 import { DesfechoForm } from "./desfecho-form";
 import { ImplicacaoForm } from "./implicacao-form";
 import { StatusAcoes } from "./status-acoes";
@@ -35,7 +36,7 @@ export function CasoDetalhe({
   podeConduzirFluxo: boolean;
   ehAdmin: boolean;
 }) {
-  const { caso, donoNome, criadoPorNome, historico, anexos, desfechos, implicacao } = detalhe;
+  const { caso, donoNome, criadoPorNome, historico, anexos, contratosAdicionais, desfechos, implicacao } = detalhe;
 
   return (
     <div className="flex flex-col gap-4">
@@ -123,6 +124,8 @@ export function CasoDetalhe({
           </CardContent>
         </Card>
       </div>
+
+      <ContratosAdicionaisSecao casoId={caso.id} contratos={contratosAdicionais} />
 
       <AnexosSecao casoId={caso.id} anexos={anexos} />
 

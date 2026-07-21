@@ -18,9 +18,9 @@ import {
   ANEXO_TIPOS_DOCUMENTO,
   FILIAIS,
   MOTIVOS_CASO,
-  TIPOS_CASO,
+  tiposCasoPermitidos,
 } from "@/lib/validation/caso";
-import type { TipoCaso } from "@/lib/supabase/types";
+import type { PerfilUsuario, TipoCaso } from "@/lib/supabase/types";
 
 import { criarCaso, type CasoFormValores, type CriarCasoState } from "./actions";
 
@@ -43,7 +43,13 @@ function validarArquivoAnexo(arquivo: File): string | undefined {
   return undefined;
 }
 
-export function CasoForm({ donosElegiveis }: { donosElegiveis: DonoElegivel[] }) {
+export function CasoForm({
+  donosElegiveis,
+  perfilUsuario,
+}: {
+  donosElegiveis: DonoElegivel[];
+  perfilUsuario: PerfilUsuario;
+}) {
   const [state, formAction, isPending] = useActionState(criarCaso, initialState);
 
   if (state.sucesso) {
@@ -57,6 +63,13 @@ export function CasoForm({ donosElegiveis }: { donosElegiveis: DonoElegivel[] })
           {state.sucesso.avisosAnexos && (
             <ul className="text-destructive text-sm list-disc pl-4">
               {state.sucesso.avisosAnexos.map((aviso) => (
+                <li key={aviso}>{aviso}</li>
+              ))}
+            </ul>
+          )}
+          {state.sucesso.avisosContratos && (
+            <ul className="text-destructive text-sm list-disc pl-4">
+              {state.sucesso.avisosContratos.map((aviso) => (
                 <li key={aviso}>{aviso}</li>
               ))}
             </ul>
@@ -94,6 +107,7 @@ export function CasoForm({ donosElegiveis }: { donosElegiveis: DonoElegivel[] })
           formAction={formAction}
           isPending={isPending}
           donosElegiveis={donosElegiveis}
+          perfilUsuario={perfilUsuario}
         />
       </CardContent>
     </Card>
@@ -107,14 +121,22 @@ function CasoFormCampos({
   formAction,
   isPending,
   donosElegiveis,
+  perfilUsuario,
 }: {
   state: CriarCasoState;
   formAction: (formData: FormData) => void;
   isPending: boolean;
   donosElegiveis: DonoElegivel[];
+  perfilUsuario: PerfilUsuario;
 }) {
+  const tiposDisponiveis = tiposCasoPermitidos(perfilUsuario);
+
+  // Se o valor reidratado (ex.: após um erro do server action) não estiver
+  // mais entre os tipos permitidos para este perfil, não pré-seleciona nada
+  // — evita reexibir "Cancelamento" selecionado para quem não pode escolhê-lo.
+  const tipoCasoInicial = state.valores?.tipoCaso as TipoCaso | undefined;
   const [tipoCaso, setTipoCaso] = useState<TipoCaso | "">(
-    (state.valores?.tipoCaso as TipoCaso | undefined) ?? ""
+    tipoCasoInicial && (tiposDisponiveis as readonly TipoCaso[]).includes(tipoCasoInicial) ? tipoCasoInicial : ""
   );
   const [vendedorDonoId, setVendedorDonoId] = useState(
     state.valores?.vendedorDono ?? donosElegiveis[0]?.id ?? ""
@@ -127,6 +149,10 @@ function CasoFormCampos({
   const [anexoRows, setAnexoRows] = useState<string[]>([]);
   const [anexoErros, setAnexoErros] = useState<Record<string, string | undefined>>({});
   const anexoIdBase = useId();
+  const [contratoAdicionalRows, setContratoAdicionalRows] = useState<string[]>([]);
+  const [contratoAdicionalValores, setContratoAdicionalValores] = useState<Record<string, string>>({});
+  const [contratoAdicionalErros, setContratoAdicionalErros] = useState<Record<string, string | undefined>>({});
+  const contratoAdicionalIdBase = useId();
 
   const setErroLocal = (campo: CampoObrigatorio, mensagem: string | undefined) =>
     setErrosLocais((prev) => ({ ...prev, [campo]: mensagem }));
@@ -137,6 +163,30 @@ function CasoFormCampos({
   const removerAnexoRow = (rowId: string) => {
     setAnexoRows((prev) => prev.filter((id) => id !== rowId));
     setAnexoErros((prev) => {
+      const { [rowId]: _removido, ...resto } = prev;
+      return resto;
+    });
+  };
+
+  // Contratos adicionais não passam pela derivação de filial (só o contrato
+  // principal faz isso, via set_caso_defaults) — validação é só o formato,
+  // sem checagem de prefixo de filial.
+  const validarContratoAdicional = (valor: string): string | undefined => {
+    if (valor.length === 0) return "Informe o número do contrato ou remova esta linha";
+    if (valor.length < 14) return "Contrato deve ter exatamente 14 números";
+    return undefined;
+  };
+
+  const adicionarContratoAdicionalRow = () =>
+    setContratoAdicionalRows((prev) => [...prev, `${contratoAdicionalIdBase}-${prev.length}-${Date.now()}`]);
+
+  const removerContratoAdicionalRow = (rowId: string) => {
+    setContratoAdicionalRows((prev) => prev.filter((id) => id !== rowId));
+    setContratoAdicionalValores((prev) => {
+      const { [rowId]: _removido, ...resto } = prev;
+      return resto;
+    });
+    setContratoAdicionalErros((prev) => {
       const { [rowId]: _removido, ...resto } = prev;
       return resto;
     });
@@ -210,6 +260,10 @@ function CasoFormCampos({
     if (Object.values(anexoErros).some(Boolean)) {
       event.preventDefault();
     }
+
+    if (Object.values(contratoAdicionalErros).some(Boolean)) {
+      event.preventDefault();
+    }
   };
 
   const exigeMotivoDescricao = tipoCaso === "alteracao_data" || tipoCaso === "cancelamento";
@@ -271,7 +325,7 @@ function CasoFormCampos({
             <SelectValue placeholder="Selecione" />
           </SelectTrigger>
           <SelectContent>
-            {TIPOS_CASO.map((t) => (
+            {tiposDisponiveis.map((t) => (
               <SelectItem key={t} value={t}>
                 {TIPO_CASO_LABELS[t]}
               </SelectItem>
@@ -315,6 +369,47 @@ function CasoFormCampos({
           />
           <FieldError mensagem={errosLocais.prazoVigencia ?? state.fieldErrors?.prazoVigencia} />
         </div>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t pt-4">
+        <div className="flex items-center justify-between">
+          <Label>Contratos adicionais (opcional)</Label>
+          <Button type="button" variant="outline" size="sm" onClick={adicionarContratoAdicionalRow}>
+            <Plus /> Adicionar contrato
+          </Button>
+        </div>
+
+        {contratoAdicionalRows.map((rowId) => (
+          <div key={rowId} className="grid grid-cols-[1fr_auto] items-start gap-2">
+            <div className="flex flex-col gap-1">
+              <Input
+                inputMode="numeric"
+                maxLength={14}
+                name="contratoAdicional"
+                placeholder="Número do contrato"
+                value={contratoAdicionalValores[rowId] ?? ""}
+                aria-invalid={Boolean(contratoAdicionalErros[rowId])}
+                onChange={(e) => {
+                  const novoValor = somenteDigitos(e.target.value).slice(0, 14);
+                  setContratoAdicionalValores((prev) => ({ ...prev, [rowId]: novoValor }));
+                  setContratoAdicionalErros((prev) => ({ ...prev, [rowId]: validarContratoAdicional(novoValor) }));
+                }}
+              />
+              {contratoAdicionalErros[rowId] && (
+                <p className="text-destructive text-sm">{contratoAdicionalErros[rowId]}</p>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Remover contrato adicional"
+              onClick={() => removerContratoAdicionalRow(rowId)}
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-2 gap-4">

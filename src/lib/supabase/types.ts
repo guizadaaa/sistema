@@ -248,6 +248,24 @@ export interface Database {
         }>;
         Relationships: [];
       };
+      casos_contratos_adicionais: {
+        Row: {
+          id: string;
+          caso_id: string;
+          contrato_numero: string;
+          criado_por: string;
+          criado_em: string;
+        };
+        Insert: {
+          caso_id: string;
+          contrato_numero: string;
+        };
+        // Sem UPDATE previsto — ver nota em status_historico.Update.
+        Update: Partial<{
+          contrato_numero: string;
+        }>;
+        Relationships: [];
+      };
       auditoria: {
         Row: {
           id: string;

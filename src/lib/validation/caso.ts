@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { cpfValido, somenteDigitos } from "./cpf";
-import type { FilialCvc, MotivoCaso, TipoCaso } from "@/lib/supabase/types";
+import type { FilialCvc, MotivoCaso, PerfilUsuario, TipoCaso } from "@/lib/supabase/types";
 
 export const TIPOS_CASO: readonly TipoCaso[] = [
   "alteracao_data",
@@ -10,14 +10,31 @@ export const TIPOS_CASO: readonly TipoCaso[] = [
   "inadimplencia",
 ];
 
+// Cancelamento é restrito a gerente/adm/adm_master — mesma regra reforçada na
+// policy casos_insert (RLS, supabase/migrations/20260721000001). Esta função
+// só espelha a regra para a UI e a validação do server action; o banco é
+// quem de fato impede a criação, nunca confiar só nisto aqui.
+const PERFIS_QUE_CRIAM_CANCELAMENTO: readonly PerfilUsuario[] = ["gerente", "adm", "adm_master"];
+
+export function tiposCasoPermitidos(perfil: PerfilUsuario): readonly TipoCaso[] {
+  if (PERFIS_QUE_CRIAM_CANCELAMENTO.includes(perfil)) return TIPOS_CASO;
+  return TIPOS_CASO.filter((t) => t !== "cancelamento");
+}
+
 export const MOTIVOS_CASO: readonly MotivoCaso[] = ["pedido_cliente", "erro_vendedor", "fornecedor"];
+
+// Mesma regra do contrato principal (casos_contrato_numero_formato) — usada
+// também para os contratos adicionais (casos_contratos_adicionais_formato).
+const contratoNumeroSchema = z
+  .string()
+  .transform(somenteDigitos)
+  .refine((v) => v.length === 14, "Contrato deve ter exatamente 14 números");
+
+export const contratoAdicionalSchema = contratoNumeroSchema;
 
 const camposComuns = {
   vendedorDono: z.string().uuid("Selecione o dono do caso"),
-  contratoNumero: z
-    .string()
-    .transform(somenteDigitos)
-    .refine((v) => v.length === 14, "Contrato deve ter exatamente 14 números"),
+  contratoNumero: contratoNumeroSchema,
   clienteNome: z.string().trim().min(1, "Informe o nome completo do contratante"),
   clienteCpf: z
     .string()
