@@ -75,8 +75,71 @@ function GerarLinkBotao({ usuarioId }: { usuarioId: string }) {
   );
 }
 
+function ExcluirUsuarioBotao({ usuario }: { usuario: UsuarioListado }) {
+  const [aberto, setAberto] = useState(false);
+  const [erro, setErro] = useState<string | undefined>();
+  const [isPending, startTransition] = useTransition();
+
+  const confirmar = () => {
+    setErro(undefined);
+    startTransition(async () => {
+      const resultado = await atualizarUsuario(usuario.id, {
+        nomeCompleto: usuario.nome_completo,
+        email: usuario.email,
+        perfil: usuario.perfil,
+        filial: usuario.filial,
+        ativo: false,
+      });
+      if (resultado.error) {
+        setErro(resultado.error);
+      } else {
+        setAberto(false);
+      }
+    });
+  };
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="destructive"
+        onClick={() => {
+          setErro(undefined);
+          setAberto(true);
+        }}
+      >
+        Excluir
+      </Button>
+      <Dialog open={aberto} onOpenChange={setAberto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir {usuario.nome_completo}?</DialogTitle>
+            <DialogDescription>
+              É uma exclusão lógica: a pessoa fica marcada como inativa e perde o acesso ao sistema, mas nada
+              é apagado — histórico e auditoria continuam preservados. Os casos que ela possuir são
+              transferidos automaticamente: se for vendedor, vão para o gerente ativo da filial; se for
+              gerente, vão para quem confirmar esta ação.
+            </DialogDescription>
+          </DialogHeader>
+          {erro && <p className="text-destructive text-sm">{erro}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setAberto(false)} disabled={isPending}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmar} disabled={isPending}>
+              {isPending ? "Excluindo..." : "Confirmar exclusão"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEditar: boolean }) {
   const [editando, setEditando] = useState(false);
+  const [nomeCompleto, setNomeCompleto] = useState(usuario.nome_completo);
+  const [email, setEmail] = useState(usuario.email);
   const [perfil, setPerfil] = useState<PerfilUsuario>(usuario.perfil);
   const [filial, setFilial] = useState<FilialCvc | "">(usuario.filial ?? "");
   const [ativo, setAtivo] = useState(usuario.ativo);
@@ -102,6 +165,7 @@ function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEdit
                 Editar
               </Button>
               <GerarLinkBotao usuarioId={usuario.id} />
+              {usuario.ativo && <ExcluirUsuarioBotao usuario={usuario} />}
             </div>
           </td>
         )}
@@ -113,6 +177,8 @@ function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEdit
     setErro(undefined);
     startTransition(async () => {
       const resultado = await atualizarUsuario(usuario.id, {
+        nomeCompleto,
+        email,
         perfil,
         filial: exigeFilial(perfil) ? filial || null : null,
         ativo,
@@ -127,8 +193,17 @@ function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEdit
 
   return (
     <tr className="border-b last:border-0 align-top">
-      <td className="py-2 pr-4">{usuario.nome_completo}</td>
-      <td className="py-2 pr-4">{usuario.email}</td>
+      <td className="py-2 pr-4">
+        <Input value={nomeCompleto} onChange={(e) => setNomeCompleto(e.target.value)} className="min-w-40" />
+      </td>
+      <td className="py-2 pr-4">
+        <Input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="min-w-48"
+        />
+      </td>
       <td className="py-2 pr-4">
         <Select value={perfil} onValueChange={(v) => setPerfil(v as PerfilUsuario)}>
           <SelectTrigger className="w-36">
@@ -178,7 +253,20 @@ function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEdit
             <Button size="sm" onClick={salvar} disabled={isPending}>
               {isPending ? "Salvando..." : "Salvar"}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setEditando(false)} disabled={isPending}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setNomeCompleto(usuario.nome_completo);
+                setEmail(usuario.email);
+                setPerfil(usuario.perfil);
+                setFilial(usuario.filial ?? "");
+                setAtivo(usuario.ativo);
+                setErro(undefined);
+                setEditando(false);
+              }}
+              disabled={isPending}
+            >
               Cancelar
             </Button>
           </div>

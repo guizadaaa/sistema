@@ -32,6 +32,8 @@ export const convidarUsuarioSchema = comFilialPorPerfil(
 
 export const atualizarUsuarioSchema = comFilialPorPerfil(
   z.object({
+    nomeCompleto: z.string().trim().min(1, "Informe o nome completo"),
+    email: z.string().trim().email("E-mail inválido"),
     perfil: z.enum(PERFIS_USUARIO as [PerfilUsuario, ...PerfilUsuario[]]),
     filial: z.enum(FILIAIS_USUARIO as [FilialCvc, ...FilialCvc[]]).nullable(),
     ativo: z.boolean(),
