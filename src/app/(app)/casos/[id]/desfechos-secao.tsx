@@ -96,7 +96,10 @@ export function DesfechosSecao({
               // Correção com histórico (20260722000001): o registro nunca é
               // apagado — só marcado como substituído ou cancelado. Ambos
               // ficam visíveis, esmaecidos, sem ações (já são estado final).
-              const inativo = d.substituido_por !== null || d.cancelado_em !== null;
+              // Boolean(...), não "!== null": se a migration ainda não rodou
+              // no projeto Supabase em uso, essas colunas vêm undefined (não
+              // presentes na linha), e undefined !== null é true em JS.
+              const inativo = Boolean(d.substituido_por) || Boolean(d.cancelado_em);
 
               if (editandoId === d.id) {
                 return (
@@ -116,10 +119,10 @@ export function DesfechosSecao({
                   <div className={inativo ? "line-through decoration-muted-foreground" : ""}>
                     <ResumoDesfecho d={d} />
                   </div>
-                  {d.substituido_por !== null && (
-                    <p className="text-muted-foreground mt-1 text-xs">Substituído em {formatarData(d.substituido_em!)}</p>
+                  {d.substituido_em && (
+                    <p className="text-muted-foreground mt-1 text-xs">Substituído em {formatarData(d.substituido_em)}</p>
                   )}
-                  {d.cancelado_em !== null && (
+                  {d.cancelado_em && (
                     <p className="text-muted-foreground mt-1 text-xs">Cancelado em {formatarData(d.cancelado_em)}</p>
                   )}
                   {podeConduzirFluxo && !inativo && (
