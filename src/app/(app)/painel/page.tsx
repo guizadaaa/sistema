@@ -3,12 +3,17 @@ import { redirect } from "next/navigation";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatTile } from "@/components/stat-tile";
 import { FILIAL_LABELS, QUEM_PAGA_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
-import { carregarMetricasPainel, STATUS_ORDEM } from "@/lib/painel/metricas";
+import { carregarMetricasPainel, listarVendedoresParaFiltro, STATUS_ORDEM } from "@/lib/painel/metricas";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 import { TIPOS_CASO } from "@/lib/validation/caso";
+import type { FilialCvc } from "@/lib/supabase/types";
+
+import { FILIAL_OPCOES, isFilialCvc } from "../casos/casos-lista";
 
 function formatarData(data: string) {
   return new Date(`${data}T00:00:00`).toLocaleDateString("pt-BR");
@@ -18,7 +23,11 @@ function formatarMoeda(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default async function PainelPage() {
+export default async function PainelPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const usuario = await requireCurrentUser();
 
   // Painel de Gestão é para quem gerencia operação (gerente e admin) — o
@@ -27,12 +36,67 @@ export default async function PainelPage() {
     redirect("/");
   }
 
-  const metricas = await carregarMetricasPainel();
+  const sp = await searchParams;
+  const mostrarFiltroFilial = usuario.perfil === "adm" || usuario.perfil === "adm_master";
+  const filial: FilialCvc | undefined =
+    mostrarFiltroFilial && typeof sp.filial === "string" && isFilialCvc(sp.filial) ? sp.filial : undefined;
+  const vendedorId = typeof sp.vendedorId === "string" && sp.vendedorId !== "todos" ? sp.vendedorId : undefined;
+
+  const [metricas, vendedoresDisponiveis] = await Promise.all([
+    carregarMetricasPainel({ filial, vendedorId }),
+    listarVendedoresParaFiltro(filial),
+  ]);
   const tiposOrdenados = [...TIPOS_CASO].sort((a, b) => metricas.porTipo[b] - metricas.porTipo[a]);
 
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-semibold">Painel de Gestão</h1>
+
+      <Card>
+        <CardContent>
+          <form method="get" className="flex flex-wrap items-end gap-3">
+            {mostrarFiltroFilial && (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Filial</label>
+                <Select name="filial" defaultValue={filial ?? "todas"}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas</SelectItem>
+                    {FILIAL_OPCOES.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {FILIAL_LABELS[f]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium">Vendedor</label>
+              <Select name="vendedorId" defaultValue={vendedorId ?? "todos"}>
+                <SelectTrigger className="w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {vendedoresDisponiveis.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button type="submit" variant="outline">
+              Filtrar
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile titulo="Total de protocolos" valor={metricas.total} />

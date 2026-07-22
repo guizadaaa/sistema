@@ -53,6 +53,31 @@ export type MetricasPainel = {
   taxasRemarcacao: { taxas: number; diferencaTarifaria: number };
 };
 
+export type FiltrosPainel = {
+  filial?: FilialCvc;
+  vendedorId?: string;
+};
+
+export type VendedorOpcao = { id: string; nome: string };
+
+/**
+ * Opções pro filtro de vendedor — RLS de usuarios (usuarios_select_admin /
+ * usuarios_select_filial_gerente) já restringe a lista à filial de quem
+ * consulta quando é gerente; passar filial explicitamente só importa pro
+ * admin, que enxerga todas.
+ */
+export async function listarVendedoresParaFiltro(filial?: FilialCvc): Promise<VendedorOpcao[]> {
+  const supabase = await createClient();
+
+  let query = supabase.from("usuarios").select("id, nome_completo").eq("perfil", "vendedor").order("nome_completo");
+  if (filial) query = query.eq("filial", filial);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (data ?? []).map((u) => ({ id: u.id, nome: u.nome_completo }));
+}
+
 type CasoParaMetricas = {
   status_atual: StatusCaso;
   tipo_caso: TipoCaso;
@@ -74,17 +99,23 @@ function tipoMaisComum(casosDoGrupo: CasoParaMetricas[]): { tipo: TipoCaso; quan
 /**
  * Mesma base de dados do Dashboard (Acompanhar Casos) — a RLS já decide o
  * escopo por perfil (vendedor: próprios; gerente: filial; admin: tudo), o
- * Painel de Gestão só agrega o que ela libera. Sem SQL de agregação: no
- * volume desta operação (uma franquia, 3 filiais) uma soma em memória sobre
- * as linhas já filtradas é simples e rápida o suficiente — ver decisão
- * registrada na conversa que introduziu o Painel de Gestão.
+ * Painel de Gestão só agrega o que ela libera. Filtros (filial/vendedor) são
+ * só um recorte dentro do que a RLS já libera — nunca uma forma de ver mais
+ * do que o perfil já pode. Sem SQL de agregação: no volume desta operação
+ * (uma franquia, 3 filiais) uma soma em memória sobre as linhas já
+ * filtradas é simples e rápida o suficiente — ver decisão registrada na
+ * conversa que introduziu o Painel de Gestão.
  */
-export async function carregarMetricasPainel(): Promise<MetricasPainel> {
+export async function carregarMetricasPainel(filtros: FiltrosPainel = {}): Promise<MetricasPainel> {
   const supabase = await createClient();
 
-  const { data: casos, error } = await supabase
+  let query = supabase
     .from("casos")
     .select("id, protocolo, cliente_nome, status_atual, tipo_caso, filial, vendedor_dono, prazo_vigencia");
+  if (filtros.filial) query = query.eq("filial", filtros.filial);
+  if (filtros.vendedorId) query = query.eq("vendedor_dono", filtros.vendedorId);
+
+  const { data: casos, error } = await query;
   if (error) throw error;
 
   const lista = casos ?? [];
@@ -150,39 +181,48 @@ export async function carregarMetricasPainel(): Promise<MetricasPainel> {
   }
   casosAtencaoPrazo.sort((a, b) => a.diasAteVencimento - b.diasAteVencimento);
 
-  // implicacoes tem RLS idêntica à de casos (mesmo caso_id por trás) — a
-  // mesma consulta RLS-scoped já garante que só somamos o que este perfil
-  // pode ver, sem checagem extra em código.
-  const { data: implicacoes, error: implicacoesError } = await supabase
-    .from("implicacoes")
-    .select("multa_contratual_valor, multa_fornecedor_valor, quem_paga");
-  if (implicacoesError) throw implicacoesError;
+  // implicacoes/desfechos não têm filial/vendedor_dono — o recorte por
+  // filtro passa pelos ids de `lista` (já filtrada acima), não por uma
+  // condição própria nessas tabelas. RLS delas espelha a de casos de
+  // qualquer forma, então mesmo sem filtro nunca vaza mais que `lista`.
+  const casoIds = lista.map((c) => c.id);
 
   let multaTotal = 0;
   const multaPorQuemPaga: Record<QuemPagaMulta, number> = { cliente: 0, vendedor: 0 };
-  for (const i of implicacoes ?? []) {
-    const valor = i.multa_contratual_valor + i.multa_fornecedor_valor;
-    multaTotal += valor;
-    multaPorQuemPaga[i.quem_paga] += valor;
-  }
-
-  // Só desfechos ativos (não substituídos/cancelados) — correção com
-  // histórico (20260722000001) significa que um caso pode ter várias linhas
-  // de remarcação ao longo do tempo; somar todas contaria valor já corrigido.
-  const { data: remarcacoes, error: remarcacoesError } = await supabase
-    .from("desfechos_visivel")
-    .select("valor_taxas, valor_diferenca_tarifaria, substituido_por, cancelado_em")
-    .eq("tipo", "remarcacao");
-  if (remarcacoesError) throw remarcacoesError;
-
   const taxasRemarcacao = { taxas: 0, diferencaTarifaria: 0 };
-  for (const r of remarcacoes ?? []) {
-    // Boolean(...), não "!== null": mesma lição do bug de "Invalid Date" em
-    // desfechos-secao.tsx — se a coluna não existir na linha (schema
-    // desatualizado), ela vem undefined, e undefined !== null é true em JS.
-    if (Boolean(r.substituido_por) || Boolean(r.cancelado_em)) continue;
-    taxasRemarcacao.taxas += r.valor_taxas ?? 0;
-    taxasRemarcacao.diferencaTarifaria += r.valor_diferenca_tarifaria ?? 0;
+
+  if (casoIds.length > 0) {
+    const { data: implicacoes, error: implicacoesError } = await supabase
+      .from("implicacoes")
+      .select("multa_contratual_valor, multa_fornecedor_valor, quem_paga")
+      .in("caso_id", casoIds);
+    if (implicacoesError) throw implicacoesError;
+
+    for (const i of implicacoes ?? []) {
+      const valor = i.multa_contratual_valor + i.multa_fornecedor_valor;
+      multaTotal += valor;
+      multaPorQuemPaga[i.quem_paga] += valor;
+    }
+
+    // Só desfechos ativos (não substituídos/cancelados) — correção com
+    // histórico (20260722000001) significa que um caso pode ter várias
+    // linhas de remarcação ao longo do tempo; somar todas contaria valor
+    // já corrigido.
+    const { data: remarcacoes, error: remarcacoesError } = await supabase
+      .from("desfechos_visivel")
+      .select("valor_taxas, valor_diferenca_tarifaria, substituido_por, cancelado_em")
+      .eq("tipo", "remarcacao")
+      .in("caso_id", casoIds);
+    if (remarcacoesError) throw remarcacoesError;
+
+    for (const r of remarcacoes ?? []) {
+      // Boolean(...), não "!== null": mesma lição do bug de "Invalid Date"
+      // em desfechos-secao.tsx — se a coluna não existir na linha (schema
+      // desatualizado), ela vem undefined, e undefined !== null é true em JS.
+      if (Boolean(r.substituido_por) || Boolean(r.cancelado_em)) continue;
+      taxasRemarcacao.taxas += r.valor_taxas ?? 0;
+      taxasRemarcacao.diferencaTarifaria += r.valor_diferenca_tarifaria ?? 0;
+    }
   }
 
   return {
