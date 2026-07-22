@@ -4,6 +4,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { buscarProximaDelegacaoParaAviso } from "@/lib/delegacoes/listar";
 import { FILIAL_LABELS, PERFIL_LABELS } from "@/lib/labels";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 import { DelegacaoAvisoBanner } from "./delegacao-aviso-banner";
 import { logout } from "../login/actions";
@@ -49,11 +50,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </Link>
           </nav>
         </div>
-        <form action={logout}>
-          <Button type="submit" variant="outline" size="sm">
-            Sair
-          </Button>
-        </form>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <form action={logout}>
+            <Button type="submit" variant="outline" size="sm">
+              Sair
+            </Button>
+          </form>
+        </div>
       </header>
       {proximaDelegacao && <DelegacaoAvisoBanner inicio={proximaDelegacao.inicio} />}
       <main className="flex-1 p-4">{children}</main>
