@@ -14,6 +14,8 @@ const ERRO_MENSAGENS: Record<string, string> = {
   conta_desativada: "Sua conta foi desativada. Fale com o administrador do sistema.",
   perfil_nao_encontrado: "Não encontramos um perfil vinculado a este login. Fale com o administrador.",
   link_invalido: "Este link expirou ou já foi usado. Solicite um novo.",
+  sessao_expirada: "Sua sessão expirou após 12 horas. Entre novamente.",
+  inatividade: "Sessão encerrada por inatividade (30 minutos). Entre novamente.",
 };
 
 const initialState: LoginState = {};

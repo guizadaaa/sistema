@@ -12,17 +12,13 @@ Implementação: `src/lib/auth/mfa.ts`, `src/app/mfa/`, `src/app/(app)/seguranca
 
 ## Expiração de sessão
 
-**Status: limitação conhecida e aceita, não é um plano de ação.** Time-box e inactivity timeout (Authentication → Sessions) são recursos do plano Pro do Supabase. Decisão do projeto: seguir no plano gratuito indefinidamente, sem previsão de migrar para o Pro — então esses dois controles **não vão ser aplicados**, não é algo "pendente" esperando um upgrade futuro.
-
-Caso o cálculo de custo/benefício mude no futuro e o projeto migre para o Pro, os valores recomendados seriam:
+O projeto segue no plano gratuito do Supabase, sem previsão de migrar para o Pro — decisão do projeto, não uma limitação temporária. Os controles nativos de sessão (Authentication → Sessions: time-box e inactivity timeout) só existem no plano pago, então **foram implementados na própria aplicação**, fora do Supabase:
 
 - **Time-box de sessão: 12 horas** — força login completo (senha + 2FA) de novo depois desse período, independente de uso.
-- **Timeout de inatividade: 30 minutos** — força login de novo depois desse tempo sem atividade.
+- **Timeout de inatividade: 30 minutos** — força login de novo depois desse tempo sem atividade no servidor (navegação de página ou submit de formulário/Server Action).
 
-Motivo (vale como registro, mesmo sem os controles ligados): o sistema lida com CPF e dado bancário de clientes (contas para reembolso), e roda em ambiente de loja/atendimento com tela potencialmente compartilhada — 30 minutos de inatividade cobriria o cenário de alguém sair da mesa com a sessão aberta; 12 horas garantiria que ninguém fica com sessão aberta de um turno para o outro sem repassar pela autenticação completa.
+Motivo: o sistema lida com CPF e dado bancário de clientes (contas para reembolso), e roda em ambiente de loja/atendimento com tela potencialmente compartilhada — 30 minutos de inatividade cobre o cenário de alguém sair da mesa com a sessão aberta; 12 horas garante que ninguém fica com sessão aberta de um turno para o outro sem repassar pela autenticação completa.
 
-Sem esses controles, uma sessão pode em teoria persistir indefinidamente (o Supabase renova o token sozinho enquanto o navegador mantiver o cookie). Mitigação real hoje, dentro do plano gratuito:
+**Implementação**: dois cookies `httpOnly` (`sessao_inicio`, `ultima_atividade` — `src/lib/auth/sessao.ts`), checados a cada requisição autenticada em `src/proxy.ts` (é onde a sessão já é revalidada hoje — Next.js 16 renomeou `middleware.ts`/`middleware` para `proxy.ts`/`proxy`, ver `AGENTS.md`). Ao expirar qualquer um dos dois limites, a sessão é encerrada (`signOut()`) e a pessoa volta para `/login` com uma mensagem explicando o motivo. `login()` grava `sessao_inicio` explicitamente no momento do login; os cookies são "self-healing" nos demais pontos de entrada de sessão (ex.: `/auth/confirm`) — se ausentes, só começam a contar a partir daquele momento, sem forçar logout.
 
-- **2FA obrigatório para adm/adm_master** é a principal proteção contra sessão comprometida — mesmo com a sessão aberta, um ataque preexistente ao navegador não teria driblado o 2FA para chegar até ali.
-- Hábito operacional de clicar em **"Sair"** ao deixar a mesa, especialmente em terminal compartilhado — não é reforçado por código, depende de cada pessoa.
-- Existe um caminho para implementar inactivity timeout e time-box **na própria aplicação** (sem depender do Supabase Pro — checagem de última atividade e de início de sessão via cookie próprio, reforçada no middleware) caso o projeto decida que vale o esforço de manutenção extra. Não implementado; ver com o time antes de priorizar.
+**Limitação conhecida e aceita**: a checagem de inatividade só enxerga requisições ao servidor, não digitação/scroll no cliente — alguém preenchendo um formulário longo por mais de 30 minutos sem nenhum submit ou navegação seria desconectado mesmo "ativo" na tela. Não implementamos um heartbeat (ping periódico em JS) para cobrir esse caso porque os formulários deste sistema não são longos o suficiente para isso ser um problema real na prática.
