@@ -8,10 +8,8 @@
 export const SESSAO_INICIO_COOKIE = "sessao_inicio";
 export const ULTIMA_ATIVIDADE_COOKIE = "ultima_atividade";
 
-// TEMPORÁRIO — valores reduzidos só para teste manual em PR (ver #23).
-// Reverter para 12h / 30min antes do merge.
-export const SESSAO_TIME_BOX_MS = 2 * 60 * 1000; // 2min (TESTE — valor final: 12h)
-export const SESSAO_INATIVIDADE_MS = 1 * 60 * 1000; // 1min (TESTE — valor final: 30min)
+export const SESSAO_TIME_BOX_MS = 12 * 60 * 60 * 1000; // 12h
+export const SESSAO_INATIVIDADE_MS = 30 * 60 * 1000; // 30min
 
 // A checagem de expiração de verdade acontece no servidor (proxy.ts),
 // comparando o timestamp guardado dentro do valor do cookie — o maxAge do
