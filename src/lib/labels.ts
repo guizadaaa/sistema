@@ -101,4 +101,5 @@ export const TABELA_AUDITORIA_LABELS: Record<string, string> = {
   implicacoes: "Implicações financeiras",
   desfechos: "Desfechos",
   anexos: "Anexos",
+  casos: "Casos",
 };
