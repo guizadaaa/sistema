@@ -23,6 +23,15 @@ function formatarMoeda(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function formatarDias(dias: number | null): string {
+  if (dias === null) return "—";
+  if (dias < 1) return "Menos de 1 dia";
+  const inteiro = Math.round(dias);
+  return inteiro === 1 ? "1 dia" : `${inteiro} dias`;
+}
+
+const STATUS_MARCOS = STATUS_ORDEM.filter((s) => s !== "inicial");
+
 export default async function PainelPage({
   searchParams,
 }: {
@@ -184,6 +193,87 @@ export default async function PainelPage({
                       <td className="py-2 pr-4">{v.vendedorNome}</td>
                       <td className="py-2 pr-4">{TIPO_CASO_LABELS[v.tipo]}</td>
                       <td className="py-2 pr-4">{v.totalCasos}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tempo médio por etapa</CardTitle>
+          <CardDescription>Dias corridos desde a abertura do caso até alcançar cada status pela primeira vez</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {metricas.total === 0 ? (
+            <p className="text-muted-foreground text-sm">Nenhum caso encontrado.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {STATUS_MARCOS.map((status) => (
+                <li key={status} className="flex items-center justify-between text-sm">
+                  <span>Até {STATUS_LABELS[status]}</span>
+                  <span className="font-medium">{formatarDias(metricas.tempoMedioPorStatus[status])}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {metricas.tempoMedioPorStatusPorFilial.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Por loja</h3>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-muted-foreground border-b text-left">
+                    <th className="py-2 pr-4 font-medium">Filial</th>
+                    {STATUS_MARCOS.map((status) => (
+                      <th key={status} className="py-2 pr-4 font-medium">
+                        Até {STATUS_LABELS[status]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {metricas.tempoMedioPorStatusPorFilial.map((f) => (
+                    <tr key={f.filial} className="border-b last:border-0">
+                      <td className="py-2 pr-4">{FILIAL_LABELS[f.filial]}</td>
+                      {STATUS_MARCOS.map((status) => (
+                        <td key={status} className="py-2 pr-4">
+                          {formatarDias(f.porStatus[status])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {metricas.tempoMedioPorStatusPorVendedor.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Por vendedor</h3>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-muted-foreground border-b text-left">
+                    <th className="py-2 pr-4 font-medium">Vendedor</th>
+                    {STATUS_MARCOS.map((status) => (
+                      <th key={status} className="py-2 pr-4 font-medium">
+                        Até {STATUS_LABELS[status]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {metricas.tempoMedioPorStatusPorVendedor.map((v) => (
+                    <tr key={v.vendedorId} className="border-b last:border-0">
+                      <td className="py-2 pr-4">{v.vendedorNome}</td>
+                      {STATUS_MARCOS.map((status) => (
+                        <td key={status} className="py-2 pr-4">
+                          {formatarDias(v.porStatus[status])}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { duracaoEmDiasFracionarios } from "@/lib/casos/duracao";
 import { diasAteVencimento, situacaoPrazoVigencia } from "@/lib/casos/prazo";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 import { createClient } from "@/lib/supabase/server";
@@ -27,6 +28,17 @@ export type TipoMaisComumPorVendedor = {
   totalCasos: number;
 };
 
+/**
+ * Dias corridos (fracionários) desde a criação do caso até a PRIMEIRA vez
+ * que ele alcançou aquele status — null quando nenhum caso do grupo chegou
+ * lá ainda. "inicial" fica sempre null (tempo até o próprio início é 0,
+ * não é uma métrica útil de exibir).
+ */
+export type TempoMedioPorStatus = Record<StatusCaso, number | null>;
+
+export type TempoMedioPorStatusPorFilial = { filial: FilialCvc; porStatus: TempoMedioPorStatus };
+export type TempoMedioPorStatusPorVendedor = { vendedorId: string; vendedorNome: string; porStatus: TempoMedioPorStatus };
+
 export type CasoAtencaoPrazo = {
   id: string;
   protocolo: number;
@@ -47,6 +59,10 @@ export type MetricasPainel = {
   prazoVencendo: number;
   /** Vencidos primeiro (mais atrasado primeiro), depois vencendo (mais próximo primeiro). */
   casosAtencaoPrazo: CasoAtencaoPrazo[];
+  tempoMedioPorStatus: TempoMedioPorStatus;
+  /** Só populado quando há mais de uma filial nos dados (perfil admin). */
+  tempoMedioPorStatusPorFilial: TempoMedioPorStatusPorFilial[];
+  tempoMedioPorStatusPorVendedor: TempoMedioPorStatusPorVendedor[];
   multaTotal: number;
   multaPorQuemPaga: Record<QuemPagaMulta, number>;
   /** Natureza diferente de multa contratual — nunca somada junto (confirmado com o cliente). */
@@ -94,6 +110,61 @@ function tipoMaisComum(casosDoGrupo: CasoParaMetricas[]): { tipo: TipoCaso; quan
     (melhor, tipo) => (contagem[tipo] > melhor.quantidade ? { tipo, quantidade: contagem[tipo] } : melhor),
     { tipo: TIPOS_CASO[0], quantidade: -1 }
   );
+}
+
+type EtapaHistorico = { caso_id: string; status: StatusCaso; duracao: string };
+
+/**
+ * Para cada caso, tempo acumulado (em dias) até a primeira vez que ele
+ * alcançou cada status — reaproveita a `duracao` já calculada por
+ * status_historico_com_duracao (tempo em CADA etapa) em vez de recalcular
+ * diferenças de timestamp: a soma telescópica das durações de todas as
+ * etapas anteriores a X é, por construção, exatamente o tempo decorrido até
+ * alcançar X (duracao[etapa] = entrou_em[próxima etapa] − entrou_em[etapa]).
+ *
+ * `historico` precisa estar ordenado por caso_id, entrou_em (a query abaixo
+ * já garante isso) — a função não reordena.
+ */
+function calcularTempoAteStatusPorCaso(historico: EtapaHistorico[]): Map<string, Partial<Record<StatusCaso, number>>> {
+  const tempoAtePorCaso = new Map<string, Partial<Record<StatusCaso, number>>>();
+  const cumulativoPorCaso = new Map<string, number>();
+
+  for (const etapa of historico) {
+    const cumulativo = cumulativoPorCaso.get(etapa.caso_id) ?? 0;
+    const tempoAte = tempoAtePorCaso.get(etapa.caso_id) ?? {};
+
+    if (!(etapa.status in tempoAte)) {
+      tempoAte[etapa.status] = cumulativo;
+      tempoAtePorCaso.set(etapa.caso_id, tempoAte);
+    }
+
+    cumulativoPorCaso.set(etapa.caso_id, cumulativo + duracaoEmDiasFracionarios(etapa.duracao));
+  }
+
+  return tempoAtePorCaso;
+}
+
+/** Média (em dias) por status, sobre um grupo de caso_ids — null se nenhum caso do grupo chegou lá. */
+function mediaTempoPorStatus(
+  casoIds: string[],
+  tempoAtePorCaso: Map<string, Partial<Record<StatusCaso, number>>>
+): TempoMedioPorStatus {
+  const resultado = {} as TempoMedioPorStatus;
+
+  for (const status of STATUS_ORDEM) {
+    if (status === "inicial") {
+      resultado[status] = null;
+      continue;
+    }
+
+    const valores = casoIds
+      .map((id) => tempoAtePorCaso.get(id)?.[status])
+      .filter((v): v is number => v !== undefined);
+
+    resultado[status] = valores.length > 0 ? valores.reduce((soma, v) => soma + v, 0) / valores.length : null;
+  }
+
+  return resultado;
 }
 
 /**
@@ -187,6 +258,46 @@ export async function carregarMetricasPainel(filtros: FiltrosPainel = {}): Promi
   // qualquer forma, então mesmo sem filtro nunca vaza mais que `lista`.
   const casoIds = lista.map((c) => c.id);
 
+  let tempoMedioPorStatus = mediaTempoPorStatus([], new Map());
+  let tempoMedioPorStatusPorFilial: TempoMedioPorStatusPorFilial[] = [];
+  let tempoMedioPorStatusPorVendedor: TempoMedioPorStatusPorVendedor[] = [];
+
+  if (casoIds.length > 0) {
+    const { data: historico, error: historicoError } = await supabase
+      .from("status_historico_com_duracao")
+      .select("caso_id, status, duracao")
+      .in("caso_id", casoIds)
+      .order("caso_id", { ascending: true })
+      .order("entrou_em", { ascending: true });
+    if (historicoError) throw historicoError;
+
+    const tempoAtePorCaso = calcularTempoAteStatusPorCaso(historico ?? []);
+
+    tempoMedioPorStatus = mediaTempoPorStatus(casoIds, tempoAtePorCaso);
+
+    tempoMedioPorStatusPorFilial =
+      filiaisPresentes.length > 1
+        ? filiaisPresentes.map((filial) => ({
+            filial,
+            porStatus: mediaTempoPorStatus(
+              lista.filter((c) => c.filial === filial).map((c) => c.id),
+              tempoAtePorCaso
+            ),
+          }))
+        : [];
+
+    tempoMedioPorStatusPorVendedor = vendedorIds
+      .map((vendedorId) => ({
+        vendedorId,
+        vendedorNome: nomesPorVendedor.get(vendedorId) ?? "—",
+        porStatus: mediaTempoPorStatus(
+          lista.filter((c) => c.vendedor_dono === vendedorId).map((c) => c.id),
+          tempoAtePorCaso
+        ),
+      }))
+      .sort((a, b) => a.vendedorNome.localeCompare(b.vendedorNome, "pt-BR"));
+  }
+
   let multaTotal = 0;
   const multaPorQuemPaga: Record<QuemPagaMulta, number> = { cliente: 0, vendedor: 0 };
   const taxasRemarcacao = { taxas: 0, diferencaTarifaria: 0 };
@@ -234,6 +345,9 @@ export async function carregarMetricasPainel(filtros: FiltrosPainel = {}): Promi
     prazoVencidos,
     prazoVencendo,
     casosAtencaoPrazo: casosAtencaoPrazo.map(({ diasAteVencimento: _d, ...resto }) => resto),
+    tempoMedioPorStatus,
+    tempoMedioPorStatusPorFilial,
+    tempoMedioPorStatusPorVendedor,
     multaTotal,
     multaPorQuemPaga,
     taxasRemarcacao,
