@@ -3,7 +3,7 @@ import "server-only";
 import { diasAteVencimento, situacaoPrazoVigencia } from "@/lib/casos/prazo";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 import { createClient } from "@/lib/supabase/server";
-import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
+import type { FilialCvc, QuemPagaMulta, StatusCaso, TipoCaso } from "@/lib/supabase/types";
 
 export const STATUS_ORDEM: readonly StatusCaso[] = [
   "inicial",
@@ -47,6 +47,10 @@ export type MetricasPainel = {
   prazoVencendo: number;
   /** Vencidos primeiro (mais atrasado primeiro), depois vencendo (mais próximo primeiro). */
   casosAtencaoPrazo: CasoAtencaoPrazo[];
+  multaTotal: number;
+  multaPorQuemPaga: Record<QuemPagaMulta, number>;
+  /** Natureza diferente de multa contratual — nunca somada junto (confirmado com o cliente). */
+  taxasRemarcacao: { taxas: number; diferencaTarifaria: number };
 };
 
 type CasoParaMetricas = {
@@ -146,6 +150,41 @@ export async function carregarMetricasPainel(): Promise<MetricasPainel> {
   }
   casosAtencaoPrazo.sort((a, b) => a.diasAteVencimento - b.diasAteVencimento);
 
+  // implicacoes tem RLS idêntica à de casos (mesmo caso_id por trás) — a
+  // mesma consulta RLS-scoped já garante que só somamos o que este perfil
+  // pode ver, sem checagem extra em código.
+  const { data: implicacoes, error: implicacoesError } = await supabase
+    .from("implicacoes")
+    .select("multa_contratual_valor, multa_fornecedor_valor, quem_paga");
+  if (implicacoesError) throw implicacoesError;
+
+  let multaTotal = 0;
+  const multaPorQuemPaga: Record<QuemPagaMulta, number> = { cliente: 0, vendedor: 0 };
+  for (const i of implicacoes ?? []) {
+    const valor = i.multa_contratual_valor + i.multa_fornecedor_valor;
+    multaTotal += valor;
+    multaPorQuemPaga[i.quem_paga] += valor;
+  }
+
+  // Só desfechos ativos (não substituídos/cancelados) — correção com
+  // histórico (20260722000001) significa que um caso pode ter várias linhas
+  // de remarcação ao longo do tempo; somar todas contaria valor já corrigido.
+  const { data: remarcacoes, error: remarcacoesError } = await supabase
+    .from("desfechos_visivel")
+    .select("valor_taxas, valor_diferenca_tarifaria, substituido_por, cancelado_em")
+    .eq("tipo", "remarcacao");
+  if (remarcacoesError) throw remarcacoesError;
+
+  const taxasRemarcacao = { taxas: 0, diferencaTarifaria: 0 };
+  for (const r of remarcacoes ?? []) {
+    // Boolean(...), não "!== null": mesma lição do bug de "Invalid Date" em
+    // desfechos-secao.tsx — se a coluna não existir na linha (schema
+    // desatualizado), ela vem undefined, e undefined !== null é true em JS.
+    if (Boolean(r.substituido_por) || Boolean(r.cancelado_em)) continue;
+    taxasRemarcacao.taxas += r.valor_taxas ?? 0;
+    taxasRemarcacao.diferencaTarifaria += r.valor_diferenca_tarifaria ?? 0;
+  }
+
   return {
     total: lista.length,
     porStatus,
@@ -155,5 +194,8 @@ export async function carregarMetricasPainel(): Promise<MetricasPainel> {
     prazoVencidos,
     prazoVencendo,
     casosAtencaoPrazo: casosAtencaoPrazo.map(({ diasAteVencimento: _d, ...resto }) => resto),
+    multaTotal,
+    multaPorQuemPaga,
+    taxasRemarcacao,
   };
 }

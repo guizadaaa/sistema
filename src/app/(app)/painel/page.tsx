@@ -5,13 +5,17 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatTile } from "@/components/stat-tile";
-import { FILIAL_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
+import { FILIAL_LABELS, QUEM_PAGA_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { carregarMetricasPainel, STATUS_ORDEM } from "@/lib/painel/metricas";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 
 function formatarData(data: string) {
   return new Date(`${data}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+function formatarMoeda(valor: number) {
+  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export default async function PainelPage() {
@@ -169,6 +173,44 @@ export default async function PainelPage() {
           )}
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Multa total</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <span className="text-3xl font-semibold">{formatarMoeda(metricas.multaTotal)}</span>
+            <ul className="flex flex-col gap-2 text-sm">
+              {(Object.keys(metricas.multaPorQuemPaga) as (keyof typeof metricas.multaPorQuemPaga)[]).map((quemPaga) => (
+                <li key={quemPaga} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Paga pelo {QUEM_PAGA_LABELS[quemPaga].toLowerCase()}</span>
+                  <span className="font-medium">{formatarMoeda(metricas.multaPorQuemPaga[quemPaga])}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Taxas de remarcação</CardTitle>
+            <CardDescription>Natureza diferente de multa contratual — custo real de remarcações com custo</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="flex flex-col gap-2 text-sm">
+              <li className="flex items-center justify-between">
+                <span className="text-muted-foreground">Taxas</span>
+                <span className="font-medium">{formatarMoeda(metricas.taxasRemarcacao.taxas)}</span>
+              </li>
+              <li className="flex items-center justify-between">
+                <span className="text-muted-foreground">Diferença tarifária</span>
+                <span className="font-medium">{formatarMoeda(metricas.taxasRemarcacao.diferencaTarifaria)}</span>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
