@@ -11,6 +11,7 @@ import type {
   TipoCaso,
   TipoDesfecho,
   TipoDocumentoAnexo,
+  TipoNotificacao,
 } from "@/lib/supabase/types";
 
 export const PERFIL_LABELS: Record<PerfilUsuario, string> = {
@@ -102,4 +103,10 @@ export const TABELA_AUDITORIA_LABELS: Record<string, string> = {
   desfechos: "Desfechos",
   anexos: "Anexos",
   casos: "Casos",
+};
+
+export const TIPO_NOTIFICACAO_LABELS: Record<TipoNotificacao, string> = {
+  prazo_vencendo: "Prazo vencendo",
+  caso_novo: "Caso novo",
+  delegacao_expirando: "Delegação expirando",
 };

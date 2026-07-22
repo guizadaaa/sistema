@@ -3,10 +3,12 @@ import Link from "next/link";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { buscarProximaDelegacaoParaAviso } from "@/lib/delegacoes/listar";
 import { FILIAL_LABELS, PERFIL_LABELS } from "@/lib/labels";
+import { buscarNotificacoesRecentes, contarNotificacoesNaoLidas } from "@/lib/notificacoes/listar";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 import { DelegacaoAvisoBanner } from "./delegacao-aviso-banner";
+import { SinoNotificacoes } from "./sino-notificacoes";
 import { logout } from "../login/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -16,6 +18,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // adm_master, gerente_id sempre gerente — ver validate_delegacao).
   const proximaDelegacao =
     usuario.perfil === "gerente" ? await buscarProximaDelegacaoParaAviso(usuario.id) : null;
+
+  const [naoLidas, recentes] = await Promise.all([contarNotificacoesNaoLidas(), buscarNotificacoesRecentes(10)]);
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -56,6 +60,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </nav>
         </div>
         <div className="flex items-center gap-2">
+          <SinoNotificacoes naoLidasInicial={naoLidas} recentesIniciais={recentes} />
           <ThemeToggle />
           <form action={logout}>
             <Button type="submit" variant="outline" size="sm">
