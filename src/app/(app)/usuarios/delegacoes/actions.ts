@@ -54,7 +54,7 @@ export async function criarDelegacao(
     };
   }
 
-  revalidatePath("/delegacoes");
+  revalidatePath("/usuarios/delegacoes");
   return {};
 }
 
@@ -112,7 +112,7 @@ export async function atualizarDelegacaoAgendada(
     return { error: "Esta delegação já começou e não pode mais ser editada." };
   }
 
-  revalidatePath("/delegacoes");
+  revalidatePath("/usuarios/delegacoes");
   return {};
 }
 
@@ -143,7 +143,7 @@ export async function cancelarDelegacaoAgendada(delegacaoId: string): Promise<{ 
     return { error: "Esta delegação já começou e não pode mais ser cancelada — use Encerrar." };
   }
 
-  revalidatePath("/delegacoes");
+  revalidatePath("/usuarios/delegacoes");
   return {};
 }
 
@@ -161,6 +161,6 @@ export async function encerrarDelegacao(delegacaoId: string): Promise<{ error?: 
     return { error: "Não foi possível encerrar a delegação." };
   }
 
-  revalidatePath("/delegacoes");
+  revalidatePath("/usuarios/delegacoes");
   return {};
 }

@@ -31,14 +31,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link href="/casos" className="hover:underline">
               Casos
             </Link>
-            {(usuario.perfil === "adm" || usuario.perfil === "adm_master") && (
+            {/* Usuários e Delegações vivem sob a mesma rota /usuarios (abas
+                internas para quem enxerga as duas — hoje só adm_master); um
+                único link aqui, cada perfil cai direto no que pode ver. */}
+            {(usuario.perfil === "adm" || usuario.perfil === "adm_master" || usuario.perfil === "gerente") && (
               <Link href="/usuarios" className="hover:underline">
                 Usuários
-              </Link>
-            )}
-            {(usuario.perfil === "adm_master" || usuario.perfil === "gerente") && (
-              <Link href="/delegacoes" className="hover:underline">
-                Delegações
               </Link>
             )}
             {usuario.perfil === "adm_master" && (
