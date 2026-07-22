@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import {
+  cookieOptionsSessao,
+  SESSAO_INATIVIDADE_MS,
+  SESSAO_INICIO_COOKIE,
+  SESSAO_TIME_BOX_MS,
+  ULTIMA_ATIVIDADE_COOKIE,
+} from "@/lib/auth/sessao";
+
 import { supabaseAnonKey, supabaseUrl } from "./env";
 
 // /auth/confirm e /forgot-password precisam ser acessíveis sem sessão (é
@@ -50,6 +58,58 @@ export async function updateSession(request: NextRequest) {
     homeUrl.pathname = "/";
     homeUrl.search = "";
     return NextResponse.redirect(homeUrl);
+  }
+
+  // Time-box (12h) e inactivity timeout (30min) — ver src/lib/auth/sessao.ts.
+  // Os dois cookies são "self-healing": se ausentes (primeira requisição após
+  // login via /auth/confirm, ou logo depois do deploy desta feature), só
+  // começam a contar a partir de agora, sem forçar logout — login() também
+  // grava sessao_inicio explicitamente no caminho comum (senha), então isso
+  // aqui é o fallback para os outros pontos de entrada de sessão.
+  if (user) {
+    const agora = Date.now();
+    const sessaoInicio = Number(request.cookies.get(SESSAO_INICIO_COOKIE)?.value);
+    const ultimaAtividade = Number(request.cookies.get(ULTIMA_ATIVIDADE_COOKIE)?.value);
+
+    const expirouPorTempoMaximo = Number.isFinite(sessaoInicio) && agora - sessaoInicio > SESSAO_TIME_BOX_MS;
+    const expirouPorInatividade =
+      Number.isFinite(ultimaAtividade) && agora - ultimaAtividade > SESSAO_INATIVIDADE_MS;
+
+    if (expirouPorTempoMaximo || expirouPorInatividade) {
+      await supabase.auth.signOut();
+
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.search = "";
+      loginUrl.searchParams.set("erro", expirouPorTempoMaximo ? "sessao_expirada" : "inatividade");
+
+      const redirectResponse = NextResponse.redirect(loginUrl);
+      // signOut() já preparou (via setAll acima) a limpeza dos cookies de
+      // sessão do Supabase em `response` — repassa pro redirect, já que
+      // NextResponse.redirect() precisa de uma response nova, não reaproveita.
+      for (const cookie of response.cookies.getAll()) {
+        redirectResponse.cookies.set(cookie);
+      }
+      redirectResponse.cookies.delete(SESSAO_INICIO_COOKIE);
+      redirectResponse.cookies.delete(ULTIMA_ATIVIDADE_COOKIE);
+      return redirectResponse;
+    }
+
+    // Prefetch automático de <Link> (padrão do Next.js) não conta como
+    // atividade — o menu fica visível em toda página, então sem isso o
+    // relógio de inatividade nunca avançaria de verdade enquanto a aba
+    // ficasse aberta, mesmo sem nenhuma interação real do usuário.
+    const ehPrefetch =
+      request.headers.get("next-router-prefetch") === "1" ||
+      request.headers.get("purpose") === "prefetch" ||
+      (request.headers.get("sec-purpose")?.includes("prefetch") ?? false);
+
+    if (!ehPrefetch) {
+      response.cookies.set(ULTIMA_ATIVIDADE_COOKIE, String(agora), cookieOptionsSessao());
+    }
+    if (!Number.isFinite(sessaoInicio)) {
+      response.cookies.set(SESSAO_INICIO_COOKIE, String(agora), cookieOptionsSessao());
+    }
   }
 
   return response;
