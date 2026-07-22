@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatarDuracaoEmDias } from "@/lib/casos/duracao";
 import type { HistoricoComNome } from "@/lib/casos/detalhe";
 import { STATUS_LABELS } from "@/lib/labels";
+import { STATUS_DOT_ATUAL, STATUS_DOT_PASSADO } from "@/lib/status-colors";
 
 export function Timeline({ historico }: { historico: HistoricoComNome[] }) {
   return (
@@ -11,7 +12,9 @@ export function Timeline({ historico }: { historico: HistoricoComNome[] }) {
         return (
           <li key={item.id} className="flex gap-3">
             <div className="flex flex-col items-center">
-              <span className={`size-2.5 rounded-full ${ultimo ? "bg-primary" : "bg-muted-foreground"}`} />
+              <span
+                className={`size-2.5 rounded-full ${ultimo ? STATUS_DOT_ATUAL[item.status] : STATUS_DOT_PASSADO[item.status]}`}
+              />
               {i < historico.length - 1 && <span className="bg-border mt-1 w-px flex-1" />}
             </div>
             <div className="flex flex-1 flex-col gap-0.5 pb-3">
