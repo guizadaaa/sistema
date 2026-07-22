@@ -21,7 +21,7 @@ export async function removerFatorMfa(factorId: string): Promise<RemoverFatorSta
   const { error } = await supabase.auth.mfa.unenroll({ factorId });
   if (error) {
     console.error("Erro ao remover fator MFA:", error);
-    return { error: "Não foi possível remover este fator." };
+    return { error: `Não foi possível remover este fator: ${error.message}.` };
   }
 
   revalidatePath("/seguranca");

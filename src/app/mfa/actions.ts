@@ -25,7 +25,7 @@ export async function iniciarConfiguracaoMfa(): Promise<IniciarConfiguracaoMfaSt
   const { data: fatores, error: listError } = await supabase.auth.mfa.listFactors();
   if (listError) {
     console.error("Erro ao listar fatores MFA:", listError);
-    return { error: "Não foi possível iniciar a configuração do 2FA. Tente novamente." };
+    return { error: `Não foi possível iniciar a configuração do 2FA: ${listError.message}.` };
   }
 
   const naoVerificados = fatores.all.filter((f) => f.factor_type === "totp" && f.status === "unverified");
@@ -33,10 +33,16 @@ export async function iniciarConfiguracaoMfa(): Promise<IniciarConfiguracaoMfaSt
     await supabase.auth.mfa.unenroll({ factorId: fator.id });
   }
 
-  const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp" });
+  // friendlyName único é obrigatório na prática: o Supabase rejeita um novo
+  // fator TOTP sem nome (ou com nome repetido) quando o usuário já tem outro
+  // fator — Date.now() garante unicidade sem precisar contar fatores existentes.
+  const { data, error } = await supabase.auth.mfa.enroll({
+    factorType: "totp",
+    friendlyName: `Autenticador ${Date.now()}`,
+  });
   if (error || !data) {
     console.error("Erro ao iniciar enroll MFA:", error);
-    return { error: "Não foi possível iniciar a configuração do 2FA. Tente novamente." };
+    return { error: `Não foi possível iniciar a configuração do 2FA${error ? `: ${error.message}` : ""}.` };
   }
 
   return { qrCode: data.totp.qr_code, secret: data.totp.secret, factorId: data.id };
@@ -67,7 +73,8 @@ export async function verificarCodigoMfa(
   const supabase = await createClient();
   const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId, code: codigo });
   if (error) {
-    return { error: "Código inválido ou expirado. Confira o app autenticador e tente de novo." };
+    console.error("Erro ao verificar código MFA:", error);
+    return { error: `Código inválido ou expirado (${error.message}). Confira o app autenticador e tente de novo.` };
   }
 
   redirect(redirectTo);
