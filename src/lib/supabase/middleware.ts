@@ -95,9 +95,20 @@ export async function updateSession(request: NextRequest) {
       return redirectResponse;
     }
 
-    response.cookies.set(ULTIMA_ATIVIDADE_COOKIE, String(agora), cookieOptionsSessao(SESSAO_INATIVIDADE_MS));
+    // Prefetch automático de <Link> (padrão do Next.js) não conta como
+    // atividade — o menu fica visível em toda página, então sem isso o
+    // relógio de inatividade nunca avançaria de verdade enquanto a aba
+    // ficasse aberta, mesmo sem nenhuma interação real do usuário.
+    const ehPrefetch =
+      request.headers.get("next-router-prefetch") === "1" ||
+      request.headers.get("purpose") === "prefetch" ||
+      (request.headers.get("sec-purpose")?.includes("prefetch") ?? false);
+
+    if (!ehPrefetch) {
+      response.cookies.set(ULTIMA_ATIVIDADE_COOKIE, String(agora), cookieOptionsSessao());
+    }
     if (!Number.isFinite(sessaoInicio)) {
-      response.cookies.set(SESSAO_INICIO_COOKIE, String(agora), cookieOptionsSessao(SESSAO_TIME_BOX_MS));
+      response.cookies.set(SESSAO_INICIO_COOKIE, String(agora), cookieOptionsSessao());
     }
   }
 

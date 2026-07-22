@@ -4,13 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import {
-  cookieOptionsSessao,
-  SESSAO_INATIVIDADE_MS,
-  SESSAO_INICIO_COOKIE,
-  SESSAO_TIME_BOX_MS,
-  ULTIMA_ATIVIDADE_COOKIE,
-} from "@/lib/auth/sessao";
+import { cookieOptionsSessao, SESSAO_INICIO_COOKIE, ULTIMA_ATIVIDADE_COOKIE } from "@/lib/auth/sessao";
 import { createClient } from "@/lib/supabase/server";
 import { caminhoRedirectSeguro } from "@/lib/validation/redirect-path";
 
@@ -52,8 +46,8 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   // logo após um logout).
   const cookieStore = await cookies();
   const agora = String(Date.now());
-  cookieStore.set(SESSAO_INICIO_COOKIE, agora, cookieOptionsSessao(SESSAO_TIME_BOX_MS));
-  cookieStore.set(ULTIMA_ATIVIDADE_COOKIE, agora, cookieOptionsSessao(SESSAO_INATIVIDADE_MS));
+  cookieStore.set(SESSAO_INICIO_COOKIE, agora, cookieOptionsSessao());
+  cookieStore.set(ULTIMA_ATIVIDADE_COOKIE, agora, cookieOptionsSessao());
 
   redirect(parsed.data.redirectTo || "/");
 }
