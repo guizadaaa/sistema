@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Testes de RLS contra Postgres local (sem Docker/Supabase CLI — ver
-# .claude/skills/verify/SKILL.md). Recria um banco efêmero, aplica o mock de
-# auth/storage, todas as migrations reais em ordem, semeia dados de teste e
-# roda as asserções em supabase/tests/02_assertions_rls.sql.
+# Testes de banco (RLS + triggers de auditoria) contra Postgres local (sem
+# Docker/Supabase CLI — ver .claude/skills/verify/SKILL.md). Recria um banco
+# efêmero, aplica o mock de auth/storage, todas as migrations reais em
+# ordem, semeia dados de teste e roda toda asserção em
+# supabase/tests/NN_assertions_*.sql (ordem numérica).
 #
 # Requer: Postgres local rodando com um usuário que possa `createdb`/`dropdb`
 # (por padrão usa o role "postgres" via `sudo -u postgres`, ajuste PSQL/DB_USER
@@ -31,8 +32,11 @@ done
 echo "==> Semeando dados de teste"
 $PSQL -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "$REPO_ROOT/supabase/tests/01_seed.sql"
 
-echo "==> Rodando asserções de RLS"
-$PSQL -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "$REPO_ROOT/supabase/tests/02_assertions_rls.sql"
+echo "==> Rodando asserções"
+for f in "$REPO_ROOT"/supabase/tests/[0-9]*_assertions_*.sql; do
+  echo "    - $(basename "$f")"
+  $PSQL -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "$f"
+done
 
 echo "==> Limpando banco de teste"
 $DROPDB --if-exists "$DB_NAME"

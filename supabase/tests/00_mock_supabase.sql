@@ -68,8 +68,9 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
--- net (pg_net) — só o suficiente para a migration de retenção de anexos
--- (20260720000001) compilar; não exercitado pelos testes de C1/C2/M1.
+-- net (pg_net) — só o suficiente para as migrations de retenção de anexos
+-- (20260720000001) e backup (20260723000004) compilarem; nenhuma faz uma
+-- chamada HTTP de verdade nos testes (mockada como sucesso/200).
 -- ---------------------------------------------------------------------------
 create schema if not exists net;
 
@@ -77,6 +78,11 @@ create type net.http_response_result as (status_code integer, content text);
 
 create or replace function net.http_delete(
   url text, headers jsonb default '{}'::jsonb, body jsonb default '{}'::jsonb, timeout_milliseconds integer default 5000
+) returns bigint language sql as $$ select 1::bigint $$;
+
+create or replace function net.http_post(
+  url text, body jsonb default '{}'::jsonb, params jsonb default '{}'::jsonb,
+  headers jsonb default '{"Content-Type": "application/json"}'::jsonb, timeout_milliseconds integer default 5000
 ) returns bigint language sql as $$ select 1::bigint $$;
 
 create or replace function net.http_collect_response(request_id bigint, async boolean default true)

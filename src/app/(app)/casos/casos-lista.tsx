@@ -39,7 +39,16 @@ export function CasosLista({
   mostrarFiltroFilial,
 }: {
   casos: CasoListado[];
-  filtros: { status?: StatusCaso; tipo?: TipoCaso; filial?: FilialCvc; busca?: string };
+  filtros: {
+    status?: StatusCaso;
+    tipo?: TipoCaso;
+    filial?: FilialCvc;
+    busca?: string;
+    cpf?: string;
+    contrato?: string;
+    dataInicio?: string;
+    dataFim?: string;
+  };
   mostrarFiltroFilial: boolean;
 }) {
   return (
@@ -119,6 +128,46 @@ export function CasosLista({
                 </Select>
               </div>
             )}
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium" htmlFor="cpf">
+                CPF do cliente
+              </label>
+              <Input
+                id="cpf"
+                name="cpf"
+                placeholder="000.000.000-00"
+                defaultValue={filtros.cpf ?? ""}
+                className="w-44"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium" htmlFor="contrato">
+                Número de contrato
+              </label>
+              <Input
+                id="contrato"
+                name="contrato"
+                placeholder="Principal ou adicional"
+                defaultValue={filtros.contrato ?? ""}
+                className="w-44"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium" htmlFor="dataInicio">
+                Aberto de
+              </label>
+              <Input id="dataInicio" name="dataInicio" type="date" defaultValue={filtros.dataInicio ?? ""} className="w-40" />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium" htmlFor="dataFim">
+                até
+              </label>
+              <Input id="dataFim" name="dataFim" type="date" defaultValue={filtros.dataFim ?? ""} className="w-40" />
+            </div>
 
             <Button type="submit" variant="outline">
               Filtrar

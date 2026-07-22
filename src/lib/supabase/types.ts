@@ -29,6 +29,7 @@ export type TipoDocumentoAnexo =
   | "certidao_obito"
   | "outro";
 export type AcaoAuditoria = "insert" | "update" | "delete" | "download_signed_url";
+export type TipoNotificacao = "prazo_vencendo" | "caso_novo" | "delegacao_expirando";
 
 export interface Database {
   public: {
@@ -307,6 +308,27 @@ export interface Database {
         }>;
         Relationships: [];
       };
+      notificacoes: {
+        Row: {
+          id: string;
+          destinatario_id: string;
+          tipo: TipoNotificacao;
+          mensagem: string;
+          caso_id: string | null;
+          lida_em: string | null;
+          criado_em: string;
+        };
+        // Nunca inserido pelo client — só via trigger (casos_notificar_novo) ou
+        // pelas funções periódicas (notificar_prazos_vencendo/
+        // notificar_delegacoes_expirando), ambas SECURITY DEFINER.
+        Insert: never;
+        // authenticated só pode alterar a própria notificação, e só lida_em
+        // (enforce_notificacoes_update_permissions barra o resto).
+        Update: Partial<{
+          lida_em: string | null;
+        }>;
+        Relationships: [];
+      };
     };
     Views: {
       status_historico_com_duracao: {
@@ -377,6 +399,17 @@ export interface Database {
       cancelar_desfecho: {
         Args: { p_desfecho_id: string };
         Returns: void;
+      };
+      // Chamadas periodicamente (pg_cron ainda não agendado — ver
+      // 20260723000003_notificacoes.sql), não pelo app; tipadas por
+      // completude/consistência com as demais funções deste bloco.
+      notificar_prazos_vencendo: {
+        Args: { p_dias_antecedencia?: number };
+        Returns: number;
+      };
+      notificar_delegacoes_expirando: {
+        Args: { p_dias_antecedencia?: number };
+        Returns: number;
       };
     };
   };

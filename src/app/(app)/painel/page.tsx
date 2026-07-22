@@ -5,8 +5,10 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatTile } from "@/components/stat-tile";
+import { formatarDataBr, formatarDias, formatarMoeda } from "@/lib/formatacao";
 import { FILIAL_LABELS, QUEM_PAGA_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { carregarMetricasPainel, listarVendedoresParaFiltro, STATUS_ORDEM } from "@/lib/painel/metricas";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
@@ -15,13 +17,7 @@ import type { FilialCvc } from "@/lib/supabase/types";
 
 import { FILIAL_OPCOES, isFilialCvc } from "../casos/casos-lista";
 
-function formatarData(data: string) {
-  return new Date(`${data}T00:00:00`).toLocaleDateString("pt-BR");
-}
-
-function formatarMoeda(valor: number) {
-  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
+const STATUS_MARCOS = STATUS_ORDEM.filter((s) => s !== "inicial");
 
 export default async function PainelPage({
   searchParams,
@@ -41,11 +37,20 @@ export default async function PainelPage({
   const filial: FilialCvc | undefined =
     mostrarFiltroFilial && typeof sp.filial === "string" && isFilialCvc(sp.filial) ? sp.filial : undefined;
   const vendedorId = typeof sp.vendedorId === "string" && sp.vendedorId !== "todos" ? sp.vendedorId : undefined;
+  const dataInicio = typeof sp.dataInicio === "string" ? sp.dataInicio : undefined;
+  const dataFim = typeof sp.dataFim === "string" ? sp.dataFim : undefined;
 
   const [metricas, vendedoresDisponiveis] = await Promise.all([
-    carregarMetricasPainel({ filial, vendedorId }),
+    carregarMetricasPainel({ filial, vendedorId, dataInicio, dataFim }),
     listarVendedoresParaFiltro(filial),
   ]);
+
+  const queryStringExportacao = new URLSearchParams({
+    ...(filial ? { filial } : {}),
+    ...(vendedorId ? { vendedorId } : {}),
+    ...(dataInicio ? { dataInicio } : {}),
+    ...(dataFim ? { dataFim } : {}),
+  }).toString();
   const tiposOrdenados = [...TIPOS_CASO].sort((a, b) => metricas.porTipo[b] - metricas.porTipo[a]);
 
   return (
@@ -91,12 +96,35 @@ export default async function PainelPage({
               </Select>
             </div>
 
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium" htmlFor="dataInicio">
+                Aberto de
+              </label>
+              <Input id="dataInicio" name="dataInicio" type="date" defaultValue={dataInicio ?? ""} className="w-40" />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium" htmlFor="dataFim">
+                até
+              </label>
+              <Input id="dataFim" name="dataFim" type="date" defaultValue={dataFim ?? ""} className="w-40" />
+            </div>
+
             <Button type="submit" variant="outline">
               Filtrar
             </Button>
           </form>
         </CardContent>
       </Card>
+
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="outline" size="sm">
+          <a href={`/painel/exportar/pdf?${queryStringExportacao}`}>Exportar PDF</a>
+        </Button>
+        <Button asChild variant="outline" size="sm">
+          <a href={`/painel/exportar/excel?${queryStringExportacao}`}>Exportar Excel</a>
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile titulo="Total de protocolos" valor={metricas.total} />
@@ -176,6 +204,7 @@ export default async function PainelPage({
                     <th className="py-2 pr-4 font-medium">Vendedor</th>
                     <th className="py-2 pr-4 font-medium">Tipo mais comum</th>
                     <th className="py-2 pr-4 font-medium">Total de casos</th>
+                    <th className="py-2 pr-4 font-medium">Extrato</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -184,6 +213,92 @@ export default async function PainelPage({
                       <td className="py-2 pr-4">{v.vendedorNome}</td>
                       <td className="py-2 pr-4">{TIPO_CASO_LABELS[v.tipo]}</td>
                       <td className="py-2 pr-4">{v.totalCasos}</td>
+                      <td className="py-2 pr-4">
+                        <a href={`/painel/extrato-vendedor/${v.vendedorId}`} className="text-sm underline">
+                          Baixar PDF
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tempo médio por etapa</CardTitle>
+          <CardDescription>Dias corridos desde a abertura do caso até alcançar cada status pela primeira vez</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {metricas.total === 0 ? (
+            <p className="text-muted-foreground text-sm">Nenhum caso encontrado.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {STATUS_MARCOS.map((status) => (
+                <li key={status} className="flex items-center justify-between text-sm">
+                  <span>Até {STATUS_LABELS[status]}</span>
+                  <span className="font-medium">{formatarDias(metricas.tempoMedioPorStatus[status])}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {metricas.tempoMedioPorStatusPorFilial.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Por loja</h3>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-muted-foreground border-b text-left">
+                    <th className="py-2 pr-4 font-medium">Filial</th>
+                    {STATUS_MARCOS.map((status) => (
+                      <th key={status} className="py-2 pr-4 font-medium">
+                        Até {STATUS_LABELS[status]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {metricas.tempoMedioPorStatusPorFilial.map((f) => (
+                    <tr key={f.filial} className="border-b last:border-0">
+                      <td className="py-2 pr-4">{FILIAL_LABELS[f.filial]}</td>
+                      {STATUS_MARCOS.map((status) => (
+                        <td key={status} className="py-2 pr-4">
+                          {formatarDias(f.porStatus[status])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {metricas.tempoMedioPorStatusPorVendedor.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Por vendedor</h3>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-muted-foreground border-b text-left">
+                    <th className="py-2 pr-4 font-medium">Vendedor</th>
+                    {STATUS_MARCOS.map((status) => (
+                      <th key={status} className="py-2 pr-4 font-medium">
+                        Até {STATUS_LABELS[status]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {metricas.tempoMedioPorStatusPorVendedor.map((v) => (
+                    <tr key={v.vendedorId} className="border-b last:border-0">
+                      <td className="py-2 pr-4">{v.vendedorNome}</td>
+                      {STATUS_MARCOS.map((status) => (
+                        <td key={status} className="py-2 pr-4">
+                          {formatarDias(v.porStatus[status])}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
@@ -227,7 +342,7 @@ export default async function PainelPage({
                           c.situacao === "vencido" ? "text-destructive font-medium" : "font-medium text-amber-600 dark:text-amber-500"
                         }
                       >
-                        {formatarData(c.prazoVigencia)}
+                        {formatarDataBr(c.prazoVigencia)}
                       </span>
                     </td>
                   </tr>

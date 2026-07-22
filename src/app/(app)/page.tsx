@@ -24,6 +24,11 @@ export default async function HomePage() {
           <Button asChild variant="outline">
             <Link href="/casos">Acompanhar casos</Link>
           </Button>
+          {usuario.perfil === "vendedor" && (
+            <Button asChild variant="outline">
+              <a href={`/painel/extrato-vendedor/${usuario.id}`}>Baixar meu extrato</a>
+            </Button>
+          )}
         </div>
       </div>
 
