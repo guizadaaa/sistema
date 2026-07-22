@@ -1,5 +1,6 @@
 import "server-only";
 
+import { diasAteVencimento, situacaoPrazoVigencia } from "@/lib/casos/prazo";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 import { createClient } from "@/lib/supabase/server";
 import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
@@ -26,6 +27,15 @@ export type TipoMaisComumPorVendedor = {
   totalCasos: number;
 };
 
+export type CasoAtencaoPrazo = {
+  id: string;
+  protocolo: number;
+  clienteNome: string;
+  vendedorNome: string;
+  prazoVigencia: string;
+  situacao: "vencido" | "vencendo";
+};
+
 export type MetricasPainel = {
   total: number;
   porStatus: Record<StatusCaso, number>;
@@ -33,6 +43,10 @@ export type MetricasPainel = {
   /** Só populado quando há mais de uma filial nos dados (perfil admin). */
   tipoMaisComumPorFilial: TipoMaisComumPorFilial[];
   tipoMaisComumPorVendedor: TipoMaisComumPorVendedor[];
+  prazoVencidos: number;
+  prazoVencendo: number;
+  /** Vencidos primeiro (mais atrasado primeiro), depois vencendo (mais próximo primeiro). */
+  casosAtencaoPrazo: CasoAtencaoPrazo[];
 };
 
 type CasoParaMetricas = {
@@ -64,7 +78,9 @@ function tipoMaisComum(casosDoGrupo: CasoParaMetricas[]): { tipo: TipoCaso; quan
 export async function carregarMetricasPainel(): Promise<MetricasPainel> {
   const supabase = await createClient();
 
-  const { data: casos, error } = await supabase.from("casos").select("status_atual, tipo_caso, filial, vendedor_dono");
+  const { data: casos, error } = await supabase
+    .from("casos")
+    .select("id, protocolo, cliente_nome, status_atual, tipo_caso, filial, vendedor_dono, prazo_vigencia");
   if (error) throw error;
 
   const lista = casos ?? [];
@@ -109,5 +125,35 @@ export async function carregarMetricasPainel(): Promise<MetricasPainel> {
     })
     .sort((a, b) => b.totalCasos - a.totalCasos);
 
-  return { total: lista.length, porStatus, porTipo, tipoMaisComumPorFilial, tipoMaisComumPorVendedor };
+  let prazoVencidos = 0;
+  let prazoVencendo = 0;
+  const casosAtencaoPrazo: (CasoAtencaoPrazo & { diasAteVencimento: number })[] = [];
+  for (const c of lista) {
+    const situacao = situacaoPrazoVigencia(c.prazo_vigencia);
+    if (situacao === "vencido") prazoVencidos += 1;
+    if (situacao === "vencendo") prazoVencendo += 1;
+    if (situacao !== "normal") {
+      casosAtencaoPrazo.push({
+        id: c.id,
+        protocolo: c.protocolo,
+        clienteNome: c.cliente_nome,
+        vendedorNome: nomesPorVendedor.get(c.vendedor_dono) ?? "—",
+        prazoVigencia: c.prazo_vigencia,
+        situacao,
+        diasAteVencimento: diasAteVencimento(c.prazo_vigencia),
+      });
+    }
+  }
+  casosAtencaoPrazo.sort((a, b) => a.diasAteVencimento - b.diasAteVencimento);
+
+  return {
+    total: lista.length,
+    porStatus,
+    porTipo,
+    tipoMaisComumPorFilial,
+    tipoMaisComumPorVendedor,
+    prazoVencidos,
+    prazoVencendo,
+    casosAtencaoPrazo: casosAtencaoPrazo.map(({ diasAteVencimento: _d, ...resto }) => resto),
+  };
 }

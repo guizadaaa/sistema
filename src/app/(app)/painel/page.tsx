@@ -1,12 +1,18 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatTile } from "@/components/stat-tile";
 import { FILIAL_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { carregarMetricasPainel, STATUS_ORDEM } from "@/lib/painel/metricas";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 import { TIPOS_CASO } from "@/lib/validation/caso";
+
+function formatarData(data: string) {
+  return new Date(`${data}T00:00:00`).toLocaleDateString("pt-BR");
+}
 
 export default async function PainelPage() {
   const usuario = await requireCurrentUser();
@@ -25,12 +31,9 @@ export default async function PainelPage() {
       <h1 className="text-xl font-semibold">Painel de Gestão</h1>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="flex flex-col gap-1 py-4">
-            <span className="text-muted-foreground text-sm">Total de protocolos</span>
-            <span className="text-3xl font-semibold">{metricas.total}</span>
-          </CardContent>
-        </Card>
+        <StatTile titulo="Total de protocolos" valor={metricas.total} />
+        <StatTile titulo="Prazo vencido" valor={metricas.prazoVencidos} tom="destructive" />
+        <StatTile titulo="Vencendo em breve" valor={metricas.prazoVencendo} tom="atencao" />
       </div>
 
       <Card>
@@ -118,6 +121,51 @@ export default async function PainelPage() {
                 </tbody>
               </table>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Casos que precisam de atenção</CardTitle>
+          <CardDescription>Prazo de vigência vencido ou vencendo nos próximos dias</CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {metricas.casosAtencaoPrazo.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Nenhum caso com prazo vencido ou vencendo.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-muted-foreground border-b text-left">
+                  <th className="py-2 pr-4 font-medium">Protocolo</th>
+                  <th className="py-2 pr-4 font-medium">Cliente</th>
+                  <th className="py-2 pr-4 font-medium">Vendedor</th>
+                  <th className="py-2 pr-4 font-medium">Prazo de vigência</th>
+                </tr>
+              </thead>
+              <tbody>
+                {metricas.casosAtencaoPrazo.map((c) => (
+                  <tr key={c.id} className="border-b last:border-0 hover:bg-accent/50">
+                    <td className="py-2 pr-4">
+                      <Link href={`/casos/${c.id}`} className="font-medium hover:underline">
+                        #{c.protocolo}
+                      </Link>
+                    </td>
+                    <td className="py-2 pr-4">{c.clienteNome}</td>
+                    <td className="py-2 pr-4">{c.vendedorNome}</td>
+                    <td className="py-2 pr-4">
+                      <span
+                        className={
+                          c.situacao === "vencido" ? "text-destructive font-medium" : "font-medium text-amber-600 dark:text-amber-500"
+                        }
+                      >
+                        {formatarData(c.prazoVigencia)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </CardContent>
       </Card>
