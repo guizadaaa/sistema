@@ -72,7 +72,12 @@ export type MetricasPainel = {
 export type FiltrosPainel = {
   filial?: FilialCvc;
   vendedorId?: string;
+  /** Data de abertura (criado_em), formato yyyy-mm-dd, inclusive nas duas pontas. */
+  dataInicio?: string;
+  dataFim?: string;
 };
+
+const DATA_FORMATO = /^\d{4}-\d{2}-\d{2}$/;
 
 export type VendedorOpcao = { id: string; nome: string };
 
@@ -182,9 +187,15 @@ export async function carregarMetricasPainel(filtros: FiltrosPainel = {}): Promi
 
   let query = supabase
     .from("casos")
-    .select("id, protocolo, cliente_nome, status_atual, tipo_caso, filial, vendedor_dono, prazo_vigencia");
+    .select("id, protocolo, cliente_nome, status_atual, tipo_caso, filial, vendedor_dono, prazo_vigencia, criado_em");
   if (filtros.filial) query = query.eq("filial", filtros.filial);
   if (filtros.vendedorId) query = query.eq("vendedor_dono", filtros.vendedorId);
+  if (filtros.dataInicio && DATA_FORMATO.test(filtros.dataInicio)) {
+    query = query.gte("criado_em", `${filtros.dataInicio}T00:00:00`);
+  }
+  if (filtros.dataFim && DATA_FORMATO.test(filtros.dataFim)) {
+    query = query.lte("criado_em", `${filtros.dataFim}T23:59:59.999`);
+  }
 
   const { data: casos, error } = await query;
   if (error) throw error;
