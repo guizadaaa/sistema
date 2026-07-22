@@ -197,3 +197,52 @@ export async function gerarLinkAcesso(usuarioId: string): Promise<GerarLinkAcess
 
   return { link };
 }
+
+/**
+ * Plano de recuperação para quem perdeu o app autenticador: unenroll exige
+ * sessão aal2 (não dá pra se auto-remover sem o próprio código que se
+ * perdeu), então o único caminho é um adm_master remover os fatores do
+ * colega travado pela Admin API. Depois disso ele loga só com senha e o
+ * gate de MFA (requireCurrentUser) o manda reconfigurar do zero.
+ *
+ * Reset não passa por nenhum trigger de tabela (é uma operação na Admin API
+ * do Auth, fora de public.usuarios) — registra manualmente em auditoria,
+ * reaproveitando a ação 'update' existente. Falha nesse registro não desfaz
+ * o reset em si (a recuperação de acesso é a prioridade), só fica no log do
+ * servidor para investigação.
+ */
+export async function resetarMfaUsuario(usuarioId: string): Promise<{ error?: string }> {
+  const usuario = await requireCurrentUser();
+  if (usuario.perfil !== "adm_master") {
+    return { error: "Apenas o adm_master pode resetar o 2FA de outro usuário." };
+  }
+
+  const admin = createAdminClient();
+  const { data: fatoresResp, error: listError } = await admin.auth.admin.mfa.listFactors({ userId: usuarioId });
+  if (listError) {
+    console.error("Erro ao listar fatores MFA do usuário:", listError);
+    return { error: "Não foi possível resetar o 2FA deste usuário." };
+  }
+
+  for (const fator of fatoresResp.factors) {
+    const { error: deleteError } = await admin.auth.admin.mfa.deleteFactor({ id: fator.id, userId: usuarioId });
+    if (deleteError) {
+      console.error("Erro ao remover fator MFA do usuário:", deleteError);
+      return { error: "Não foi possível resetar o 2FA deste usuário." };
+    }
+  }
+
+  const { error: auditoriaError } = await admin.from("auditoria").insert({
+    tabela: "usuarios",
+    registro_id: usuarioId,
+    acao: "update",
+    dados_novos: { mfa_reset: true },
+    realizado_por: usuario.id,
+  });
+  if (auditoriaError) {
+    console.error("Erro ao registrar reset de MFA em auditoria:", auditoriaError);
+  }
+
+  revalidatePath("/usuarios");
+  return {};
+}
