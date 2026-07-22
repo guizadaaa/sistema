@@ -17,6 +17,11 @@ export const metadata: Metadata = {
   description: "Sistema de Gestão de Casos Operacionais — CVC",
 };
 
+// Aplica a classe "dark" antes da hidratação, direto no <html>, pra não
+// piscar o tema errado — lê a preferência salva (ver theme-toggle.tsx) e,
+// na primeira visita, cai para a preferência do sistema operacional.
+const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("tema");var d=t==="dark"||(t!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d)}catch(e){}})()`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,7 +31,11 @@ export default function RootLayout({
     <html
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

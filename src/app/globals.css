@@ -29,6 +29,23 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+
+  /* Cores por status de caso — matizes escolhidas e validadas para
+     distinção sob daltonismo (ΔE em OKLab, checado com script dedicado);
+     "-ink" é a variante escura usada como texto/badge sobre fundo claro,
+     para contraste AA — nunca a mesma cor usada sozinha para indicar algo. */
+  --status-inicial: #1baf7a;
+  --status-inicial-ink: #0f7a55;
+  --status-recepcionado: #eb6834;
+  --status-recepcionado-ink: #b8491e;
+  --status-em-andamento-interno: #4a3aa7;
+  --status-em-andamento-interno-ink: #4a3aa7;
+  --status-reavaliacao: #e87ba4;
+  --status-reavaliacao-ink: #a83865;
+  --status-resolvido: #008300;
+  --status-resolvido-ink: #008300;
+  --status-ouvidoria: #e34948;
+  --status-ouvidoria-ink: #c53030;
 }
 
 .dark {
@@ -56,6 +73,20 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
+
+  /* mesma família de matizes, passos re-validados contra a superfície escura */
+  --status-inicial: #199e70;
+  --status-inicial-ink: #34d399;
+  --status-recepcionado: #d95926;
+  --status-recepcionado-ink: #f0925f;
+  --status-em-andamento-interno: #9085e9;
+  --status-em-andamento-interno-ink: #b3aaff;
+  --status-reavaliacao: #d55181;
+  --status-reavaliacao-ink: #f183ac;
+  --status-resolvido: #1fbf1f;
+  --status-resolvido-ink: #3ddc3d;
+  --status-ouvidoria: #e66767;
+  --status-ouvidoria-ink: #f39191;
 }
 
 @theme inline {
@@ -85,6 +116,18 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-status-inicial: var(--status-inicial);
+  --color-status-inicial-ink: var(--status-inicial-ink);
+  --color-status-recepcionado: var(--status-recepcionado);
+  --color-status-recepcionado-ink: var(--status-recepcionado-ink);
+  --color-status-em-andamento-interno: var(--status-em-andamento-interno);
+  --color-status-em-andamento-interno-ink: var(--status-em-andamento-interno-ink);
+  --color-status-reavaliacao: var(--status-reavaliacao);
+  --color-status-reavaliacao-ink: var(--status-reavaliacao-ink);
+  --color-status-resolvido: var(--status-resolvido);
+  --color-status-resolvido-ink: var(--status-resolvido-ink);
+  --color-status-ouvidoria: var(--status-ouvidoria);
+  --color-status-ouvidoria-ink: var(--status-ouvidoria-ink);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

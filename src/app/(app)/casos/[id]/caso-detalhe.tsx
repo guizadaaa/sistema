@@ -11,6 +11,7 @@ import {
   TIPO_CASO_LABELS,
   TIPO_DESFECHO_LABELS,
 } from "@/lib/labels";
+import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 
 import { AnexosSecao } from "./anexos-secao";
 import { ContratosAdicionaisSecao } from "./contratos-adicionais-secao";
@@ -42,7 +43,7 @@ export function CasoDetalhe({
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <h1 className="text-xl font-semibold">Protocolo #{caso.protocolo}</h1>
-        <Badge variant="secondary">{STATUS_LABELS[caso.status_atual]}</Badge>
+        <Badge className={STATUS_BADGE_CLASSES[caso.status_atual]}>{STATUS_LABELS[caso.status_atual]}</Badge>
         {caso.elegivel_ouvidoria && <Badge variant="outline">Elegível a Ouvidoria</Badge>}
       </div>
 

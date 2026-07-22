@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { STATUS_LABELS } from "@/lib/labels";
+import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 
 function StatTile({
   titulo,
@@ -73,7 +74,7 @@ export default async function HomePage() {
               <ul className="flex flex-col gap-2">
                 {STATUS_ORDEM.map((status) => (
                   <li key={status} className="flex items-center justify-between text-sm">
-                    <Badge variant="secondary">{STATUS_LABELS[status]}</Badge>
+                    <Badge className={STATUS_BADGE_CLASSES[status]}>{STATUS_LABELS[status]}</Badge>
                     <span className="font-medium">{metricas.porStatus[status]}</span>
                   </li>
                 ))}
@@ -110,7 +111,7 @@ export default async function HomePage() {
                       </td>
                       <td className="py-2 pr-4">{c.clienteNome}</td>
                       <td className="py-2 pr-4">
-                        <Badge variant="secondary">{STATUS_LABELS[c.statusAtual]}</Badge>
+                        <Badge className={STATUS_BADGE_CLASSES[c.statusAtual]}>{STATUS_LABELS[c.statusAtual]}</Badge>
                       </td>
                       <td className="py-2 pr-4">{c.duracaoTexto}</td>
                     </tr>

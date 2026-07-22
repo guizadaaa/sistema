@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FILIAL_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { situacaoPrazoVigencia } from "@/lib/casos/prazo";
+import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 import type { CasoListado } from "@/lib/casos/listar";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
@@ -156,7 +157,7 @@ export function CasosLista({
                       <td className="py-2 pr-4">{c.cliente_nome}</td>
                       <td className="py-2 pr-4">{c.donoNome}</td>
                       <td className="py-2 pr-4">
-                        <Badge variant="secondary">{STATUS_LABELS[c.status_atual]}</Badge>
+                        <Badge className={STATUS_BADGE_CLASSES[c.status_atual]}>{STATUS_LABELS[c.status_atual]}</Badge>
                       </td>
                       <td className="py-2 pr-4">
                         <span
