@@ -10,7 +10,14 @@ import { bancoPorCodigo, CODIGO_BANCO_OUTRO } from "@/lib/validation/bancos";
 import { anexoObrigatorioFaltando, desfechoSchema } from "@/lib/validation/desfecho";
 import { implicacaoSchema } from "@/lib/validation/implicacao";
 import { ANEXO_TIPO_LABELS } from "@/lib/labels";
-import type { StatusCaso } from "@/lib/supabase/types";
+import type {
+  OrigemReembolsoIntegral,
+  OrigemRemarcacaoComCusto,
+  StatusCaso,
+  SubtipoReembolso,
+  SubtipoRemarcacao,
+  TipoDesfecho,
+} from "@/lib/supabase/types";
 
 export type EnviarAnexoState = {
   avisos?: string[];
@@ -116,20 +123,35 @@ export type RegistrarDesfechoState = {
   error?: string;
 };
 
-/**
- * A exigência de anexo (seção 3: remarcação com_custo exige atestado de
- * saúde; reembolso integral por saúde exige atestado ou certidão de óbito)
- * é revalidada aqui contra o banco, nunca contra o que o client alega ter
- * carregado — o mesmo princípio de "nunca confiar só no client" que já
- * aplicamos a CPF e ao tipo/tamanho de arquivo.
- */
-export async function registrarDesfecho(
-  casoId: string,
-  _prevState: RegistrarDesfechoState,
-  formData: FormData
-): Promise<RegistrarDesfechoState> {
-  await requireCurrentUser();
+type DesfechoParaGravar = {
+  tipo: TipoDesfecho;
+  subtipo_reembolso: SubtipoReembolso | null;
+  origem_reembolso_integral: OrigemReembolsoIntegral | null;
+  banco_codigo: string | null;
+  banco_nome_completo: string | null;
+  banco_agencia: string | null;
+  banco_conta: string | null;
+  banco_cpf: string | null;
+  valor: number | null;
+  subtipo_remarcacao: SubtipoRemarcacao | null;
+  origem_remarcacao_com_custo: OrigemRemarcacaoComCusto | null;
+  valor_taxas: number | null;
+  valor_diferenca_tarifaria: number | null;
+};
 
+/**
+ * Parsing + validação compartilhados entre registrar um desfecho novo e
+ * corrigir um existente (mesmos campos, mesmas regras — só o destino da
+ * escrita muda). A exigência de anexo (seção 3: remarcação com_custo exige
+ * atestado de saúde; reembolso integral por saúde exige atestado ou
+ * certidão de óbito) é revalidada aqui contra o banco, nunca contra o que o
+ * client alega ter carregado — o mesmo princípio de "nunca confiar só no
+ * client" que já aplicamos a CPF e ao tipo/tamanho de arquivo.
+ */
+async function parseDesfechoFormData(
+  casoId: string,
+  formData: FormData
+): Promise<{ error: string } | { dados: DesfechoParaGravar }> {
   const tipo = formData.get("tipo");
   const raw =
     tipo === "reembolso"
@@ -185,26 +207,111 @@ export async function registrarDesfecho(
         : { banco_codigo: dados.bancoCodigo, banco_nome_completo: bancoPorCodigo(dados.bancoCodigo)?.nome ?? null }
       : { banco_codigo: null, banco_nome_completo: null };
 
-  const { error } = await supabase.from("desfechos").insert({
-    caso_id: casoId,
-    tipo: dados.tipo,
-    subtipo_reembolso: "subtipoReembolso" in dados ? dados.subtipoReembolso : null,
-    origem_reembolso_integral: "origemReembolsoIntegral" in dados ? (dados.origemReembolsoIntegral ?? null) : null,
-    banco_codigo: banco.banco_codigo,
-    banco_nome_completo: banco.banco_nome_completo,
-    banco_agencia: "bancoAgencia" in dados ? (dados.bancoAgencia ?? null) : null,
-    banco_conta: "bancoConta" in dados ? (dados.bancoConta ?? null) : null,
-    banco_cpf: "bancoCpf" in dados ? (dados.bancoCpf ?? null) : null,
-    valor: "valor" in dados ? (dados.valor ?? null) : null,
-    subtipo_remarcacao: "subtipoRemarcacao" in dados ? dados.subtipoRemarcacao : null,
-    origem_remarcacao_com_custo: "origemRemarcacaoComCusto" in dados ? (dados.origemRemarcacaoComCusto ?? null) : null,
-    valor_taxas: "valorTaxas" in dados ? (dados.valorTaxas ?? null) : null,
-    valor_diferenca_tarifaria: "valorDiferencaTarifaria" in dados ? (dados.valorDiferencaTarifaria ?? null) : null,
-  });
+  return {
+    dados: {
+      tipo: dados.tipo,
+      subtipo_reembolso: "subtipoReembolso" in dados ? dados.subtipoReembolso : null,
+      origem_reembolso_integral: "origemReembolsoIntegral" in dados ? (dados.origemReembolsoIntegral ?? null) : null,
+      banco_codigo: banco.banco_codigo,
+      banco_nome_completo: banco.banco_nome_completo,
+      banco_agencia: "bancoAgencia" in dados ? (dados.bancoAgencia ?? null) : null,
+      banco_conta: "bancoConta" in dados ? (dados.bancoConta ?? null) : null,
+      banco_cpf: "bancoCpf" in dados ? (dados.bancoCpf ?? null) : null,
+      valor: "valor" in dados ? (dados.valor ?? null) : null,
+      subtipo_remarcacao: "subtipoRemarcacao" in dados ? dados.subtipoRemarcacao : null,
+      origem_remarcacao_com_custo: "origemRemarcacaoComCusto" in dados ? (dados.origemRemarcacaoComCusto ?? null) : null,
+      valor_taxas: "valorTaxas" in dados ? (dados.valorTaxas ?? null) : null,
+      valor_diferenca_tarifaria: "valorDiferencaTarifaria" in dados ? (dados.valorDiferencaTarifaria ?? null) : null,
+    },
+  };
+}
+
+export async function registrarDesfecho(
+  casoId: string,
+  _prevState: RegistrarDesfechoState,
+  formData: FormData
+): Promise<RegistrarDesfechoState> {
+  await requireCurrentUser();
+
+  const resultado = await parseDesfechoFormData(casoId, formData);
+  if ("error" in resultado) return { error: resultado.error };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("desfechos").insert({ caso_id: casoId, ...resultado.dados });
 
   if (error) {
     console.error("Erro ao registrar desfecho:", error);
     return { error: "Não foi possível registrar o desfecho. Verifique se você tem permissão para esta ação." };
+  }
+
+  revalidatePath(`/casos/${casoId}`);
+  return {};
+}
+
+export type CorrigirDesfechoState = {
+  error?: string;
+};
+
+/**
+ * Desfechos são imutáveis (dado bancário/financeiro — mesmo racional de
+ * casos nunca serem apagados fisicamente): corrigir não faz UPDATE no
+ * registro existente, cria um novo e marca o antigo como substituído, via
+ * RPC (registrar_correcao_desfecho, 20260722000001_desfechos_correcao_com_historico.sql)
+ * — a mesma elegibilidade de registrar (admin, ou gerente com delegação
+ * ativa na filial do caso) é checada dentro da função, não por RLS.
+ */
+export async function corrigirDesfecho(
+  casoId: string,
+  desfechoAnteriorId: string,
+  _prevState: CorrigirDesfechoState,
+  formData: FormData
+): Promise<CorrigirDesfechoState> {
+  await requireCurrentUser();
+
+  const resultado = await parseDesfechoFormData(casoId, formData);
+  if ("error" in resultado) return { error: resultado.error };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("registrar_correcao_desfecho", {
+    p_desfecho_anterior_id: desfechoAnteriorId,
+    p_tipo: resultado.dados.tipo,
+    p_subtipo_reembolso: resultado.dados.subtipo_reembolso,
+    p_origem_reembolso_integral: resultado.dados.origem_reembolso_integral,
+    p_banco_codigo: resultado.dados.banco_codigo,
+    p_banco_nome_completo: resultado.dados.banco_nome_completo,
+    p_banco_agencia: resultado.dados.banco_agencia,
+    p_banco_conta: resultado.dados.banco_conta,
+    p_banco_cpf: resultado.dados.banco_cpf,
+    p_valor: resultado.dados.valor,
+    p_subtipo_remarcacao: resultado.dados.subtipo_remarcacao,
+    p_origem_remarcacao_com_custo: resultado.dados.origem_remarcacao_com_custo,
+    p_valor_taxas: resultado.dados.valor_taxas,
+    p_valor_diferenca_tarifaria: resultado.dados.valor_diferenca_tarifaria,
+  });
+
+  if (error) {
+    console.error("Erro ao corrigir desfecho:", error);
+    return { error: "Não foi possível corrigir o desfecho. Verifique se você tem permissão para esta ação." };
+  }
+
+  revalidatePath(`/casos/${casoId}`);
+  return {};
+}
+
+/**
+ * Cancela (anula) um desfecho registrado por engano, sem substituto — via
+ * RPC cancelar_desfecho, mesma elegibilidade e mesma regra de "só
+ * transiciona uma vez" de corrigirDesfecho.
+ */
+export async function cancelarDesfecho(casoId: string, desfechoId: string): Promise<{ error?: string }> {
+  await requireCurrentUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("cancelar_desfecho", { p_desfecho_id: desfechoId });
+
+  if (error) {
+    console.error("Erro ao cancelar desfecho:", error);
+    return { error: "Não foi possível cancelar o desfecho. Verifique se você tem permissão para esta ação." };
   }
 
   revalidatePath(`/casos/${casoId}`);

@@ -33,10 +33,12 @@ import type {
   TipoDesfecho,
   TipoDocumentoAnexo,
 } from "@/lib/supabase/types";
+import type { DesfechoVisivelRow } from "@/lib/casos/detalhe";
 
-import { registrarDesfecho, type RegistrarDesfechoState } from "./actions";
+import { corrigirDesfecho, registrarDesfecho, type CorrigirDesfechoState, type RegistrarDesfechoState } from "./actions";
 
 const initialState: RegistrarDesfechoState = {};
+const initialCorrecaoState: CorrigirDesfechoState = {};
 
 // Máscaras genéricas (não específicas de um banco — o formato varia demais
 // entre instituições para validar com precisão): agência até 4 dígitos +
@@ -52,18 +54,39 @@ function formatarConta(valor: string): string {
   return digitos.length > 1 ? `${digitos.slice(0, -1)}-${digitos.slice(-1)}` : digitos;
 }
 
-export function DesfechoForm({ casoId, tiposAnexosExistentes }: { casoId: string; tiposAnexosExistentes: TipoDocumentoAnexo[] }) {
-  const registrarAction = registrarDesfecho.bind(null, casoId);
-  const [state, formAction, isPending] = useActionState(registrarAction, initialState);
+export function DesfechoForm({
+  casoId,
+  tiposAnexosExistentes,
+  desfechoParaCorrigir,
+  onCancelarCorrecao,
+}: {
+  casoId: string;
+  tiposAnexosExistentes: TipoDocumentoAnexo[];
+  /** Presente = formulário em modo correção (pré-preenchido, grava como desfecho novo e substitui este). */
+  desfechoParaCorrigir?: DesfechoVisivelRow;
+  onCancelarCorrecao?: () => void;
+}) {
+  const action = desfechoParaCorrigir
+    ? corrigirDesfecho.bind(null, casoId, desfechoParaCorrigir.id)
+    : registrarDesfecho.bind(null, casoId);
+  const [state, formAction, isPending] = useActionState(action, desfechoParaCorrigir ? initialCorrecaoState : initialState);
 
-  const [tipo, setTipo] = useState<TipoDesfecho | "">("");
-  const [subtipoReembolso, setSubtipoReembolso] = useState<SubtipoReembolso | "">("");
-  const [origemIntegral, setOrigemIntegral] = useState<OrigemReembolsoIntegral | "">("");
-  const [subtipoRemarcacao, setSubtipoRemarcacao] = useState<SubtipoRemarcacao | "">("");
-  const [origemRemarcacaoComCusto, setOrigemRemarcacaoComCusto] = useState<OrigemRemarcacaoComCusto | "">("");
-  const [bancoCodigo, setBancoCodigo] = useState("");
-  const [agencia, setAgencia] = useState("");
-  const [conta, setConta] = useState("");
+  const [tipo, setTipo] = useState<TipoDesfecho | "">(desfechoParaCorrigir?.tipo ?? "");
+  const [subtipoReembolso, setSubtipoReembolso] = useState<SubtipoReembolso | "">(
+    desfechoParaCorrigir?.subtipo_reembolso ?? ""
+  );
+  const [origemIntegral, setOrigemIntegral] = useState<OrigemReembolsoIntegral | "">(
+    desfechoParaCorrigir?.origem_reembolso_integral ?? ""
+  );
+  const [subtipoRemarcacao, setSubtipoRemarcacao] = useState<SubtipoRemarcacao | "">(
+    desfechoParaCorrigir?.subtipo_remarcacao ?? ""
+  );
+  const [origemRemarcacaoComCusto, setOrigemRemarcacaoComCusto] = useState<OrigemRemarcacaoComCusto | "">(
+    desfechoParaCorrigir?.origem_remarcacao_com_custo ?? ""
+  );
+  const [bancoCodigo, setBancoCodigo] = useState(desfechoParaCorrigir?.banco_codigo ?? "");
+  const [agencia, setAgencia] = useState(desfechoParaCorrigir?.banco_agencia ?? "");
+  const [conta, setConta] = useState(desfechoParaCorrigir?.banco_conta ?? "");
   const [cpfError, setCpfError] = useState<string | undefined>();
 
   const avisoAnexo = useMemo(() => {
@@ -105,7 +128,7 @@ export function DesfechoForm({ casoId, tiposAnexosExistentes }: { casoId: string
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Registrar desfecho</CardTitle>
+        <CardTitle>{desfechoParaCorrigir ? "Corrigir desfecho" : "Registrar desfecho"}</CardTitle>
       </CardHeader>
       <CardContent>
         <form action={formAction} onSubmit={validarAntesDeEnviar} className="flex flex-col gap-4">
@@ -199,7 +222,12 @@ export function DesfechoForm({ casoId, tiposAnexosExistentes }: { casoId: string
               {bancoCodigo === CODIGO_BANCO_OUTRO && (
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="bancoNomeCompleto">Nome do banco</Label>
-                  <Input id="bancoNomeCompleto" name="bancoNomeCompleto" required />
+                  <Input
+                    id="bancoNomeCompleto"
+                    name="bancoNomeCompleto"
+                    required
+                    defaultValue={desfechoParaCorrigir?.banco_nome_completo ?? undefined}
+                  />
                 </div>
               )}
               <div className="flex flex-col gap-2">
@@ -234,6 +262,7 @@ export function DesfechoForm({ casoId, tiposAnexosExistentes }: { casoId: string
                   inputMode="numeric"
                   maxLength={14}
                   required
+                  defaultValue={desfechoParaCorrigir?.banco_cpf ?? undefined}
                   aria-invalid={Boolean(cpfError)}
                   onChange={() => cpfError && setCpfError(undefined)}
                 />
@@ -241,7 +270,7 @@ export function DesfechoForm({ casoId, tiposAnexosExistentes }: { casoId: string
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="valor">Valor</Label>
-                <CampoMoeda id="valor" name="valor" required />
+                <CampoMoeda id="valor" name="valor" required defaultValue={desfechoParaCorrigir?.valor} />
               </div>
             </div>
           )}
@@ -296,11 +325,16 @@ export function DesfechoForm({ casoId, tiposAnexosExistentes }: { casoId: string
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="valorTaxas">Valor das taxas</Label>
-                <CampoMoeda id="valorTaxas" name="valorTaxas" required />
+                <CampoMoeda id="valorTaxas" name="valorTaxas" required defaultValue={desfechoParaCorrigir?.valor_taxas} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="valorDiferencaTarifaria">Diferença tarifária</Label>
-                <CampoMoeda id="valorDiferencaTarifaria" name="valorDiferencaTarifaria" required />
+                <CampoMoeda
+                  id="valorDiferencaTarifaria"
+                  name="valorDiferencaTarifaria"
+                  required
+                  defaultValue={desfechoParaCorrigir?.valor_diferenca_tarifaria}
+                />
               </div>
             </div>
           )}
@@ -308,16 +342,23 @@ export function DesfechoForm({ casoId, tiposAnexosExistentes }: { casoId: string
           {tipo === "carta_credito" && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="valor">Valor</Label>
-              <CampoMoeda id="valor" name="valor" required className="w-48" />
+              <CampoMoeda id="valor" name="valor" required className="w-48" defaultValue={desfechoParaCorrigir?.valor} />
             </div>
           )}
 
           {state.error && <p className="text-destructive text-sm">{state.error}</p>}
 
           {tipo && (
-            <Button type="submit" disabled={isPending} className="w-fit">
-              {isPending ? "Salvando..." : "Registrar desfecho"}
-            </Button>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={isPending} className="w-fit">
+                {isPending ? "Salvando..." : desfechoParaCorrigir ? "Salvar correção" : "Registrar desfecho"}
+              </Button>
+              {desfechoParaCorrigir && (
+                <Button type="button" variant="ghost" disabled={isPending} onClick={onCancelarCorrecao} className="w-fit">
+                  Cancelar
+                </Button>
+              )}
+            </div>
           )}
         </form>
       </CardContent>

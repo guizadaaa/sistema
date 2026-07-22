@@ -144,6 +144,12 @@ export interface Database {
           valor_diferenca_tarifaria: number | null;
           criado_por: string;
           criado_em: string;
+          // Correção com histórico (20260722000001) — nunca escritas por
+          // UPDATE direto do client, só pelas RPCs registrar_correcao_desfecho
+          // / cancelar_desfecho (ver Functions abaixo).
+          substituido_por: string | null;
+          substituido_em: string | null;
+          cancelado_em: string | null;
         };
         Insert: Partial<{
           subtipo_reembolso: SubtipoReembolso | null;
@@ -163,7 +169,8 @@ export interface Database {
           tipo: TipoDesfecho;
         };
         // Imutável após criação — ver nota em status_historico.Update sobre
-        // por que isso é Partial<Row> em vez de never.
+        // por que isso é Partial<Row> em vez de never. Na prática nunca
+        // chamada pelo client: a correção/cancelamento passam pelas RPCs.
         Update: Partial<{
           tipo: TipoDesfecho;
         }>;
@@ -336,6 +343,9 @@ export interface Database {
           criado_por: string;
           criado_em: string;
           origem_remarcacao_com_custo: OrigemRemarcacaoComCusto | null;
+          substituido_por: string | null;
+          substituido_em: string | null;
+          cancelado_em: string | null;
         };
         Relationships: [];
       };
@@ -343,6 +353,29 @@ export interface Database {
     Functions: {
       log_anexo_signed_url: {
         Args: { p_anexo_id: string };
+        Returns: void;
+      };
+      registrar_correcao_desfecho: {
+        Args: {
+          p_desfecho_anterior_id: string;
+          p_tipo: TipoDesfecho;
+          p_subtipo_reembolso: SubtipoReembolso | null;
+          p_origem_reembolso_integral: OrigemReembolsoIntegral | null;
+          p_banco_codigo: string | null;
+          p_banco_nome_completo: string | null;
+          p_banco_agencia: string | null;
+          p_banco_conta: string | null;
+          p_banco_cpf: string | null;
+          p_valor: number | null;
+          p_subtipo_remarcacao: SubtipoRemarcacao | null;
+          p_origem_remarcacao_com_custo: OrigemRemarcacaoComCusto | null;
+          p_valor_taxas: number | null;
+          p_valor_diferenca_tarifaria: number | null;
+        };
+        Returns: string;
+      };
+      cancelar_desfecho: {
+        Args: { p_desfecho_id: string };
         Returns: void;
       };
     };
