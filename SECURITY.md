@@ -12,11 +12,13 @@ Implementação: `src/lib/auth/mfa.ts`, `src/app/mfa/`, `src/app/(app)/seguranca
 
 ## Expiração de sessão
 
-Configurado no painel do Supabase (Authentication → Sessions), não no código deste repositório:
+**Status: pendente, não aplicado hoje.** Time-box e inactivity timeout (Authentication → Sessions) são recursos do plano Pro do Supabase — o projeto está no plano gratuito por enquanto, então esses controles não estão disponíveis para configurar. Aplicar assim que o projeto migrar para o Pro:
 
 - **Time-box de sessão: 12 horas** — força login completo (senha + 2FA) de novo depois desse período, independente de uso.
 - **Timeout de inatividade: 30 minutos** — força login de novo depois desse tempo sem atividade.
 
-Motivo: o sistema lida com CPF e dado bancário de clientes (contas para reembolso), e roda em ambiente de loja/atendimento com tela potencialmente compartilhada — 30 minutos de inatividade cobre o cenário de alguém sair da mesa com a sessão aberta; 12 horas garante que ninguém fica com sessão aberta de um turno para o outro sem repassar pela autenticação completa.
+Motivo (vale desde já, mesmo sem os controles ligados): o sistema lida com CPF e dado bancário de clientes (contas para reembolso), e roda em ambiente de loja/atendimento com tela potencialmente compartilhada — 30 minutos de inatividade cobre o cenário de alguém sair da mesa com a sessão aberta; 12 horas garante que ninguém fica com sessão aberta de um turno para o outro sem repassar pela autenticação completa.
 
 Esses dois controles são por projeto, não por perfil — valem para todo mundo (vendedor, gerente, adm, adm_master), já que todo perfil lida com CPF de cliente.
+
+Até lá, o **2FA obrigatório para adm/adm_master é a principal proteção** contra sessão comprometida — sem o time-box, uma sessão pode em teoria persistir indefinidamente (o Supabase renova o token sozinho), então vale reforçar o hábito de clicar em "Sair" ao deixar a mesa, especialmente em terminal compartilhado.
