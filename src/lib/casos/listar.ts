@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { somenteDigitos } from "@/lib/validation/cpf";
 import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
 
 export type FiltrosCasos = {
@@ -8,6 +9,13 @@ export type FiltrosCasos = {
   tipo?: TipoCaso;
   busca?: string;
   filial?: FilialCvc;
+  /** CPF do cliente — aceita com ou sem máscara, comparado só pelos dígitos (match exato). */
+  cpf?: string;
+  /** Número de contrato — aceita com ou sem máscara; casa o contrato principal ou qualquer adicional. */
+  contrato?: string;
+  /** Data de abertura (criado_em), formato yyyy-mm-dd, inclusive nas duas pontas. */
+  dataInicio?: string;
+  dataFim?: string;
 };
 
 export type CasoListado = {
@@ -22,6 +30,81 @@ export type CasoListado = {
   vendedor_dono: string;
   donoNome: string;
 };
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+const DATA_FORMATO = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * ids de casos cujo contrato adicional (tabela filha, não dá pra filtrar
+ * via a mesma query de `casos`) bate com o termo — RLS de
+ * casos_contratos_adicionais espelha a de casos, então só volta caso_id que
+ * este usuário já pode ver.
+ */
+async function idsCasosPorContratoAdicional(supabase: SupabaseClient, termo: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("casos_contratos_adicionais")
+    .select("caso_id")
+    .ilike("contrato_numero", `%${termo}%`);
+  if (error) throw error;
+  return [...new Set((data ?? []).map((c) => c.caso_id))];
+}
+
+/**
+ * ids de casos cujo contrato (principal ou adicional) bate com o termo
+ * (já só dígitos). Reaproveitado pelo filtro dedicado "Contrato" e pela
+ * busca geral.
+ */
+async function idsCasosPorContrato(supabase: SupabaseClient, termoDigitos: string): Promise<string[]> {
+  const ids = new Set<string>();
+
+  const { data: porPrincipal, error: porPrincipalError } = await supabase
+    .from("casos")
+    .select("id")
+    .ilike("contrato_numero", `%${termoDigitos}%`);
+  if (porPrincipalError) throw porPrincipalError;
+  for (const c of porPrincipal ?? []) ids.add(c.id);
+
+  for (const id of await idsCasosPorContratoAdicional(supabase, termoDigitos)) ids.add(id);
+
+  return [...ids];
+}
+
+/**
+ * ids de casos que batem com a busca geral (cliente, contrato ou
+ * protocolo). Implementado como várias queries de coluna única (nunca
+ * `.or()` com o termo bruto interpolado) — cada `.ilike()`/`.eq()` do
+ * supabase-js escapa o valor sozinho; a fragilidade só existia na sintaxe
+ * combinada de `.or()`, que tratava vírgula/parênteses no termo digitado
+ * como separador/agrupador de condições (bug B1 da auditoria de 22/07: um
+ * nome de cliente com parênteses quebrava a query).
+ */
+async function idsCasosPorBusca(supabase: SupabaseClient, termoBruto: string): Promise<string[]> {
+  const termo = termoBruto.trim();
+  if (!termo) return [];
+
+  const ids = new Set<string>();
+
+  const { data: porNome, error: porNomeError } = await supabase
+    .from("casos")
+    .select("id")
+    .ilike("cliente_nome", `%${termo}%`);
+  if (porNomeError) throw porNomeError;
+  for (const c of porNome ?? []) ids.add(c.id);
+
+  for (const id of await idsCasosPorContrato(supabase, termo)) ids.add(id);
+
+  if (/^\d+$/.test(termo)) {
+    const { data: porProtocolo, error: porProtocoloError } = await supabase
+      .from("casos")
+      .select("id")
+      .eq("protocolo", Number(termo));
+    if (porProtocoloError) throw porProtocoloError;
+    for (const c of porProtocolo ?? []) ids.add(c.id);
+  }
+
+  return [...ids];
+}
 
 /**
  * RLS já escopa as linhas por perfil (vendedor só vê as próprias, gerente só
@@ -39,35 +122,42 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   if (filtros.status) query = query.eq("status_atual", filtros.status);
   if (filtros.tipo) query = query.eq("tipo_caso", filtros.tipo);
   if (filtros.filial) query = query.eq("filial", filtros.filial);
-  if (filtros.busca) {
-    const termo = filtros.busca.trim();
-    if (termo) {
-      const termoEscapado = termo.replace(/[%,]/g, "");
 
-      // Um vendedor pode receber a ligação com qualquer um dos números do
-      // caso, não só o principal — busca também em casos_contratos_
-      // adicionais (tabela filha, não dá pra filtrar via .or() na mesma
-      // query de `casos`). RLS dessa tabela espelha a de `casos`, então só
-      // volta caso_id de casos que este usuário já pode ver.
-      const { data: contratosAdicionais, error: contratosAdicionaisError } = await supabase
-        .from("casos_contratos_adicionais")
-        .select("caso_id")
-        .ilike("contrato_numero", `%${termoEscapado}%`);
-      if (contratosAdicionaisError) throw contratosAdicionaisError;
+  if (filtros.cpf) {
+    const cpfDigitos = somenteDigitos(filtros.cpf);
+    if (cpfDigitos) query = query.eq("cliente_cpf", cpfDigitos);
+  }
 
-      const idsPorContratoAdicional = [...new Set((contratosAdicionais ?? []).map((c) => c.caso_id))];
+  if (filtros.dataInicio && DATA_FORMATO.test(filtros.dataInicio)) {
+    query = query.gte("criado_em", `${filtros.dataInicio}T00:00:00`);
+  }
+  if (filtros.dataFim && DATA_FORMATO.test(filtros.dataFim)) {
+    query = query.lte("criado_em", `${filtros.dataFim}T23:59:59.999`);
+  }
 
-      const condicoes = [
-        `cliente_nome.ilike.%${termoEscapado}%`,
-        `contrato_numero.ilike.%${termoEscapado}%`,
-        `protocolo.eq.${/^\d+$/.test(termoEscapado) ? termoEscapado : "-1"}`,
-      ];
-      if (idsPorContratoAdicional.length > 0) {
-        condicoes.push(`id.in.(${idsPorContratoAdicional.join(",")})`);
-      }
+  // busca (nome/contrato/protocolo) e contrato (dedicado) são filtros
+  // independentes baseados em ids pré-calculados — combinados por
+  // interseção em JS, nunca por dois `.in("id", ...)` empilhados na mesma
+  // query (ambíguo pra AND na mesma coluna).
+  let idsPermitidos: string[] | undefined;
+  const intersecta = (novo: string[]) => {
+    idsPermitidos = idsPermitidos === undefined ? novo : idsPermitidos.filter((id) => novo.includes(id));
+  };
 
-      query = query.or(condicoes.join(","));
+  if (filtros.busca?.trim()) {
+    intersecta(await idsCasosPorBusca(supabase, filtros.busca));
+  }
+
+  if (filtros.contrato) {
+    const contratoDigitos = somenteDigitos(filtros.contrato);
+    if (contratoDigitos) {
+      intersecta(await idsCasosPorContrato(supabase, contratoDigitos));
     }
+  }
+
+  if (idsPermitidos !== undefined) {
+    if (idsPermitidos.length === 0) return [];
+    query = query.in("id", idsPermitidos);
   }
 
   const { data: casos, error } = await query;
