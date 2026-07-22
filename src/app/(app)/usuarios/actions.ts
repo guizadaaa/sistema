@@ -71,21 +71,28 @@ export type AtualizarUsuarioInput = {
 };
 
 /**
- * A RLS (usuarios_update_adm_master) é a autoridade real sobre quem pode
- * editar — este action não reimplementa essa checagem, só repassa o erro do
- * Postgres de forma legível quando ela rejeitar (ex.: um "adm" tentando
- * editar, o que a UI já evita mas a API continua bloqueando).
+ * A troca de e-mail usa a Admin API (createAdminClient — service role, que
+ * bypassa RLS) porque e-mail é login (fica em auth.users, não só no espelho
+ * em public.usuarios). Diferente do UPDATE em public.usuarios logo abaixo
+ * (que a RLS usuarios_update_adm_master protege de verdade), a chamada à
+ * Admin API não passa por RLS nenhuma — por isso a checagem de perfil aqui
+ * em cima é obrigatória, não redundante: sem ela, qualquer usuário que
+ * consiga ler o e-mail alheio (a si mesmo, ou um gerente vendo um vendedor
+ * da própria filial) trocaria o e-mail de login de outra pessoa antes que o
+ * UPDATE subsequente fosse rejeitado — o efeito colateral na Admin API já
+ * teria acontecido e não é desfeito.
  *
- * E-mail é login (fica em auth.users, não só no espelho em public.usuarios)
- * — trocar o e-mail exige a Admin API. Só chama ela quando o valor muda, e
- * só grava em public.usuarios depois dela confirmar, pra nunca deixar login
- * e perfil dessincronizados.
+ * Só chama a Admin API quando o valor muda, e só grava em public.usuarios
+ * depois dela confirmar, pra nunca deixar login e perfil dessincronizados.
  */
 export async function atualizarUsuario(
   usuarioId: string,
   dados: AtualizarUsuarioInput
 ): Promise<{ error?: string }> {
-  await requireCurrentUser();
+  const usuario = await requireCurrentUser();
+  if (usuario.perfil !== "adm_master") {
+    return { error: "Apenas o adm_master pode atualizar usuários." };
+  }
 
   const parsed = atualizarUsuarioSchema.safeParse(dados);
   if (!parsed.success) {
