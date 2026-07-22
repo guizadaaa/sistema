@@ -284,11 +284,15 @@ export interface Database {
           realizado_por: string;
           realizado_em: string;
         };
-        // Nunca inserido pelo client — só via triggers e log_anexo_signed_url.
+        // Nunca inserido pelo client comum — só via triggers, log_anexo_signed_url,
+        // ou createAdminClient() (service role) em ações administrativas sem
+        // trigger de tabela correspondente, como o reset de MFA de outro usuário.
         Insert: Partial<{
           tabela: string;
           registro_id: string;
           acao: AcaoAuditoria;
+          dados_antigos: Record<string, unknown> | null;
+          dados_novos: Record<string, unknown> | null;
           realizado_por: string;
         }>;
         Update: Partial<{

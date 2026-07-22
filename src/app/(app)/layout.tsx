@@ -46,6 +46,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Auditoria
               </Link>
             )}
+            <Link href="/seguranca" className="hover:underline">
+              Segurança
+            </Link>
           </nav>
         </div>
         <form action={logout}>

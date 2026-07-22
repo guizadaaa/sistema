@@ -14,7 +14,13 @@ import type { UsuarioListado } from "@/lib/usuarios/listar";
 import { FILIAIS_USUARIO, PERFIS_USUARIO } from "@/lib/validation/usuario";
 import type { FilialCvc, PerfilUsuario } from "@/lib/supabase/types";
 
-import { atualizarUsuario, convidarUsuario, gerarLinkAcesso, type ConvidarUsuarioState } from "./actions";
+import {
+  atualizarUsuario,
+  convidarUsuario,
+  gerarLinkAcesso,
+  resetarMfaUsuario,
+  type ConvidarUsuarioState,
+} from "./actions";
 
 const initialConvidarState: ConvidarUsuarioState = {};
 
@@ -133,6 +139,38 @@ function ExcluirUsuarioBotao({ usuario }: { usuario: UsuarioListado }) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function ResetarMfaBotao({ usuarioId }: { usuarioId: string }) {
+  const [isPending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | undefined>();
+  const [sucesso, setSucesso] = useState(false);
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={isPending}
+        onClick={() =>
+          startTransition(async () => {
+            setErro(undefined);
+            setSucesso(false);
+            const resultado = await resetarMfaUsuario(usuarioId);
+            if (resultado.error) {
+              setErro(resultado.error);
+            } else {
+              setSucesso(true);
+            }
+          })
+        }
+      >
+        {isPending ? "Resetando..." : "Resetar 2FA"}
+      </Button>
+      {erro && <p className="text-destructive text-sm">{erro}</p>}
+      {sucesso && <p className="text-sm text-emerald-600 dark:text-emerald-500">2FA removido — pode logar só com senha.</p>}
+    </div>
   );
 }
 
@@ -269,6 +307,7 @@ function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEdit
               Cancelar
             </Button>
             {usuario.ativo && <ExcluirUsuarioBotao usuario={usuario} />}
+            <ResetarMfaBotao usuarioId={usuario.id} />
           </div>
           {erro && <p className="text-destructive text-sm">{erro}</p>}
         </div>
