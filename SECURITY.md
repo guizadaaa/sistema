@@ -12,13 +12,17 @@ Implementação: `src/lib/auth/mfa.ts`, `src/app/mfa/`, `src/app/(app)/seguranca
 
 ## Expiração de sessão
 
-**Status: pendente, não aplicado hoje.** Time-box e inactivity timeout (Authentication → Sessions) são recursos do plano Pro do Supabase — o projeto está no plano gratuito por enquanto, então esses controles não estão disponíveis para configurar. Aplicar assim que o projeto migrar para o Pro:
+**Status: limitação conhecida e aceita, não é um plano de ação.** Time-box e inactivity timeout (Authentication → Sessions) são recursos do plano Pro do Supabase. Decisão do projeto: seguir no plano gratuito indefinidamente, sem previsão de migrar para o Pro — então esses dois controles **não vão ser aplicados**, não é algo "pendente" esperando um upgrade futuro.
+
+Caso o cálculo de custo/benefício mude no futuro e o projeto migre para o Pro, os valores recomendados seriam:
 
 - **Time-box de sessão: 12 horas** — força login completo (senha + 2FA) de novo depois desse período, independente de uso.
 - **Timeout de inatividade: 30 minutos** — força login de novo depois desse tempo sem atividade.
 
-Motivo (vale desde já, mesmo sem os controles ligados): o sistema lida com CPF e dado bancário de clientes (contas para reembolso), e roda em ambiente de loja/atendimento com tela potencialmente compartilhada — 30 minutos de inatividade cobre o cenário de alguém sair da mesa com a sessão aberta; 12 horas garante que ninguém fica com sessão aberta de um turno para o outro sem repassar pela autenticação completa.
+Motivo (vale como registro, mesmo sem os controles ligados): o sistema lida com CPF e dado bancário de clientes (contas para reembolso), e roda em ambiente de loja/atendimento com tela potencialmente compartilhada — 30 minutos de inatividade cobriria o cenário de alguém sair da mesa com a sessão aberta; 12 horas garantiria que ninguém fica com sessão aberta de um turno para o outro sem repassar pela autenticação completa.
 
-Esses dois controles são por projeto, não por perfil — valem para todo mundo (vendedor, gerente, adm, adm_master), já que todo perfil lida com CPF de cliente.
+Sem esses controles, uma sessão pode em teoria persistir indefinidamente (o Supabase renova o token sozinho enquanto o navegador mantiver o cookie). Mitigação real hoje, dentro do plano gratuito:
 
-Até lá, o **2FA obrigatório para adm/adm_master é a principal proteção** contra sessão comprometida — sem o time-box, uma sessão pode em teoria persistir indefinidamente (o Supabase renova o token sozinho), então vale reforçar o hábito de clicar em "Sair" ao deixar a mesa, especialmente em terminal compartilhado.
+- **2FA obrigatório para adm/adm_master** é a principal proteção contra sessão comprometida — mesmo com a sessão aberta, um ataque preexistente ao navegador não teria driblado o 2FA para chegar até ali.
+- Hábito operacional de clicar em **"Sair"** ao deixar a mesa, especialmente em terminal compartilhado — não é reforçado por código, depende de cada pessoa.
+- Existe um caminho para implementar inactivity timeout e time-box **na própria aplicação** (sem depender do Supabase Pro — checagem de última atividade e de início de sessão via cookie próprio, reforçada no middleware) caso o projeto decida que vale o esforço de manutenção extra. Não implementado; ver com o time antes de priorizar.
