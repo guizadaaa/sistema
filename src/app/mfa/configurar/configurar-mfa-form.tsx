@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { iniciarConfiguracaoMfa, verificarCodigoMfa, type ConfirmarMfaState } from "../actions";
+import { paraSrcQrCode } from "../qr-code";
 import { SairLink } from "../sair-link";
 
 const initialState: ConfirmarMfaState = {};
@@ -66,7 +67,7 @@ function ConfirmarCodigo({ dados }: { dados: DadosEnroll }) {
       <CardContent className="flex flex-col gap-4">
         {/* eslint-disable-next-line @next/next/no-img-element -- data: URI do Supabase, não um asset estático */}
         <img
-          src={`data:image/svg+xml;utf-8,${encodeURIComponent(dados.qrCode)}`}
+          src={paraSrcQrCode(dados.qrCode)}
           alt="QR code para configurar o autenticador"
           width={200}
           height={200}

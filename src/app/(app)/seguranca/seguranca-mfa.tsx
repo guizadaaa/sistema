@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { iniciarConfiguracaoMfa, verificarCodigoMfa, type ConfirmarMfaState } from "@/app/mfa/actions";
+import { paraSrcQrCode } from "@/app/mfa/qr-code";
 
 import { removerFatorMfa } from "./actions";
 
@@ -85,7 +86,7 @@ function AdicionarFator({ onCancelar }: { onCancelar: () => void }) {
     <div className="flex flex-col gap-3 border-t pt-4">
       {/* eslint-disable-next-line @next/next/no-img-element -- data: URI do Supabase, não um asset estático */}
       <img
-        src={`data:image/svg+xml;utf-8,${encodeURIComponent(dados.qrCode)}`}
+        src={paraSrcQrCode(dados.qrCode)}
         alt="QR code para configurar o autenticador"
         width={180}
         height={180}
