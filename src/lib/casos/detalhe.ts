@@ -7,7 +7,7 @@ type CasoRow = Database["public"]["Tables"]["casos"]["Row"];
 type AnexoRow = Database["public"]["Tables"]["anexos"]["Row"];
 type ContratoAdicionalRow = Database["public"]["Tables"]["casos_contratos_adicionais"]["Row"];
 type StatusHistoricoComDuracaoRow = Database["public"]["Views"]["status_historico_com_duracao"]["Row"];
-type DesfechoVisivelRow = Database["public"]["Views"]["desfechos_visivel"]["Row"];
+export type DesfechoVisivelRow = Database["public"]["Views"]["desfechos_visivel"]["Row"];
 type ImplicacaoRow = Database["public"]["Tables"]["implicacoes"]["Row"];
 
 export type HistoricoComNome = StatusHistoricoComDuracaoRow & { alteradoPorNome: string };

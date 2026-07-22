@@ -6,16 +6,14 @@ import {
   MOTIVO_LABELS,
   QUEM_PAGA_LABELS,
   STATUS_LABELS,
-  SUBTIPO_REEMBOLSO_LABELS,
-  SUBTIPO_REMARCACAO_LABELS,
   TIPO_CASO_LABELS,
-  TIPO_DESFECHO_LABELS,
 } from "@/lib/labels";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 
 import { AnexosSecao } from "./anexos-secao";
 import { ContratosAdicionaisSecao } from "./contratos-adicionais-secao";
 import { DesfechoForm } from "./desfecho-form";
+import { DesfechosSecao } from "./desfechos-secao";
 import { ImplicacaoForm } from "./implicacao-form";
 import { StatusAcoes } from "./status-acoes";
 import { Timeline } from "./timeline";
@@ -134,45 +132,12 @@ export function CasoDetalhe({
         <DesfechoForm casoId={caso.id} tiposAnexosExistentes={anexos.map((a) => a.tipo_documento)} />
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Desfechos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {desfechos.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Nenhum desfecho registrado ainda.</p>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {desfechos.map((d) => (
-                <li key={d.id} className="rounded-md border p-3 text-sm">
-                  <div className="font-medium">{TIPO_DESFECHO_LABELS[d.tipo]}</div>
-                  {d.tipo === "reembolso" && d.subtipo_reembolso && (
-                    <div className="text-muted-foreground">
-                      {SUBTIPO_REEMBOLSO_LABELS[d.subtipo_reembolso]}
-                      {d.valor !== null && ` · ${formatarMoeda(d.valor)}`}
-                      {d.banco_nome_completo && ` · ${d.banco_nome_completo}`}
-                    </div>
-                  )}
-                  {d.tipo === "remarcacao" && d.subtipo_remarcacao && (
-                    <div className="text-muted-foreground">
-                      {SUBTIPO_REMARCACAO_LABELS[d.subtipo_remarcacao]}
-                      {d.origem_remarcacao_com_custo && (
-                        <> · Motivo: {d.origem_remarcacao_com_custo === "saude" ? "Saúde" : "Outro"}</>
-                      )}
-                      {d.valor_taxas !== null && ` · Taxas: ${formatarMoeda(d.valor_taxas)}`}
-                      {d.valor_diferenca_tarifaria !== null &&
-                        ` · Diferença: ${formatarMoeda(d.valor_diferenca_tarifaria)}`}
-                    </div>
-                  )}
-                  {d.tipo === "carta_credito" && d.valor !== null && (
-                    <div className="text-muted-foreground">{formatarMoeda(d.valor)}</div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <DesfechosSecao
+        casoId={caso.id}
+        desfechos={desfechos}
+        tiposAnexosExistentes={anexos.map((a) => a.tipo_documento)}
+        podeConduzirFluxo={podeConduzirFluxo}
+      />
 
       <Card>
         <CardHeader>
