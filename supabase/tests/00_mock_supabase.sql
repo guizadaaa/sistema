@@ -68,13 +68,20 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
--- net (pg_net) — só o suficiente para as migrations de retenção de anexos
--- (20260720000001) e backup (20260723000004) compilarem; nenhuma faz uma
--- chamada HTTP de verdade nos testes (mockada como sucesso/200).
+-- net (pg_net) — estrutura real confirmada contra a instalação de produção
+-- (pg_net 0.20.4, via pg_attribute/pg_get_functiondef — não suposição, ver
+-- migration 20260724000001_fix_pg_net_response_status.sql): o status_code
+-- mora dentro de um campo `response` aninhado, não no topo de
+-- http_response_result. Nenhuma chamada HTTP de verdade acontece nos
+-- testes (mockada como sucesso/200).
 -- ---------------------------------------------------------------------------
 create schema if not exists net;
 
-create type net.http_response_result as (status_code integer, content text);
+create type net.request_status as enum ('PENDING', 'SUCCESS', 'ERROR');
+
+create type net.http_response as (status_code integer, headers jsonb, body text);
+
+create type net.http_response_result as (status net.request_status, message text, response net.http_response);
 
 create or replace function net.http_delete(
   url text, headers jsonb default '{}'::jsonb, body jsonb default '{}'::jsonb, timeout_milliseconds integer default 5000
@@ -86,7 +93,11 @@ create or replace function net.http_post(
 ) returns bigint language sql as $$ select 1::bigint $$;
 
 create or replace function net.http_collect_response(request_id bigint, async boolean default true)
-returns net.http_response_result language sql as $$ select row(200, '')::net.http_response_result $$;
+returns net.http_response_result
+language sql
+as $$
+  select row('SUCCESS'::net.request_status, null, row(200, '{}'::jsonb, '')::net.http_response)::net.http_response_result
+$$;
 
 -- ---------------------------------------------------------------------------
 -- vault — idem, só para a migration de retenção compilar.
