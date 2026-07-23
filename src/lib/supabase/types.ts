@@ -75,7 +75,6 @@ export interface Database {
           criado_por: string;
           prazo_vigencia: string;
           status_atual: StatusCaso;
-          elegivel_ouvidoria: boolean;
           criado_em: string;
           contrato_numero: string;
           cliente_nome: string;
@@ -90,7 +89,6 @@ export interface Database {
           vendedor_dono: string;
           criado_por: string;
           prazo_vigencia: string;
-          elegivel_ouvidoria?: boolean;
           contrato_numero: string;
           cliente_nome: string;
           cliente_cpf: string;
@@ -99,7 +97,6 @@ export interface Database {
         };
         Update: Partial<{
           prazo_vigencia: string;
-          elegivel_ouvidoria: boolean;
           vendedor_dono: string;
         }>;
         Relationships: [];
