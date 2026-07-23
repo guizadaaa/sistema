@@ -1,19 +1,30 @@
 -- ============================================================================
--- Teste de regressão para os dois bugs de produção encontrados em sequência:
+-- Teste de regressão para os bugs de produção corrigidos em sequência nas
+-- migrations 20260724000001/000002/000004:
 --  1) "column status_code not found in data type net.http_response_result"
---     (20260724000001) — o código HTTP mora em response.status_code, não no
---     topo do tipo.
---  2) "query has no destination for result data" (20260724000002) — a
---     função pública net.http_collect_response está de fato quebrada nesta
---     versão do pg_net (um `select` sem destino dentro dela mesma); as
---     funções agora chamam net._http_collect_response (privada) direto, e é
---     essa que os testes abaixo substituem para simular sucesso/falha.
+--     — o código HTTP mora em response.status_code, não no topo do tipo.
+--  2) "query has no destination for result data" — a função pública
+--     net.http_collect_response está de fato quebrada nesta versão do
+--     pg_net; as funções chamam net._http_collect_response (privada) direto.
+--  3) "request matching request_id not found" persistindo mesmo com retry —
+--     causa raiz real: net.http_post/http_delete e o loop de coleta rodavam
+--     na MESMA transação, e o worker do pg_net (conexão própria) só enxerga
+--     requisições já commitadas. Por isso purgar_anexos_retencao_vencida e
+--     disparar_backup_dados_sensiveis viraram PROCEDURES com `commit;` logo
+--     após enfileirar — ver 20260724000004_commit_antes_de_coletar_resposta_pg_net.sql
+--     e scripts/test-pg-net-commit-visibilidade.sh (prova isolada do
+--     mecanismo com duas conexões reais, sem pg_net/mock nenhum).
 --
--- Cobre os dois pontos que o mock antigo (fictício) nunca teria pego: (1) o
--- caminho de sucesso de verdade lendo response.status_code corretamente, e
--- (2) os dois caminhos de falha (status da requisição = ERROR; e HTTP >= 300
--- com status = SUCCESS) — confirmando que nada é purgado/considerado feito
--- quando a chamada falha.
+-- Por serem procedures agora, chamam-se com CALL (não SELECT), e o retorno
+-- vem por parâmetro OUT — por isso os testes de sucesso abaixo usam blocos
+-- `do $$ ... $$` com uma variável pra capturar o OUT. No caminho de FALHA,
+-- não dá pra envolver o CALL num bloco `exception when others`: a procedure
+-- dá `commit;` internamente, e COMMIT é proibido dentro da subtransação
+-- implícita que um bloco com EXCEPTION cria ("invalid transaction
+-- termination", não o erro de negócio que estamos simulando). Em vez disso,
+-- os testes de falha desligam `ON_ERROR_STOP` só para aquele CALL e conferem
+-- a variável automática `:ERROR` do psql (true/false, atualizada a cada
+-- comando) — sem esse conflito.
 -- ============================================================================
 
 set role postgres;
@@ -37,10 +48,17 @@ on conflict (name) do nothing;
 -- disparar_backup_dados_sensiveis — caminho de sucesso (mock padrão: SUCCESS/200)
 -- ----------------------------------------------------------------------------
 
-select public._test_assert(
-  'disparar_backup_dados_sensiveis: le response.status_code corretamente no caminho de sucesso',
-  public.disparar_backup_dados_sensiveis() = 200
-);
+do $$
+declare
+  v_status integer;
+begin
+  call public.disparar_backup_dados_sensiveis(v_status);
+  perform public._test_assert(
+    'disparar_backup_dados_sensiveis: le response.status_code corretamente no caminho de sucesso',
+    v_status = 200
+  );
+end
+$$;
 
 -- ----------------------------------------------------------------------------
 -- disparar_backup_dados_sensiveis — falha de requisição (status = ERROR)
@@ -53,15 +71,14 @@ as $$
   select row('ERROR'::net.request_status, 'timeout simulado', null::net.http_response)::net.http_response_result
 $$;
 
-do $$
-begin
-  perform public.disparar_backup_dados_sensiveis();
-  raise exception 'FALHOU: disparar_backup_dados_sensiveis nao levantou excecao com status ERROR simulado';
-exception when others then
-  if sqlerrm like 'FALHOU:%' then raise; end if;
-  raise notice 'ok: disparar_backup_dados_sensiveis levanta excecao quando net retorna status ERROR (nao SUCCESS)';
-end
-$$;
+\set ON_ERROR_STOP 0
+call public.disparar_backup_dados_sensiveis(null);
+\set ON_ERROR_STOP 1
+
+select public._test_assert(
+  'disparar_backup_dados_sensiveis: levanta excecao quando net retorna status ERROR (nao SUCCESS)',
+  :'ERROR' = 'true'
+);
 
 -- ----------------------------------------------------------------------------
 -- disparar_backup_dados_sensiveis — requisição teve sucesso mas HTTP 500
@@ -74,15 +91,14 @@ as $$
   select row('SUCCESS'::net.request_status, null, row(500, '{}'::jsonb, 'erro interno simulado')::net.http_response)::net.http_response_result
 $$;
 
-do $$
-begin
-  perform public.disparar_backup_dados_sensiveis();
-  raise exception 'FALHOU: disparar_backup_dados_sensiveis nao levantou excecao com HTTP 500 simulado';
-exception when others then
-  if sqlerrm like 'FALHOU:%' then raise; end if;
-  raise notice 'ok: disparar_backup_dados_sensiveis levanta excecao quando response.status_code >= 300';
-end
-$$;
+\set ON_ERROR_STOP 0
+call public.disparar_backup_dados_sensiveis(null);
+\set ON_ERROR_STOP 1
+
+select public._test_assert(
+  'disparar_backup_dados_sensiveis: levanta excecao quando response.status_code >= 300',
+  :'ERROR' = 'true'
+);
 
 -- Restaura o mock de sucesso padrão antes de seguir.
 create or replace function net._http_collect_response(request_id bigint, async boolean default true)
@@ -136,10 +152,17 @@ set role postgres;
 
 -- Caminho de sucesso: purga tudo que está elegível (os 3 anexos de uma vez,
 -- já que a função processa em lote) — confirma que os 3 saem.
-select public._test_assert(
-  'purgar_anexos_retencao_vencida: purga os 3 anexos elegiveis no caminho de sucesso',
-  public.purgar_anexos_retencao_vencida() = 3
-);
+do $$
+declare
+  v_total integer;
+begin
+  call public.purgar_anexos_retencao_vencida(v_total);
+  perform public._test_assert(
+    'purgar_anexos_retencao_vencida: purga os 3 anexos elegiveis no caminho de sucesso',
+    v_total = 3
+  );
+end
+$$;
 
 select public._test_assert(
   'purgar_anexos_retencao_vencida: excluido_em preenchido e storage_path nulo apos a purga',
@@ -152,10 +175,17 @@ select public._test_assert(
 
 -- Nada mais elegível agora — confirma que rodar de novo não erra nem
 -- "reprocessa" nada (a query de elegibilidade já não acha as 3 anteriores).
-select public._test_assert(
-  'purgar_anexos_retencao_vencida: nao ha mais nada elegivel apos a purga (retorna 0)',
-  public.purgar_anexos_retencao_vencida() = 0
-);
+do $$
+declare
+  v_total integer;
+begin
+  call public.purgar_anexos_retencao_vencida(v_total);
+  perform public._test_assert(
+    'purgar_anexos_retencao_vencida: nao ha mais nada elegivel apos a purga (retorna 0)',
+    v_total = 0
+  );
+end
+$$;
 
 -- Novo anexo elegível, agora simulando falha (status ERROR) — nada deve ser
 -- marcado como excluído. Como authenticated (não postgres puro): o trigger
@@ -176,15 +206,14 @@ as $$
   select row('ERROR'::net.request_status, 'timeout simulado', null::net.http_response)::net.http_response_result
 $$;
 
-do $$
-begin
-  perform public.purgar_anexos_retencao_vencida();
-  raise exception 'FALHOU: purgar_anexos_retencao_vencida nao levantou excecao com status ERROR simulado';
-exception when others then
-  if sqlerrm like 'FALHOU:%' then raise; end if;
-  raise notice 'ok: purgar_anexos_retencao_vencida levanta excecao quando net retorna status ERROR';
-end
-$$;
+\set ON_ERROR_STOP 0
+call public.purgar_anexos_retencao_vencida(null);
+\set ON_ERROR_STOP 1
+
+select public._test_assert(
+  'purgar_anexos_retencao_vencida: levanta excecao quando net retorna status ERROR simulado',
+  :'ERROR' = 'true'
+);
 
 select public._test_assert(
   'purgar_anexos_retencao_vencida: anexo NAO foi marcado como excluido apos falha simulada',

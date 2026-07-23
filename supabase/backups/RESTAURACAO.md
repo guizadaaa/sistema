@@ -46,19 +46,24 @@ commitar numa migration — quem tem esse acesso (você) precisa rodar:
    irrecuperáveis.
 3. **Confirmar que `service_role_key` já está no Vault** (deveria já estar,
    da ativação da retenção de anexos — mesma secret, reaproveitada aqui).
-4. **Agendar o disparo semanal**:
+4. **Agendar o disparo semanal** — `disparar_backup_dados_sensiveis` é uma
+   PROCEDURE (não function, desde a migration
+   `20260724000004_commit_antes_de_coletar_resposta_pg_net.sql` — precisa dar
+   `commit` internamente logo após enfileirar a chamada à Edge Function,
+   pra o worker do pg_net conseguir enxergar a requisição; só procedures
+   permitem controle de transação), então chama-se com `CALL`, não `SELECT`:
    ```sql
    select cron.schedule(
      'backup-dados-sensiveis-semanal',
      '0 3 * * 0', -- domingo às 03:00 UTC — ajuste o horário/fuso à vontade
-     $$ select public.disparar_backup_dados_sensiveis(); $$
+     $$ call public.disparar_backup_dados_sensiveis(null); $$
    );
    ```
 5. **Fazer o deploy da Edge Function** (`supabase functions deploy
    backup-dados-sensiveis`) — ela não é aplicada por uma migration SQL,
    precisa do CLI do Supabase ou do dashboard.
-6. Rodar `select public.disparar_backup_dados_sensiveis();` manualmente uma
-   vez para confirmar que o primeiro backup sobe com sucesso antes de
+6. Rodar `call public.disparar_backup_dados_sensiveis(null);` manualmente
+   uma vez para confirmar que o primeiro backup sobe com sucesso antes de
    confiar no agendamento.
 
 ## Sobre a chave no Vault — o que ela protege (e o que não protege)
