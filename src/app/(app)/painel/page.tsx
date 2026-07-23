@@ -215,9 +215,12 @@ export default async function PainelPage({
                       <td className="py-2 pr-4">{v.vendedorNome}</td>
                       <td className="py-2 pr-4">{TIPO_CASO_LABELS[v.tipo]}</td>
                       <td className="py-2 pr-4">{v.totalCasos}</td>
-                      <td className="py-2 pr-4">
+                      <td className="flex items-center gap-3 py-2 pr-4">
                         <a href={`/painel/extrato-vendedor/${v.vendedorId}`} className="text-sm underline">
                           Baixar PDF
+                        </a>
+                        <a href={`/painel/extrato-vendedor/${v.vendedorId}/excel`} className="text-sm underline">
+                          Baixar Excel
                         </a>
                       </td>
                     </tr>
