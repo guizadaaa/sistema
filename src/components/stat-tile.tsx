@@ -1,17 +1,20 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 /** Card de número de destaque — mesmo visual no Dashboard e no Painel de Gestão. */
 export function StatTile({
   titulo,
   valor,
   tom,
+  className,
 }: {
   titulo: string;
   valor: number;
   tom?: "destructive" | "atencao";
+  className?: string;
 }) {
   return (
-    <Card>
+    <Card className={cn("justify-center", className)}>
       <CardContent className="flex flex-col gap-1 py-4">
         <span className="text-muted-foreground text-sm">{titulo}</span>
         <span
