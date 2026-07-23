@@ -1,10 +1,19 @@
 -- ============================================================================
--- Teste de regressão para o bug de produção: "column status_code not found
--- in data type net.http_response_result". Cobre os dois pontos que o mock
--- antigo (fictício) nunca teria pego: (1) o caminho de sucesso de verdade
--- lendo response.status_code corretamente, e (2) os dois caminhos de falha
--- (status da requisição = ERROR; e HTTP >= 300 com status = SUCCESS) —
--- confirmando que nada é purgado/considerado feito quando a chamada falha.
+-- Teste de regressão para os dois bugs de produção encontrados em sequência:
+--  1) "column status_code not found in data type net.http_response_result"
+--     (20260724000001) — o código HTTP mora em response.status_code, não no
+--     topo do tipo.
+--  2) "query has no destination for result data" (20260724000002) — a
+--     função pública net.http_collect_response está de fato quebrada nesta
+--     versão do pg_net (um `select` sem destino dentro dela mesma); as
+--     funções agora chamam net._http_collect_response (privada) direto, e é
+--     essa que os testes abaixo substituem para simular sucesso/falha.
+--
+-- Cobre os dois pontos que o mock antigo (fictício) nunca teria pego: (1) o
+-- caminho de sucesso de verdade lendo response.status_code corretamente, e
+-- (2) os dois caminhos de falha (status da requisição = ERROR; e HTTP >= 300
+-- com status = SUCCESS) — confirmando que nada é purgado/considerado feito
+-- quando a chamada falha.
 -- ============================================================================
 
 set role postgres;
@@ -37,7 +46,7 @@ select public._test_assert(
 -- disparar_backup_dados_sensiveis — falha de requisição (status = ERROR)
 -- ----------------------------------------------------------------------------
 
-create or replace function net.http_collect_response(request_id bigint, async boolean default true)
+create or replace function net._http_collect_response(request_id bigint, async boolean default true)
 returns net.http_response_result
 language sql
 as $$
@@ -58,7 +67,7 @@ $$;
 -- disparar_backup_dados_sensiveis — requisição teve sucesso mas HTTP 500
 -- ----------------------------------------------------------------------------
 
-create or replace function net.http_collect_response(request_id bigint, async boolean default true)
+create or replace function net._http_collect_response(request_id bigint, async boolean default true)
 returns net.http_response_result
 language sql
 as $$
@@ -76,7 +85,7 @@ end
 $$;
 
 -- Restaura o mock de sucesso padrão antes de seguir.
-create or replace function net.http_collect_response(request_id bigint, async boolean default true)
+create or replace function net._http_collect_response(request_id bigint, async boolean default true)
 returns net.http_response_result
 language sql
 as $$
@@ -160,7 +169,7 @@ reset request.jwt.claim.sub;
 
 set role postgres;
 
-create or replace function net.http_collect_response(request_id bigint, async boolean default true)
+create or replace function net._http_collect_response(request_id bigint, async boolean default true)
 returns net.http_response_result
 language sql
 as $$
@@ -186,7 +195,7 @@ select public._test_assert(
 );
 
 -- Restaura o mock de sucesso padrão para qualquer teste que rode depois.
-create or replace function net.http_collect_response(request_id bigint, async boolean default true)
+create or replace function net._http_collect_response(request_id bigint, async boolean default true)
 returns net.http_response_result
 language sql
 as $$

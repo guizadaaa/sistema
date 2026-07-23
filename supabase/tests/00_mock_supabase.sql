@@ -92,11 +92,31 @@ create or replace function net.http_post(
   headers jsonb default '{"Content-Type": "application/json"}'::jsonb, timeout_milliseconds integer default 5000
 ) returns bigint language sql as $$ select 1::bigint $$;
 
-create or replace function net.http_collect_response(request_id bigint, async boolean default true)
+-- net._http_collect_response é a implementação real (privada) — funcional.
+create or replace function net._http_collect_response(request_id bigint, async boolean default true)
 returns net.http_response_result
 language sql
 as $$
   select row('SUCCESS'::net.request_status, null, row(200, '{}'::jsonb, '')::net.http_response)::net.http_response_result
+$$;
+
+-- net.http_collect_response (pública, deprecated) reproduzida byte-a-byte
+-- da definição real capturada em produção via pg_get_functiondef — um
+-- `select` sem destino dentro de uma função plpgsql, que SEMPRE lança
+-- "query has no destination for result data" (42601) quando chamada,
+-- independente de quem/como a chama. Confirmado em produção com a
+-- migration 20260724000001 (que ainda chamava a pública) — descoberto só
+-- ao testar de verdade, não por inspeção. Mantido aqui exatamente quebrado
+-- de propósito: é isso que garante que ninguém no nosso código volte a
+-- chamar a pública sem que o harness acuse o erro.
+create or replace function net.http_collect_response(request_id bigint, async boolean default true)
+returns net.http_response_result
+language plpgsql
+as $$
+begin
+  raise notice 'The net.http_collect_response function is deprecated.';
+  select net._http_collect_response(request_id, async);
+end;
 $$;
 
 -- ---------------------------------------------------------------------------
