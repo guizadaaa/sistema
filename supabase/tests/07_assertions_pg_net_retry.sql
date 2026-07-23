@@ -22,6 +22,10 @@
 -- `ON_ERROR_STOP` só para o CALL problemático e conferem a variável
 -- automática `:ERROR` do psql, e usam `\gset` pra capturar timestamps
 -- antes/depois em vez de medir dentro de um bloco plpgsql.
+--
+-- Desde 20260724000005, a janela é 15 tentativas x 0.5s (até ~7.5s) em vez
+-- de 5 x 0.4s (~2s) — dimensionada com medição real em produção (delay
+-- observado: resolvido na 3a tentativa, 2.03s), não mais uma estimativa.
 -- ============================================================================
 
 set role postgres;
@@ -112,14 +116,14 @@ select public._test_assert(
 );
 
 select public._test_assert(
-  'disparar_backup_dados_sensiveis: nao desistiu rapido demais — esperou entre tentativas antes de desistir',
-  (:'t_fim_nunca_pronto'::timestamptz - :'t_inicio_nunca_pronto'::timestamptz) >= interval '0.5 seconds'
+  'disparar_backup_dados_sensiveis: nao desistiu rapido demais — esperou entre tentativas antes de desistir (janela de ~7.5s, 15x0.5s)',
+  (:'t_fim_nunca_pronto'::timestamptz - :'t_inicio_nunca_pronto'::timestamptz) >= interval '6 seconds'
 );
 
 truncate _test_pg_net_tentativas;
 
 -- ----------------------------------------------------------------------------
--- Erro genuíno (não é "not found") deve falhar rápido, sem esperar as 5
+-- Erro genuíno (não é "not found") deve falhar rápido, sem esperar as 15
 -- tentativas à toa por algo que não vai se resolver sozinho.
 -- ----------------------------------------------------------------------------
 
