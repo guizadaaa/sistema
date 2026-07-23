@@ -42,7 +42,6 @@ export function CasoDetalhe({
       <div className="flex items-center gap-3">
         <h1 className="text-xl font-semibold">Protocolo #{caso.protocolo}</h1>
         <Badge className={STATUS_BADGE_CLASSES[caso.status_atual]}>{STATUS_LABELS[caso.status_atual]}</Badge>
-        {caso.elegivel_ouvidoria && <Badge variant="outline">Elegível a Ouvidoria</Badge>}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -116,7 +115,6 @@ export function CasoDetalhe({
             <StatusAcoes
               casoId={caso.id}
               statusAtual={caso.status_atual}
-              elegivelOuvidoria={caso.elegivel_ouvidoria}
               podeConduzirFluxo={podeConduzirFluxo}
               ehAdmin={ehAdmin}
             />

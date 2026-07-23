@@ -126,32 +126,34 @@ export default async function PainelPage({
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatTile titulo="Total de protocolos" valor={metricas.total} />
-        <StatTile titulo="Prazo vencido" valor={metricas.prazoVencidos} tom="destructive" />
-        <StatTile titulo="Vencendo em breve" valor={metricas.prazoVencendo} tom="atencao" />
-      </div>
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
+        <Card className="aspect-square">
+          <CardHeader>
+            <CardTitle>Casos por status</CardTitle>
+            <CardDescription>Total: {metricas.total}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col">
+            {metricas.total === 0 ? (
+              <p className="text-muted-foreground text-sm">Nenhum caso encontrado.</p>
+            ) : (
+              <ul className="flex flex-1 flex-col justify-between py-2">
+                {STATUS_ORDEM.map((status) => (
+                  <li key={status} className="flex items-center justify-between text-sm">
+                    <Badge className={STATUS_BADGE_CLASSES[status]}>{STATUS_LABELS[status]}</Badge>
+                    <span className="font-medium">{metricas.porStatus[status]}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Casos por status</CardTitle>
-          <CardDescription>Total: {metricas.total}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {metricas.total === 0 ? (
-            <p className="text-muted-foreground text-sm">Nenhum caso encontrado.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {STATUS_ORDEM.map((status) => (
-                <li key={status} className="flex items-center justify-between text-sm">
-                  <Badge className={STATUS_BADGE_CLASSES[status]}>{STATUS_LABELS[status]}</Badge>
-                  <span className="font-medium">{metricas.porStatus[status]}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+        <div className="flex flex-col gap-4">
+          <StatTile titulo="Total de protocolos" valor={metricas.total} className="flex-1" />
+          <StatTile titulo="Prazo vencido" valor={metricas.prazoVencidos} tom="destructive" className="flex-1" />
+          <StatTile titulo="Vencendo em breve" valor={metricas.prazoVencendo} tom="atencao" className="flex-1" />
+        </div>
+      </div>
 
       <Card>
         <CardHeader>
@@ -161,9 +163,9 @@ export default async function PainelPage({
           {metricas.total === 0 ? (
             <p className="text-muted-foreground text-sm">Nenhum caso encontrado.</p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="grid grid-cols-1 gap-x-12 gap-y-2 sm:grid-cols-2">
               {tiposOrdenados.map((tipo) => (
-                <li key={tipo} className="flex items-center justify-between text-sm">
+                <li key={tipo} className="flex items-center justify-between gap-4 text-sm">
                   <span>{TIPO_CASO_LABELS[tipo]}</span>
                   <span className="font-medium">{metricas.porTipo[tipo]}</span>
                 </li>
@@ -213,9 +215,12 @@ export default async function PainelPage({
                       <td className="py-2 pr-4">{v.vendedorNome}</td>
                       <td className="py-2 pr-4">{TIPO_CASO_LABELS[v.tipo]}</td>
                       <td className="py-2 pr-4">{v.totalCasos}</td>
-                      <td className="py-2 pr-4">
+                      <td className="flex items-center gap-3 py-2 pr-4">
                         <a href={`/painel/extrato-vendedor/${v.vendedorId}`} className="text-sm underline">
                           Baixar PDF
+                        </a>
+                        <a href={`/painel/extrato-vendedor/${v.vendedorId}/excel`} className="text-sm underline">
+                          Baixar Excel
                         </a>
                       </td>
                     </tr>
@@ -236,10 +241,13 @@ export default async function PainelPage({
           {metricas.total === 0 ? (
             <p className="text-muted-foreground text-sm">Nenhum caso encontrado.</p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
               {STATUS_MARCOS.map((status) => (
-                <li key={status} className="flex items-center justify-between text-sm">
-                  <span>Até {STATUS_LABELS[status]}</span>
+                <li key={status} className="flex items-center justify-between gap-4 text-sm">
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground">Até</span>
+                    <Badge className={STATUS_BADGE_CLASSES[status]}>{STATUS_LABELS[status]}</Badge>
+                  </span>
                   <span className="font-medium">{formatarDias(metricas.tempoMedioPorStatus[status])}</span>
                 </li>
               ))}
@@ -279,30 +287,41 @@ export default async function PainelPage({
           {metricas.tempoMedioPorStatusPorVendedor.length > 0 && (
             <div className="flex flex-col gap-2">
               <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Por vendedor</h3>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-muted-foreground border-b text-left">
-                    <th className="py-2 pr-4 font-medium">Vendedor</th>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] table-fixed text-sm">
+                  <colgroup>
+                    <col className="w-40" />
                     {STATUS_MARCOS.map((status) => (
-                      <th key={status} className="py-2 pr-4 font-medium">
-                        Até {STATUS_LABELS[status]}
-                      </th>
+                      <col key={status} className="w-24" />
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {metricas.tempoMedioPorStatusPorVendedor.map((v) => (
-                    <tr key={v.vendedorId} className="border-b last:border-0">
-                      <td className="py-2 pr-4">{v.vendedorNome}</td>
+                  </colgroup>
+                  <thead>
+                    <tr className="text-muted-foreground border-b text-left">
+                      <th className="py-2 pr-4 font-medium">Vendedor</th>
                       {STATUS_MARCOS.map((status) => (
-                        <td key={status} className="py-2 pr-4">
-                          {formatarDias(v.porStatus[status])}
-                        </td>
+                        <th key={status} className="py-2 pr-4 font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <span>Até</span>
+                            <Badge className={STATUS_BADGE_CLASSES[status]}>{STATUS_LABELS[status]}</Badge>
+                          </span>
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {metricas.tempoMedioPorStatusPorVendedor.map((v) => (
+                      <tr key={v.vendedorId} className="border-b last:border-0">
+                        <td className="truncate py-2 pr-4">{v.vendedorNome}</td>
+                        {STATUS_MARCOS.map((status) => (
+                          <td key={status} className="py-2 pr-4">
+                            {formatarDias(v.porStatus[status])}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </CardContent>

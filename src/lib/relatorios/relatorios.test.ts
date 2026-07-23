@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { CasoAtencaoPrazo, MetricasPainel } from "@/lib/painel/metricas";
 
 import type { ExtratoVendedor } from "./extrato-vendedor";
+import { gerarExtratoVendedorExcel } from "./extrato-vendedor-excel";
 import { gerarExtratoVendedorPdf } from "./extrato-vendedor-pdf";
 import { gerarPainelExcel } from "./painel-excel";
 import { gerarPainelPdf } from "./painel-pdf";
@@ -138,5 +139,35 @@ describe("gerarExtratoVendedorPdf", () => {
   it("não quebra quando o vendedor não tem nenhum caso", async () => {
     const buffer = await gerarExtratoVendedorPdf({ ...EXTRATO_FIXTURE, casos: [], totalCasos: 0, multaTotalGeral: 0 });
     expect(ehPdfValido(buffer)).toBe(true);
+  });
+});
+
+describe("gerarExtratoVendedorExcel", () => {
+  it("gera um .xlsx com os mesmos dados do extrato em PDF", async () => {
+    const buffer = await gerarExtratoVendedorExcel(EXTRATO_FIXTURE);
+
+    const workbook = new ExcelJS.Workbook();
+    // Cast por causa do shim de tipos incompatível de exceljs (ver
+    // comentário em painel-excel.ts) — buffer é um Buffer de Node de
+    // verdade em tempo de execução.
+    await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+
+    const resumo = workbook.getWorksheet("Resumo");
+    expect(resumo?.getRow(2).getCell(2).value).toBe("Vendedor Um");
+    expect(resumo?.getRow(3).getCell(2).value).toBe(1); // Total de casos
+    expect(resumo?.getRow(4).getCell(2).value).toBe(300); // Multa total
+
+    const casos = workbook.getWorksheet("Casos");
+    expect(casos?.rowCount).toBe(2); // cabeçalho + 1 caso
+    expect(casos?.getRow(2).getCell(1).value).toBe(42); // Protocolo
+    expect(casos?.getRow(2).getCell(2).value).toBe("Cliente Teste");
+  });
+
+  it("não quebra quando o vendedor não tem nenhum caso", async () => {
+    const buffer = await gerarExtratoVendedorExcel({ ...EXTRATO_FIXTURE, casos: [], totalCasos: 0, multaTotalGeral: 0 });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    const casos = workbook.getWorksheet("Casos");
+    expect(casos?.rowCount).toBe(1); // só o cabeçalho
   });
 });

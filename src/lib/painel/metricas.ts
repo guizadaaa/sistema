@@ -11,8 +11,8 @@ export const STATUS_ORDEM: readonly StatusCaso[] = [
   "recepcionado",
   "em_andamento_interno",
   "reavaliacao",
-  "resolvido",
   "ouvidoria",
+  "resolvido",
 ];
 
 export type TipoMaisComumPorFilial = {

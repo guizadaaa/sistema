@@ -17,8 +17,8 @@ export const STATUS_OPCOES: StatusCaso[] = [
   "recepcionado",
   "em_andamento_interno",
   "reavaliacao",
-  "resolvido",
   "ouvidoria",
+  "resolvido",
 ];
 
 export const FILIAL_OPCOES: FilialCvc[] = ["1710", "1714", "1730"];

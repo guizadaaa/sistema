@@ -104,21 +104,6 @@ export async function avancarStatus(casoId: string, novoStatus: StatusCaso): Pro
   return {};
 }
 
-export async function marcarElegivelOuvidoria(casoId: string): Promise<{ error?: string }> {
-  await requireCurrentUser();
-  const supabase = await createClient();
-
-  const { error } = await supabase.from("casos").update({ elegivel_ouvidoria: true }).eq("id", casoId);
-
-  if (error) {
-    console.error("Erro ao marcar elegível a Ouvidoria:", error);
-    return { error: "Não foi possível marcar o caso como elegível a Ouvidoria." };
-  }
-
-  revalidatePath(`/casos/${casoId}`);
-  return {};
-}
-
 export type RegistrarDesfechoState = {
   error?: string;
 };

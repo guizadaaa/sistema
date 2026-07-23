@@ -8,28 +8,23 @@ import { STATUS_LABELS } from "@/lib/labels";
 import { proximosStatusValidos } from "@/lib/casos/status";
 import type { StatusCaso } from "@/lib/supabase/types";
 
-import { avancarStatus, marcarElegivelOuvidoria } from "./actions";
+import { avancarStatus } from "./actions";
 
 export function StatusAcoes({
   casoId,
   statusAtual,
-  elegivelOuvidoria,
   podeConduzirFluxo,
   ehAdmin,
 }: {
   casoId: string;
   statusAtual: StatusCaso;
-  elegivelOuvidoria: boolean;
   podeConduzirFluxo: boolean;
   ehAdmin: boolean;
 }) {
-  const opcoes = proximosStatusValidos(statusAtual, elegivelOuvidoria, ehAdmin);
+  const opcoes = proximosStatusValidos(statusAtual, ehAdmin);
   const [novoStatus, setNovoStatus] = useState<StatusCaso | "">("");
   const [erro, setErro] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
-
-  const [erroOuvidoria, setErroOuvidoria] = useState<string | undefined>();
-  const [isPendingOuvidoria, startTransitionOuvidoria] = useTransition();
 
   if (!podeConduzirFluxo && !ehAdmin) {
     return (
@@ -49,14 +44,6 @@ export function StatusAcoes({
       } else {
         setNovoStatus("");
       }
-    });
-  };
-
-  const confirmarOuvidoria = () => {
-    setErroOuvidoria(undefined);
-    startTransitionOuvidoria(async () => {
-      const resultado = await marcarElegivelOuvidoria(casoId);
-      if (resultado.error) setErroOuvidoria(resultado.error);
     });
   };
 
@@ -90,15 +77,6 @@ export function StatusAcoes({
       )}
 
       {erro && <p className="text-destructive text-sm">{erro}</p>}
-
-      {ehAdmin && !elegivelOuvidoria && (
-        <div className="flex flex-col gap-1 border-t pt-3">
-          <Button variant="outline" size="sm" className="w-fit" onClick={confirmarOuvidoria} disabled={isPendingOuvidoria}>
-            {isPendingOuvidoria ? "Salvando..." : "Marcar elegível a Ouvidoria"}
-          </Button>
-          {erroOuvidoria && <p className="text-destructive text-sm">{erroOuvidoria}</p>}
-        </div>
-      )}
     </div>
   );
 }
