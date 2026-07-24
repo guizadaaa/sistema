@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Download, Plus } from "lucide-react";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { carregarMetricasDashboard, STATUS_ORDEM } from "@/lib/dashboard/metricas";
@@ -19,14 +20,18 @@ export default async function HomePage() {
         <h1 className="text-xl font-semibold">Bem-vindo(a), {usuario.nome_completo}</h1>
         <div className="flex gap-2">
           <Button asChild>
-            <Link href="/casos/novo">Adicionar caso</Link>
+            <Link href="/casos/novo">
+              <Plus /> Adicionar caso
+            </Link>
           </Button>
           <Button asChild variant="outline">
             <Link href="/casos">Acompanhar casos</Link>
           </Button>
           {usuario.perfil === "vendedor" && (
             <Button asChild variant="outline">
-              <a href={`/painel/extrato-vendedor/${usuario.id}`}>Baixar meu extrato</a>
+              <a href={`/painel/extrato-vendedor/${usuario.id}`}>
+                <Download /> Baixar meu extrato
+              </a>
             </Button>
           )}
         </div>
