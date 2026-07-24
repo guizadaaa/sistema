@@ -319,9 +319,14 @@ function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEdit
 export function UsuariosLista({
   usuarios,
   podeEditar,
+  filtros,
 }: {
   usuarios: UsuarioListado[];
   podeEditar: boolean;
+  filtros: {
+    filial?: FilialCvc;
+    perfil?: PerfilUsuario;
+  };
 }) {
   const [state, formAction, isPending] = useActionState(convidarUsuario, initialConvidarState);
   const [perfilConvite, setPerfilConvite] = useState<PerfilUsuario>("vendedor");
@@ -329,6 +334,50 @@ export function UsuariosLista({
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-semibold">Gestão de Usuários</h1>
+
+      <Card>
+        <CardContent>
+          <form method="get" className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium">Filial</label>
+              <Select name="filial" defaultValue={filtros.filial ?? "todas"}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  {FILIAIS_USUARIO.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {FILIAL_LABELS[f]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium">Perfil</label>
+              <Select name="perfil" defaultValue={filtros.perfil ?? "todos"}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {PERFIS_USUARIO.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {PERFIL_LABELS[p]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button type="submit" variant="outline">
+              Filtrar
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {podeEditar && (
         <Card className="max-w-2xl">
