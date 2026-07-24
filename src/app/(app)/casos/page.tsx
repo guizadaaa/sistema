@@ -16,17 +16,16 @@ export default async function CasosPage({
   const filial = typeof sp.filial === "string" && isFilialCvc(sp.filial) ? sp.filial : undefined;
   const busca = typeof sp.busca === "string" ? sp.busca : undefined;
   const cpf = typeof sp.cpf === "string" ? sp.cpf : undefined;
-  const contrato = typeof sp.contrato === "string" ? sp.contrato : undefined;
   const dataInicio = typeof sp.dataInicio === "string" ? sp.dataInicio : undefined;
   const dataFim = typeof sp.dataFim === "string" ? sp.dataFim : undefined;
 
-  const casos = await listarCasos({ status, tipo, filial, busca, cpf, contrato, dataInicio, dataFim });
+  const casos = await listarCasos({ status, tipo, filial, busca, cpf, dataInicio, dataFim });
   const mostrarFiltroFilial = usuario.perfil === "adm" || usuario.perfil === "adm_master";
 
   return (
     <CasosLista
       casos={casos}
-      filtros={{ status, tipo, filial, busca, cpf, contrato, dataInicio, dataFim }}
+      filtros={{ status, tipo, filial, busca, cpf, dataInicio, dataFim }}
       mostrarFiltroFilial={mostrarFiltroFilial}
     />
   );

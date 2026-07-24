@@ -108,6 +108,16 @@ describe("listarCasos — busca geral (bug B1)", () => {
     const resultado = await listarCasos({ busca: "101" });
     expect(resultado.map((c) => c.id)).toEqual(["c2"]);
   });
+
+  it("busca geral acha pelo contrato adicional, não só o principal", async () => {
+    const resultado = await listarCasos({ busca: "9999" });
+    expect(resultado.map((c) => c.id)).toEqual(["c2"]);
+  });
+
+  it("busca geral com 11 dígitos casa por CPF (com ou sem máscara)", async () => {
+    const resultado = await listarCasos({ busca: "111.444.777-35" });
+    expect(resultado.map((c) => c.id)).toEqual(["c1"]);
+  });
 });
 
 describe("listarCasos — filtros novos", () => {
@@ -116,18 +126,13 @@ describe("listarCasos — filtros novos", () => {
     expect(resultado.map((c) => c.id)).toEqual(["c1"]);
   });
 
-  it("filtro de contrato acha pelo contrato adicional, não só o principal", async () => {
-    const resultado = await listarCasos({ contrato: "9999" });
-    expect(resultado.map((c) => c.id)).toEqual(["c2"]);
-  });
-
   it("filtro de período exclui casos abertos fora do intervalo", async () => {
     const resultado = await listarCasos({ dataInicio: "2026-06-01", dataFim: "2026-06-30" });
     expect(resultado.map((c) => c.id)).toEqual(["c2"]);
   });
 
-  it("busca + contrato combinados são interseção (AND), não união", async () => {
-    const resultado = await listarCasos({ busca: "Maria", contrato: "9999" });
+  it("busca + cpf combinados são interseção (AND), não união", async () => {
+    const resultado = await listarCasos({ busca: "Maria", cpf: "222.333.444-56" });
     expect(resultado).toEqual([]);
   });
 });

@@ -40,15 +40,12 @@ export function CasosLista({
     filial?: FilialCvc;
     busca?: string;
     cpf?: string;
-    contrato?: string;
     dataInicio?: string;
     dataFim?: string;
   };
   mostrarFiltroFilial: boolean;
 }) {
-  const temFiltroSecundarioAtivo = Boolean(
-    filtros.cpf || filtros.contrato || filtros.dataInicio || filtros.dataFim
-  );
+  const temFiltroSecundarioAtivo = Boolean(filtros.cpf || filtros.dataInicio || filtros.dataFim);
   const temFiltroAtivo =
     Boolean(filtros.busca || filtros.status || filtros.tipo || filtros.filial) || temFiltroSecundarioAtivo;
 
@@ -74,7 +71,7 @@ export function CasosLista({
                 <Input
                   id="busca"
                   name="busca"
-                  placeholder="Contrato, cliente ou protocolo"
+                  placeholder="Contrato, cliente, protocolo ou CPF"
                   defaultValue={filtros.busca ?? ""}
                   className="w-56"
                 />
@@ -161,19 +158,6 @@ export function CasosLista({
                     name="cpf"
                     placeholder="000.000.000-00"
                     defaultValue={filtros.cpf ?? ""}
-                    className="w-44"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium" htmlFor="contrato">
-                    Número de contrato
-                  </label>
-                  <Input
-                    id="contrato"
-                    name="contrato"
-                    placeholder="Principal ou adicional"
-                    defaultValue={filtros.contrato ?? ""}
                     className="w-44"
                   />
                 </div>
