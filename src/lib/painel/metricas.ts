@@ -2,18 +2,12 @@ import "server-only";
 
 import { duracaoEmDiasFracionarios } from "@/lib/casos/duracao";
 import { diasAteVencimento, situacaoPrazoVigencia } from "@/lib/casos/prazo";
+import { STATUS_ORDEM } from "@/lib/casos/status";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 import { createClient } from "@/lib/supabase/server";
 import type { FilialCvc, QuemPagaMulta, StatusCaso, TipoCaso } from "@/lib/supabase/types";
 
-export const STATUS_ORDEM: readonly StatusCaso[] = [
-  "inicial",
-  "recepcionado",
-  "em_andamento_interno",
-  "reavaliacao",
-  "ouvidoria",
-  "resolvido",
-];
+export { STATUS_ORDEM };
 
 export type TipoMaisComumPorFilial = {
   filial: FilialCvc;
