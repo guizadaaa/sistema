@@ -12,19 +12,22 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "35mb",
     },
   },
-  // pdfkit (usado em src/lib/relatorios/pdf-util.ts) lê as métricas das
-  // fontes padrão (Helvetica etc.) de arquivos .afm em node_modules/pdfkit/js/data
-  // via fs em runtime, não via import/require estático — um padrão de acesso
-  // conhecido por escapar do output file tracing em builds na Vercel (ENOENT
-  // ao gerar PDF, mesmo funcionando local). Garantir a inclusão explícita
-  // aqui é a mitigação documentada pelo próprio Next.js para esse tipo de
-  // caso. Ressalva: build local (.next/server/.../route.js.nft.json) já
-  // inclui esses arquivos mesmo SEM esta opção — não consegui reproduzir a
-  // ausência localmente, então isto é defensivo/best-effort enquanto não
-  // temos confirmação via logs reais da Vercel do erro 500 relatado.
-  outputFileTracingIncludes: {
-    "/*": ["./node_modules/pdfkit/js/data/**/*"],
-  },
+  // Causa raiz real do 500 ao gerar PDF, reproduzida localmente com
+  // `next build && next start` (não em `next dev`, que não passa pelo
+  // bundler de produção): pdfkit lê as métricas das fontes padrão
+  // (Helvetica etc.) de arquivos .afm relativos a __dirname em runtime.
+  // O Turbopack reescreve/relocaliza esse `__dirname` ao empacotar pdfkit
+  // junto com o código da rota, e o caminho resultante não resolve pro
+  // arquivo de verdade — reproduzido com o erro exato: "ENOENT: no such
+  // file or directory, open '/ROOT/node_modules/pdfkit/js/data/Helvetica.afm'"
+  // (o "/ROOT/" é um placeholder do bundler que não foi substituído
+  // corretamente). Isso acontecia mesmo com os arquivos presentes no
+  // output file tracing (tentativa anterior) — o problema nunca foi os
+  // arquivos ficarem de fora do trace, foi o bundling do pdfkit em si.
+  // serverExternalPackages tira o pacote do bundling do Turbopack/webpack
+  // e usa `require()` nativo do Node em runtime — __dirname resolve
+  // corretamente porque o código do pdfkit nunca é reescrito/movido.
+  serverExternalPackages: ["pdfkit"],
 };
 
 export default nextConfig;

@@ -127,7 +127,7 @@ export default async function PainelPage({
       </div>
 
       <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
-        <Card className="aspect-square">
+        <Card>
           <CardHeader>
             <CardTitle>Casos por status</CardTitle>
             <CardDescription>Total: {metricas.total}</CardDescription>
