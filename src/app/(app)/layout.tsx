@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { buscarProximaDelegacaoParaAviso } from "@/lib/delegacoes/listar";
 import { FILIAL_LABELS, PERFIL_LABELS } from "@/lib/labels";
@@ -8,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 import { DelegacaoAvisoBanner } from "./delegacao-aviso-banner";
+import { NavLinks } from "./nav-links";
 import { SinoNotificacoes } from "./sino-notificacoes";
 import { logout } from "../login/actions";
 
@@ -32,32 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               {usuario.filial ? ` · ${FILIAL_LABELS[usuario.filial]}` : ""}
             </span>
           </div>
-          <nav className="flex items-center gap-4 text-sm">
-            <Link href="/casos" className="hover:underline">
-              Casos
-            </Link>
-            {(usuario.perfil === "adm" || usuario.perfil === "adm_master" || usuario.perfil === "gerente") && (
-              <Link href="/painel" className="hover:underline">
-                Painel
-              </Link>
-            )}
-            {/* Usuários e Delegações vivem sob a mesma rota /usuarios (abas
-                internas para quem enxerga as duas — hoje só adm_master); um
-                único link aqui, cada perfil cai direto no que pode ver. */}
-            {(usuario.perfil === "adm" || usuario.perfil === "adm_master" || usuario.perfil === "gerente") && (
-              <Link href="/usuarios" className="hover:underline">
-                Usuários
-              </Link>
-            )}
-            {usuario.perfil === "adm_master" && (
-              <Link href="/auditoria" className="hover:underline">
-                Auditoria
-              </Link>
-            )}
-            <Link href="/seguranca" className="hover:underline">
-              Segurança
-            </Link>
-          </nav>
+          <NavLinks perfil={usuario.perfil} />
         </div>
         <div className="flex items-center gap-2">
           <SinoNotificacoes naoLidasInicial={naoLidas} recentesIniciais={recentes} />

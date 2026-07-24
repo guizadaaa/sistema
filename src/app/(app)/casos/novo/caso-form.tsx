@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useId, useState, type FocusEvent, type FormEvent } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { FileText, Paperclip, Plus, Trash2, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,15 @@ const FILIAIS_VALIDAS: readonly string[] = FILIAIS;
 function FieldError({ mensagem }: { mensagem?: string }) {
   if (!mensagem) return null;
   return <p className="text-destructive text-sm">{mensagem}</p>;
+}
+
+function SectionTitle({ icon: Icon, children }: { icon: typeof User; children: React.ReactNode }) {
+  return (
+    <p className="text-muted-foreground flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
+      <Icon className="size-3.5" />
+      {children}
+    </p>
+  );
 }
 
 function validarArquivoAnexo(arquivo: File): string | undefined {
@@ -272,6 +281,45 @@ function CasoFormCampos({
 
   return (
     <form action={formAction} onSubmit={validarAntesDeEnviar} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
+        <SectionTitle icon={User}>Dados do cliente</SectionTitle>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="clienteNome">Nome completo do contratante</Label>
+            <Input
+              id="clienteNome"
+              name="clienteNome"
+              required
+              defaultValue={state.valores?.clienteNome}
+              aria-invalid={Boolean(errosLocais.clienteNome || state.fieldErrors?.clienteNome)}
+              onBlur={validarObrigatorioAoSair("clienteNome", "Informe o nome completo do contratante")}
+            />
+            <FieldError mensagem={errosLocais.clienteNome ?? state.fieldErrors?.clienteNome} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="clienteCpf">CPF do cliente</Label>
+            <Input
+              id="clienteCpf"
+              name="clienteCpf"
+              inputMode="numeric"
+              maxLength={14}
+              required
+              value={cpfMascarado}
+              aria-invalid={Boolean(errosLocais.clienteCpf || state.fieldErrors?.clienteCpf)}
+              onChange={(e) => {
+                const novoValor = formatarCpf(e.target.value);
+                setCpfMascarado(novoValor);
+                setErroLocal("clienteCpf", validarCpf(novoValor));
+              }}
+              onBlur={validarCpfAoSair}
+            />
+            <FieldError mensagem={errosLocais.clienteCpf ?? state.fieldErrors?.clienteCpf} />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4 border-t pt-4">
+        <SectionTitle icon={FileText}>Detalhes do caso</SectionTitle>
       {donosElegiveis.length > 1 && (
         <div className="flex flex-col gap-2">
           <Label htmlFor="vendedorDono">Dono do caso</Label>
@@ -371,7 +419,7 @@ function CasoFormCampos({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 border-t pt-4">
+      <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <Label>Contratos adicionais (opcional)</Label>
           <Button type="button" variant="outline" size="sm" onClick={adicionarContratoAdicionalRow}>
@@ -410,40 +458,6 @@ function CasoFormCampos({
             </Button>
           </div>
         ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="clienteNome">Nome completo do contratante</Label>
-          <Input
-            id="clienteNome"
-            name="clienteNome"
-            required
-            defaultValue={state.valores?.clienteNome}
-            aria-invalid={Boolean(errosLocais.clienteNome || state.fieldErrors?.clienteNome)}
-            onBlur={validarObrigatorioAoSair("clienteNome", "Informe o nome completo do contratante")}
-          />
-          <FieldError mensagem={errosLocais.clienteNome ?? state.fieldErrors?.clienteNome} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="clienteCpf">CPF do cliente</Label>
-          <Input
-            id="clienteCpf"
-            name="clienteCpf"
-            inputMode="numeric"
-            maxLength={14}
-            required
-            value={cpfMascarado}
-            aria-invalid={Boolean(errosLocais.clienteCpf || state.fieldErrors?.clienteCpf)}
-            onChange={(e) => {
-              const novoValor = formatarCpf(e.target.value);
-              setCpfMascarado(novoValor);
-              setErroLocal("clienteCpf", validarCpf(novoValor));
-            }}
-            onBlur={validarCpfAoSair}
-          />
-          <FieldError mensagem={errosLocais.clienteCpf ?? state.fieldErrors?.clienteCpf} />
-        </div>
       </div>
 
       {exigeMotivoDescricao && (
@@ -529,8 +543,11 @@ function CasoFormCampos({
           </div>
         </div>
       )}
+      </div>
 
-      <div className="flex flex-col gap-3 border-t pt-4">
+      <div className="flex flex-col gap-4 border-t pt-4">
+        <SectionTitle icon={Paperclip}>Anexos</SectionTitle>
+        <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <Label>Anexos (opcional)</Label>
           <Button type="button" variant="outline" size="sm" onClick={adicionarAnexoRow}>
@@ -579,6 +596,7 @@ function CasoFormCampos({
             </Button>
           </div>
         ))}
+        </div>
       </div>
 
       {state.error && !state.fieldErrors && <p className="text-destructive text-sm">{state.error}</p>}

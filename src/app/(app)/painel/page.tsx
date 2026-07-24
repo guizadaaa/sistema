@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { Badge } from "@/components/ui/badge";
@@ -119,10 +120,14 @@ export default async function PainelPage({
 
       <div className="flex flex-wrap gap-2">
         <Button asChild variant="outline" size="sm">
-          <a href={`/painel/exportar/pdf?${queryStringExportacao}`}>Exportar PDF</a>
+          <a href={`/painel/exportar/pdf?${queryStringExportacao}`}>
+            <FileText /> Exportar PDF
+          </a>
         </Button>
         <Button asChild variant="outline" size="sm">
-          <a href={`/painel/exportar/excel?${queryStringExportacao}`}>Exportar Excel</a>
+          <a href={`/painel/exportar/excel?${queryStringExportacao}`}>
+            <FileSpreadsheet /> Exportar Excel
+          </a>
         </Button>
       </div>
 
@@ -215,12 +220,18 @@ export default async function PainelPage({
                       <td className="py-2 pr-4">{v.vendedorNome}</td>
                       <td className="py-2 pr-4">{TIPO_CASO_LABELS[v.tipo]}</td>
                       <td className="py-2 pr-4">{v.totalCasos}</td>
-                      <td className="flex items-center gap-3 py-2 pr-4">
-                        <a href={`/painel/extrato-vendedor/${v.vendedorId}`} className="text-sm underline">
-                          Baixar PDF
+                      <td className="flex items-center gap-1 py-2 pr-4">
+                        <a
+                          href={`/painel/extrato-vendedor/${v.vendedorId}`}
+                          className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm"
+                        >
+                          <Download className="size-3.5" /> PDF
                         </a>
-                        <a href={`/painel/extrato-vendedor/${v.vendedorId}/excel`} className="text-sm underline">
-                          Baixar Excel
+                        <a
+                          href={`/painel/extrato-vendedor/${v.vendedorId}/excel`}
+                          className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm"
+                        >
+                          <Download className="size-3.5" /> Excel
                         </a>
                       </td>
                     </tr>

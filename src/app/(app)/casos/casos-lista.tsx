@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,19 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FILIAL_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { situacaoPrazoVigencia } from "@/lib/casos/prazo";
+import { STATUS_ORDEM } from "@/lib/casos/status";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 import type { CasoListado } from "@/lib/casos/listar";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
 
-export const STATUS_OPCOES: StatusCaso[] = [
-  "inicial",
-  "recepcionado",
-  "em_andamento_interno",
-  "reavaliacao",
-  "ouvidoria",
-  "resolvido",
-];
+export const STATUS_OPCOES: readonly StatusCaso[] = STATUS_ORDEM;
 
 export const FILIAL_OPCOES: FilialCvc[] = ["1710", "1714", "1730"];
 
@@ -51,127 +46,159 @@ export function CasosLista({
   };
   mostrarFiltroFilial: boolean;
 }) {
+  const temFiltroSecundarioAtivo = Boolean(
+    filtros.cpf || filtros.contrato || filtros.dataInicio || filtros.dataFim
+  );
+  const temFiltroAtivo =
+    Boolean(filtros.busca || filtros.status || filtros.tipo || filtros.filial) || temFiltroSecundarioAtivo;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Acompanhar Casos</h1>
         <Button asChild>
-          <Link href="/casos/novo">Adicionar caso</Link>
+          <Link href="/casos/novo">
+            <Plus /> Adicionar caso
+          </Link>
         </Button>
       </div>
 
       <Card>
-        <CardContent>
-          <form method="get" className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium" htmlFor="busca">
-                Buscar
-              </label>
-              <Input
-                id="busca"
-                name="busca"
-                placeholder="Contrato, cliente ou protocolo"
-                defaultValue={filtros.busca ?? ""}
-                className="w-56"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">Status</label>
-              <Select name="status" defaultValue={filtros.status ?? "todos"}>
-                <SelectTrigger className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  {STATUS_OPCOES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {STATUS_LABELS[s]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">Tipo</label>
-              <Select name="tipo" defaultValue={filtros.tipo ?? "todos"}>
-                <SelectTrigger className="w-56">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  {TIPOS_CASO.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {TIPO_CASO_LABELS[t]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {mostrarFiltroFilial && (
+        <CardContent className="flex flex-col gap-3">
+          <form method="get" className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-end gap-3">
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">Filial</label>
-                <Select name="filial" defaultValue={filtros.filial ?? "todas"}>
-                  <SelectTrigger className="w-40">
+                <label className="text-sm font-medium" htmlFor="busca">
+                  Buscar
+                </label>
+                <Input
+                  id="busca"
+                  name="busca"
+                  placeholder="Contrato, cliente ou protocolo"
+                  defaultValue={filtros.busca ?? ""}
+                  className="w-56"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Status</label>
+                <Select name="status" defaultValue={filtros.status ?? "todos"}>
+                  <SelectTrigger className="w-48">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todas">Todas</SelectItem>
-                    {FILIAL_OPCOES.map((f) => (
-                      <SelectItem key={f} value={f}>
-                        {FILIAL_LABELS[f]}
+                    <SelectItem value="todos">Todos</SelectItem>
+                    {STATUS_OPCOES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {STATUS_LABELS[s]}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
 
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium" htmlFor="cpf">
-                CPF do cliente
-              </label>
-              <Input
-                id="cpf"
-                name="cpf"
-                placeholder="000.000.000-00"
-                defaultValue={filtros.cpf ?? ""}
-                className="w-44"
-              />
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Tipo</label>
+                <Select name="tipo" defaultValue={filtros.tipo ?? "todos"}>
+                  <SelectTrigger className="w-56">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    {TIPOS_CASO.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {TIPO_CASO_LABELS[t]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {mostrarFiltroFilial && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">Filial</label>
+                  <Select name="filial" defaultValue={filtros.filial ?? "todas"}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas</SelectItem>
+                      {FILIAL_OPCOES.map((f) => (
+                        <SelectItem key={f} value={f}>
+                          {FILIAL_LABELS[f]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <Button type="submit" variant="outline">
+                Filtrar
+              </Button>
+
+              {temFiltroAtivo && (
+                <Button asChild variant="ghost">
+                  <Link href="/casos">
+                    <Trash2 /> Limpar filtros
+                  </Link>
+                </Button>
+              )}
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium" htmlFor="contrato">
-                Número de contrato
-              </label>
-              <Input
-                id="contrato"
-                name="contrato"
-                placeholder="Principal ou adicional"
-                defaultValue={filtros.contrato ?? ""}
-                className="w-44"
-              />
-            </div>
+            <details className="group" open={temFiltroSecundarioAtivo}>
+              <summary className="text-muted-foreground hover:text-foreground flex w-fit cursor-pointer list-none items-center gap-1 text-sm font-medium select-none">
+                <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+                Mais filtros
+              </summary>
+              <div className="mt-3 flex flex-wrap items-end gap-3 border-t pt-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium" htmlFor="cpf">
+                    CPF do cliente
+                  </label>
+                  <Input
+                    id="cpf"
+                    name="cpf"
+                    placeholder="000.000.000-00"
+                    defaultValue={filtros.cpf ?? ""}
+                    className="w-44"
+                  />
+                </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium" htmlFor="dataInicio">
-                Aberto de
-              </label>
-              <Input id="dataInicio" name="dataInicio" type="date" defaultValue={filtros.dataInicio ?? ""} className="w-40" />
-            </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium" htmlFor="contrato">
+                    Número de contrato
+                  </label>
+                  <Input
+                    id="contrato"
+                    name="contrato"
+                    placeholder="Principal ou adicional"
+                    defaultValue={filtros.contrato ?? ""}
+                    className="w-44"
+                  />
+                </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium" htmlFor="dataFim">
-                até
-              </label>
-              <Input id="dataFim" name="dataFim" type="date" defaultValue={filtros.dataFim ?? ""} className="w-40" />
-            </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium" htmlFor="dataInicio">
+                    Aberto de
+                  </label>
+                  <Input
+                    id="dataInicio"
+                    name="dataInicio"
+                    type="date"
+                    defaultValue={filtros.dataInicio ?? ""}
+                    className="w-40"
+                  />
+                </div>
 
-            <Button type="submit" variant="outline">
-              Filtrar
-            </Button>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium" htmlFor="dataFim">
+                    até
+                  </label>
+                  <Input id="dataFim" name="dataFim" type="date" defaultValue={filtros.dataFim ?? ""} className="w-40" />
+                </div>
+              </div>
+            </details>
           </form>
         </CardContent>
       </Card>

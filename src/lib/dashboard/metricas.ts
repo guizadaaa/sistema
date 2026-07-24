@@ -2,17 +2,11 @@ import "server-only";
 
 import { duracaoEmDiasFracionarios, formatarDuracaoEmDias } from "@/lib/casos/duracao";
 import { situacaoPrazoVigencia } from "@/lib/casos/prazo";
+import { STATUS_ORDEM } from "@/lib/casos/status";
 import { createClient } from "@/lib/supabase/server";
 import type { StatusCaso } from "@/lib/supabase/types";
 
-export const STATUS_ORDEM: readonly StatusCaso[] = [
-  "inicial",
-  "recepcionado",
-  "em_andamento_interno",
-  "reavaliacao",
-  "ouvidoria",
-  "resolvido",
-];
+export { STATUS_ORDEM };
 
 export type CasoParado = {
   id: string;

@@ -39,11 +39,11 @@
   --status-recepcionado: #eb6834;
   --status-recepcionado-ink: #b8491e;
   --status-em-andamento-interno: #4a3aa7;
-  --status-em-andamento-interno-ink: #4a3aa7;
+  --status-em-andamento-interno-ink: #30266d;
   --status-reavaliacao: #e87ba4;
   --status-reavaliacao-ink: #a83865;
   --status-resolvido: #008300;
-  --status-resolvido-ink: #008300;
+  --status-resolvido-ink: #005500;
   --status-ouvidoria: #e34948;
   --status-ouvidoria-ink: #c53030;
 }
