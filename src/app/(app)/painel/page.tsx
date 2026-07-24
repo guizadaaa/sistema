@@ -136,7 +136,7 @@ export default async function PainelPage({
             {metricas.total === 0 ? (
               <p className="text-muted-foreground text-sm">Nenhum caso encontrado.</p>
             ) : (
-              <ul className="flex flex-1 flex-col justify-between py-2">
+              <ul className="flex flex-col gap-2">
                 {STATUS_ORDEM.map((status) => (
                   <li key={status} className="flex items-center justify-between text-sm">
                     <Badge className={STATUS_BADGE_CLASSES[status]}>{STATUS_LABELS[status]}</Badge>
