@@ -29,7 +29,16 @@ describe("podeGerarExtratoVendedor", () => {
     expect(podeGerarExtratoVendedor({ id: "am-1", perfil: "adm_master", filial: null }, vendedorOutraFilial)).toBe(true);
   });
 
-  it("nunca gera extrato para um alvo que não é vendedor (gerente/admin como alvo)", () => {
-    expect(podeGerarExtratoVendedor({ id: "am-1", perfil: "adm_master", filial: null }, gerenteComoAlvo)).toBe(false);
+  it("gerente NÃO gera extrato para um alvo que não é vendedor (ex.: outro gerente)", () => {
+    expect(podeGerarExtratoVendedor({ id: "g-2", perfil: "gerente", filial: "1710" }, gerenteComoAlvo)).toBe(false);
+  });
+
+  it("admin gera extrato mesmo se o alvo não é MAIS vendedor (foi promovido depois de já ter casos)", () => {
+    // Bug real: casos.vendedor_dono é um fato histórico — a pessoa pode ter
+    // sido promovida a gerente/admin depois de já ter sido dona de casos
+    // como vendedor. O extrato ainda é sobre esses casos, independente do
+    // perfil atual dela — e admin/adm_master não têm restrição nenhuma.
+    expect(podeGerarExtratoVendedor({ id: "am-1", perfil: "adm_master", filial: null }, gerenteComoAlvo)).toBe(true);
+    expect(podeGerarExtratoVendedor({ id: "a-1", perfil: "adm", filial: null }, gerenteComoAlvo)).toBe(true);
   });
 });
