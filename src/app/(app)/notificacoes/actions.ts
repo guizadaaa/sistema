@@ -50,3 +50,41 @@ export async function marcarTodasNotificacoesComoLidas(): Promise<{ error?: stri
 
   return {};
 }
+
+/**
+ * Chamada pelo pop-up de prazo (polling próprio, mesmo intervalo do sino)
+ * — só os marcos de prazo ainda não lidos, nunca as outras 2 categorias
+ * (caso_novo/delegacao_expirando não têm o mesmo caráter de urgência
+ * "chame mais atenção que o sino").
+ */
+export async function buscarPrazosNaoLidos(): Promise<NotificacaoListada[]> {
+  await requireCurrentUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("notificacoes")
+    .select("*")
+    .eq("tipo", "prazo_vencendo")
+    .is("lida_em", null)
+    .order("marco_dias", { ascending: true });
+  if (error) throw error;
+
+  return data ?? [];
+}
+
+export async function marcarTodosPrazosComoLidos(): Promise<{ error?: string }> {
+  await requireCurrentUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("notificacoes")
+    .update({ lida_em: new Date().toISOString() })
+    .eq("tipo", "prazo_vencendo")
+    .is("lida_em", null);
+  if (error) {
+    console.error("Erro ao marcar prazos como lidos:", error);
+    return { error: "Não foi possível marcar todos como lidos." };
+  }
+
+  return {};
+}

@@ -93,9 +93,10 @@ reset role;
 reset request.jwt.claim.sub;
 
 -- ----------------------------------------------------------------------------
--- notificar_prazos_vencendo: caso novo com prazo em 2 dias (dentro da
--- janela padrão de 3) — deve notificar o vendedor dono; rodar de novo não
--- deve duplicar.
+-- notificar_prazos_vencendo: caso novo com prazo em exatamente 3 dias (um
+-- dos 5 marcos fixos) — deve notificar o vendedor dono, o gerente ativo da
+-- MESMA filial (1710) e o adm_master; NÃO o gerente de outra filial (1714)
+-- nem a vendedor B (sem relação com o caso). Rodar de novo não duplica.
 -- ----------------------------------------------------------------------------
 
 set role authenticated;
@@ -105,28 +106,67 @@ insert into public.casos (
   contrato_numero, cliente_nome, cliente_cpf
 ) values (
   '10000000-0000-0000-0000-000000000002', 'alteracao_data', 'pedido_cliente', 'teste prazo vencendo',
-  '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', (current_date + 2),
+  '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', (current_date + 3),
   '17100000000002', 'Cliente Prazo', '52998224725'
 );
 reset role;
 reset request.jwt.claim.sub;
 
 set role postgres;
-select public.notificar_prazos_vencendo(3);
+select public.notificar_prazos_vencendo();
 select public._test_assert(
-  'notificar_prazos_vencendo: notificou o vendedor dono do caso a 2 dias de vencer',
+  'notificar_prazos_vencendo: notificou o vendedor dono do caso, marco 3 dias',
   (
     select count(*) = 1 from public.notificacoes
     where destinatario_id = '00000000-0000-0000-0000-000000000001'
       and tipo = 'prazo_vencendo'
       and caso_id = '10000000-0000-0000-0000-000000000002'
+      and marco_dias = 3
   )
 );
-select public.notificar_prazos_vencendo(3);
 select public._test_assert(
-  'notificar_prazos_vencendo: rodar de novo não duplica (dedup)',
+  'notificar_prazos_vencendo: notificou o gerente ativo da mesma filial (1710)',
   (
     select count(*) = 1 from public.notificacoes
+    where destinatario_id = '00000000-0000-0000-0000-000000000003'
+      and tipo = 'prazo_vencendo'
+      and caso_id = '10000000-0000-0000-0000-000000000002'
+      and marco_dias = 3
+  )
+);
+select public._test_assert(
+  'notificar_prazos_vencendo: notificou o adm_master',
+  (
+    select count(*) = 1 from public.notificacoes
+    where destinatario_id = '00000000-0000-0000-0000-000000000004'
+      and tipo = 'prazo_vencendo'
+      and caso_id = '10000000-0000-0000-0000-000000000002'
+      and marco_dias = 3
+  )
+);
+select public._test_assert(
+  'notificar_prazos_vencendo: NAO notificou o gerente de outra filial (1714)',
+  (
+    select count(*) = 0 from public.notificacoes
+    where destinatario_id = '00000000-0000-0000-0000-000000000005'
+      and tipo = 'prazo_vencendo'
+      and caso_id = '10000000-0000-0000-0000-000000000002'
+  )
+);
+select public._test_assert(
+  'notificar_prazos_vencendo: NAO notificou a vendedor B (sem relação com o caso)',
+  (
+    select count(*) = 0 from public.notificacoes
+    where destinatario_id = '00000000-0000-0000-0000-000000000002'
+      and tipo = 'prazo_vencendo'
+      and caso_id = '10000000-0000-0000-0000-000000000002'
+  )
+);
+select public.notificar_prazos_vencendo();
+select public._test_assert(
+  'notificar_prazos_vencendo: rodar de novo não duplica (dedup por caso+marco+destinatário)',
+  (
+    select count(*) = 3 from public.notificacoes
     where caso_id = '10000000-0000-0000-0000-000000000002' and tipo = 'prazo_vencendo'
   )
 );

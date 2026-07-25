@@ -28,13 +28,16 @@ export function situacaoPrazoVigencia(prazoVigencia: string, hoje: Date = new Da
  */
 export type CorPrazo = "verde" | "amarelo" | "laranja" | "vermelho";
 
-export function corPrazoVigencia(prazoVigencia: string, hoje: Date = new Date()): CorPrazo {
-  const diffDias = diasAteVencimento(prazoVigencia, hoje);
-
+/** Mesmos limites de corPrazoVigencia, mas a partir de uma contagem de dias já calculada (ex.: marco_dias de uma notificação). */
+export function corPorDias(diffDias: number): CorPrazo {
   if (diffDias <= 3) return "vermelho";
   if (diffDias <= 7) return "laranja";
   if (diffDias <= 15) return "amarelo";
   return "verde";
+}
+
+export function corPrazoVigencia(prazoVigencia: string, hoje: Date = new Date()): CorPrazo {
+  return corPorDias(diasAteVencimento(prazoVigencia, hoje));
 }
 
 /** Texto curto pra exibir ao lado/embaixo da data — "Vence em 12 dias", "Vence hoje", "Vencido há 3 dias". */

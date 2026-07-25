@@ -314,6 +314,7 @@ export interface Database {
           tipo: TipoNotificacao;
           mensagem: string;
           caso_id: string | null;
+          marco_dias: number | null;
           lida_em: string | null;
           criado_em: string;
         };
