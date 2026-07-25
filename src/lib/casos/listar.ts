@@ -7,12 +7,11 @@ import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
 export type FiltrosCasos = {
   status?: StatusCaso;
   tipo?: TipoCaso;
+  /** Busca universal — cliente, contrato (principal ou adicional), protocolo ou CPF. */
   busca?: string;
   filial?: FilialCvc;
   /** CPF do cliente — aceita com ou sem máscara, comparado só pelos dígitos (match exato). */
   cpf?: string;
-  /** Número de contrato — aceita com ou sem máscara; casa o contrato principal ou qualquer adicional. */
-  contrato?: string;
   /** Data de abertura (criado_em), formato yyyy-mm-dd, inclusive nas duas pontas. */
   dataInicio?: string;
   dataFim?: string;
@@ -71,13 +70,13 @@ async function idsCasosPorContrato(supabase: SupabaseClient, termoDigitos: strin
 }
 
 /**
- * ids de casos que batem com a busca geral (cliente, contrato ou
- * protocolo). Implementado como várias queries de coluna única (nunca
- * `.or()` com o termo bruto interpolado) — cada `.ilike()`/`.eq()` do
- * supabase-js escapa o valor sozinho; a fragilidade só existia na sintaxe
- * combinada de `.or()`, que tratava vírgula/parênteses no termo digitado
- * como separador/agrupador de condições (bug B1 da auditoria de 22/07: um
- * nome de cliente com parênteses quebrava a query).
+ * ids de casos que batem com a busca geral (cliente, contrato, protocolo ou
+ * CPF). Implementado como várias queries de coluna única (nunca `.or()` com
+ * o termo bruto interpolado) — cada `.ilike()`/`.eq()` do supabase-js escapa
+ * o valor sozinho; a fragilidade só existia na sintaxe combinada de `.or()`,
+ * que tratava vírgula/parênteses no termo digitado como separador/agrupador
+ * de condições (bug B1 da auditoria de 22/07: um nome de cliente com
+ * parênteses quebrava a query).
  */
 async function idsCasosPorBusca(supabase: SupabaseClient, termoBruto: string): Promise<string[]> {
   const termo = termoBruto.trim();
@@ -101,6 +100,19 @@ async function idsCasosPorBusca(supabase: SupabaseClient, termoBruto: string): P
       .eq("protocolo", Number(termo));
     if (porProtocoloError) throw porProtocoloError;
     for (const c of porProtocolo ?? []) ids.add(c.id);
+  }
+
+  // CPF é sempre match exato dos 11 dígitos (mesmo critério do filtro
+  // dedicado de CPF) — um termo com qualquer outra quantidade de dígitos
+  // (contrato tem 14, protocolo é curto) nunca colide com isto.
+  const termoDigitos = somenteDigitos(termo);
+  if (termoDigitos.length === 11) {
+    const { data: porCpf, error: porCpfError } = await supabase
+      .from("casos")
+      .select("id")
+      .eq("cliente_cpf", termoDigitos);
+    if (porCpfError) throw porCpfError;
+    for (const c of porCpf ?? []) ids.add(c.id);
   }
 
   return [...ids];
@@ -135,27 +147,8 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
     query = query.lte("criado_em", `${filtros.dataFim}T23:59:59.999`);
   }
 
-  // busca (nome/contrato/protocolo) e contrato (dedicado) são filtros
-  // independentes baseados em ids pré-calculados — combinados por
-  // interseção em JS, nunca por dois `.in("id", ...)` empilhados na mesma
-  // query (ambíguo pra AND na mesma coluna).
-  let idsPermitidos: string[] | undefined;
-  const intersecta = (novo: string[]) => {
-    idsPermitidos = idsPermitidos === undefined ? novo : idsPermitidos.filter((id) => novo.includes(id));
-  };
-
   if (filtros.busca?.trim()) {
-    intersecta(await idsCasosPorBusca(supabase, filtros.busca));
-  }
-
-  if (filtros.contrato) {
-    const contratoDigitos = somenteDigitos(filtros.contrato);
-    if (contratoDigitos) {
-      intersecta(await idsCasosPorContrato(supabase, contratoDigitos));
-    }
-  }
-
-  if (idsPermitidos !== undefined) {
+    const idsPermitidos = await idsCasosPorBusca(supabase, filtros.busca);
     if (idsPermitidos.length === 0) return [];
     query = query.in("id", idsPermitidos);
   }
