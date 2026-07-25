@@ -48,6 +48,7 @@ export async function carregarExtratoVendedor(vendedorId: string): Promise<Extra
     .from("casos")
     .select("id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia")
     .eq("vendedor_dono", vendedorId)
+    .eq("caso_teste", false)
     .order("criado_em", { ascending: false });
   if (casosError) throw casosError;
 

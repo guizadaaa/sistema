@@ -4,7 +4,9 @@ import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FILIAL_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { corPrazoVigencia, descricaoDiasAteVencimento } from "@/lib/casos/prazo";
@@ -34,6 +36,7 @@ export function CasosLista({
   casos,
   filtros,
   mostrarFiltroFilial,
+  ehAdmMaster,
 }: {
   casos: CasoListado[];
   filtros: {
@@ -44,12 +47,15 @@ export function CasosLista({
     cpf?: string;
     dataInicio?: string;
     dataFim?: string;
+    mostrarTeste?: boolean;
   };
   mostrarFiltroFilial: boolean;
+  ehAdmMaster: boolean;
 }) {
   const temFiltroSecundarioAtivo = Boolean(filtros.cpf || filtros.dataInicio || filtros.dataFim);
   const temFiltroAtivo =
-    Boolean(filtros.busca || filtros.status || filtros.tipo || filtros.filial) || temFiltroSecundarioAtivo;
+    Boolean(filtros.busca || filtros.status || filtros.tipo || filtros.filial || filtros.mostrarTeste) ||
+    temFiltroSecundarioAtivo;
 
   return (
     <div className="flex flex-col gap-4">
@@ -132,6 +138,15 @@ export function CasosLista({
                 </div>
               )}
 
+              {ehAdmMaster && (
+                <div className="flex items-center gap-2">
+                  <Checkbox id="mostrarTeste" name="mostrarTeste" value="1" defaultChecked={filtros.mostrarTeste} />
+                  <Label htmlFor="mostrarTeste" className="text-sm font-normal">
+                    Mostrar casos de teste
+                  </Label>
+                </div>
+              )}
+
               <Button type="submit" variant="outline">
                 Filtrar
               </Button>
@@ -211,9 +226,12 @@ export function CasosLista({
                   return (
                     <tr key={c.id} className="border-b last:border-0 hover:bg-accent/50">
                       <td className="py-2 pr-4">
-                        <Link href={`/casos/${c.id}`} className="font-medium hover:underline">
-                          #{c.protocolo}
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/casos/${c.id}`} className="font-medium hover:underline">
+                            #{c.protocolo}
+                          </Link>
+                          {c.caso_teste && <Badge variant="outline">Teste</Badge>}
+                        </div>
                       </td>
                       <td className="py-2 pr-4">{TIPO_CASO_LABELS[c.tipo_caso]}</td>
                       <td className="py-2 pr-4">{c.cliente_nome}</td>

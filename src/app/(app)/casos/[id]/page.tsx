@@ -14,7 +14,10 @@ export default async function CasoDetalhePage({ params }: { params: Promise<{ id
   if (!detalhe) notFound();
 
   const ehAdmin = usuario.perfil === "adm" || usuario.perfil === "adm_master";
+  const ehAdmMaster = usuario.perfil === "adm_master";
   const podeConduzir = await podeConduzirFluxo(usuario, detalhe.caso.filial);
 
-  return <CasoDetalhe detalhe={detalhe} podeConduzirFluxo={podeConduzir} ehAdmin={ehAdmin} />;
+  return (
+    <CasoDetalhe detalhe={detalhe} podeConduzirFluxo={podeConduzir} ehAdmin={ehAdmin} ehAdmMaster={ehAdmMaster} />
+  );
 }

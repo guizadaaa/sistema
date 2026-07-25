@@ -181,7 +181,8 @@ export async function carregarMetricasPainel(filtros: FiltrosPainel = {}): Promi
 
   let query = supabase
     .from("casos")
-    .select("id, protocolo, cliente_nome, status_atual, tipo_caso, filial, vendedor_dono, prazo_vigencia, criado_em");
+    .select("id, protocolo, cliente_nome, status_atual, tipo_caso, filial, vendedor_dono, prazo_vigencia, criado_em")
+    .eq("caso_teste", false);
   if (filtros.filial) query = query.eq("filial", filtros.filial);
   if (filtros.vendedorId) query = query.eq("vendedor_dono", filtros.vendedorId);
   if (filtros.dataInicio && DATA_FORMATO.test(filtros.dataInicio)) {

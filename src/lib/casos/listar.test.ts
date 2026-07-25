@@ -69,6 +69,7 @@ const CASOS_FIXTURE: Row[] = [
     vendedor_dono: "v1",
     contrato_numero: "17100000000001",
     cliente_cpf: "11144477735",
+    caso_teste: false,
   },
   {
     id: "c2",
@@ -82,6 +83,21 @@ const CASOS_FIXTURE: Row[] = [
     vendedor_dono: "v1",
     contrato_numero: "17100000000002",
     cliente_cpf: "22233344456",
+    caso_teste: false,
+  },
+  {
+    id: "c3",
+    protocolo: 102,
+    cliente_nome: "Caso de Teste",
+    status_atual: "inicial",
+    prazo_vigencia: "2026-12-31",
+    tipo_caso: "alteracao_data",
+    filial: "1710",
+    criado_em: "2026-06-20T10:00:00",
+    vendedor_dono: "v1",
+    contrato_numero: "17100000000003",
+    cliente_cpf: "33344455567",
+    caso_teste: true,
   },
 ];
 
@@ -134,5 +150,17 @@ describe("listarCasos — filtros novos", () => {
   it("busca + cpf combinados são interseção (AND), não união", async () => {
     const resultado = await listarCasos({ busca: "Maria", cpf: "222.333.444-56" });
     expect(resultado).toEqual([]);
+  });
+});
+
+describe("listarCasos — casos de teste", () => {
+  it("sem mostrarTeste, casos de teste ficam de fora por padrão", async () => {
+    const resultado = await listarCasos({});
+    expect(resultado.map((c) => c.id)).toEqual(["c1", "c2"]);
+  });
+
+  it("com mostrarTeste, casos de teste aparecem junto com os demais", async () => {
+    const resultado = await listarCasos({ mostrarTeste: true });
+    expect(resultado.map((c) => c.id).sort()).toEqual(["c1", "c2", "c3"]);
   });
 });

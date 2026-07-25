@@ -81,6 +81,7 @@ export interface Database {
           cliente_cpf: string;
           parcelas_em_aberto: number | null;
           data_cancelamento: string | null;
+          caso_teste: boolean;
         };
         Insert: {
           tipo_caso: TipoCaso;
@@ -98,6 +99,7 @@ export interface Database {
         Update: Partial<{
           prazo_vigencia: string;
           vendedor_dono: string;
+          caso_teste: boolean;
         }>;
         Relationships: [];
       };
