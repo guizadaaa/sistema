@@ -9,10 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatTile } from "@/components/stat-tile";
+import { corPrazoVigencia, descricaoDiasAteVencimento } from "@/lib/casos/prazo";
 import { formatarDataBr, formatarDias, formatarMoeda } from "@/lib/formatacao";
 import { FILIAL_LABELS, QUEM_PAGA_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { carregarMetricasPainel, listarVendedoresParaFiltro, STATUS_ORDEM } from "@/lib/painel/metricas";
+import { PRAZO_COR_TEXT_CLASSES } from "@/lib/prazo-colors";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
+import { cn } from "@/lib/utils";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 import type { FilialCvc } from "@/lib/supabase/types";
 
@@ -367,13 +370,10 @@ export default async function PainelPage({
                     <td className="py-2 pr-4">{c.clienteNome}</td>
                     <td className="py-2 pr-4">{c.vendedorNome}</td>
                     <td className="py-2 pr-4">
-                      <span
-                        className={
-                          c.situacao === "vencido" ? "text-destructive font-medium" : "font-medium text-amber-600 dark:text-amber-500"
-                        }
-                      >
-                        {formatarDataBr(c.prazoVigencia)}
-                      </span>
+                      <div className={cn("flex flex-col", PRAZO_COR_TEXT_CLASSES[corPrazoVigencia(c.prazoVigencia)])}>
+                        <span className="font-medium">{formatarDataBr(c.prazoVigencia)}</span>
+                        <span className="text-xs">{descricaoDiasAteVencimento(c.prazoVigencia)}</span>
+                      </div>
                     </td>
                   </tr>
                 ))}

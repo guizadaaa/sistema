@@ -19,3 +19,30 @@ export function situacaoPrazoVigencia(prazoVigencia: string, hoje: Date = new Da
   if (diffDias <= DIAS_VENCENDO_EM_BREVE) return "vencendo";
   return "normal";
 }
+
+/**
+ * Escala de cor de urgência (seção de UX) — mais granular que
+ * SituacaoPrazo, pensada para leitura rápida por cor em listas/tabelas.
+ * "vermelho" cobre vencido e os 3 últimos dias juntos (mesma urgência
+ * prática: já é tarde demais pra resolver com folga).
+ */
+export type CorPrazo = "verde" | "amarelo" | "laranja" | "vermelho";
+
+export function corPrazoVigencia(prazoVigencia: string, hoje: Date = new Date()): CorPrazo {
+  const diffDias = diasAteVencimento(prazoVigencia, hoje);
+
+  if (diffDias <= 3) return "vermelho";
+  if (diffDias <= 7) return "laranja";
+  if (diffDias <= 15) return "amarelo";
+  return "verde";
+}
+
+/** Texto curto pra exibir ao lado/embaixo da data — "Vence em 12 dias", "Vence hoje", "Vencido há 3 dias". */
+export function descricaoDiasAteVencimento(prazoVigencia: string, hoje: Date = new Date()): string {
+  const diffDias = diasAteVencimento(prazoVigencia, hoje);
+
+  if (diffDias === 0) return "Vence hoje";
+  if (diffDias > 0) return `Vence em ${diffDias} dia${diffDias === 1 ? "" : "s"}`;
+  const dias = Math.abs(diffDias);
+  return `Vencido há ${dias} dia${dias === 1 ? "" : "s"}`;
+}
