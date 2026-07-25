@@ -59,11 +59,28 @@ Deno.serve(async (req: Request) => {
     const contagens: Record<string, number> = {};
     const tabelas: Record<string, unknown[]> = {};
 
+    // casos de teste (marcados pelo Adm Master, ver caso_teste na tabela
+    // casos) nunca entram no backup — nem eles, nem nenhuma linha
+    // dependente (implicacoes/desfechos/status_historico) que aponte pra
+    // um caso_id de teste. usuarios não depende de caso_id, segue igual.
+    const { data: casosData, error: casosError } = await supabase.from("casos").select("*");
+    if (casosError) throw new Error(`Falha ao ler casos: ${casosError.message}`);
+    const todosCasos = (casosData ?? []) as { id: string; caso_teste: boolean }[];
+    const idsCasosTeste = new Set(todosCasos.filter((c) => c.caso_teste).map((c) => c.id));
+    const casosNaoTeste = todosCasos.filter((c) => !c.caso_teste);
+
+    tabelas.casos = casosNaoTeste;
+    contagens.casos = casosNaoTeste.length;
+
     for (const tabela of TABELAS_BACKUP) {
+      if (tabela === "casos") continue;
+
       const { data, error } = await supabase.from(tabela).select("*");
       if (error) throw new Error(`Falha ao ler ${tabela}: ${error.message}`);
-      tabelas[tabela] = data ?? [];
-      contagens[tabela] = (data ?? []).length;
+      const linhas = (data ?? []) as { caso_id?: string }[];
+      const filtradas = tabela === "usuarios" ? linhas : linhas.filter((r) => !idsCasosTeste.has(r.caso_id ?? ""));
+      tabelas[tabela] = filtradas;
+      contagens[tabela] = filtradas.length;
     }
 
     const { data: chaveBase64, error: chaveError } = await supabase.rpc("obter_backup_encryption_key");

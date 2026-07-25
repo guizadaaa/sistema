@@ -335,50 +335,6 @@ export function UsuariosLista({
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-semibold">Gestão de Usuários</h1>
 
-      <Card>
-        <CardContent>
-          <form method="get" className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">Filial</label>
-              <Select name="filial" defaultValue={filtros.filial ?? "todas"}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas</SelectItem>
-                  {FILIAIS_USUARIO.map((f) => (
-                    <SelectItem key={f} value={f}>
-                      {FILIAL_LABELS[f]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">Perfil</label>
-              <Select name="perfil" defaultValue={filtros.perfil ?? "todos"}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  {PERFIS_USUARIO.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {PERFIL_LABELS[p]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button type="submit" variant="outline">
-              Filtrar
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
       {podeEditar && (
         <Card className="max-w-2xl">
           <CardHeader>
@@ -453,28 +409,73 @@ export function UsuariosLista({
       )}
 
       <Card>
-        <CardContent className="overflow-x-auto">
-          {usuarios.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Nenhum usuário encontrado.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-muted-foreground border-b text-left">
-                  <th className="py-2 pr-4 font-medium">Nome</th>
-                  <th className="py-2 pr-4 font-medium">E-mail</th>
-                  <th className="py-2 pr-4 font-medium">Perfil</th>
-                  <th className="py-2 pr-4 font-medium">Filial</th>
-                  <th className="py-2 pr-4 font-medium">Status</th>
-                  {podeEditar && <th className="py-2 pr-4 font-medium">Ações</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {usuarios.map((u) => (
-                  <UsuarioRow key={u.id} usuario={u} podeEditar={podeEditar} />
-                ))}
-              </tbody>
-            </table>
-          )}
+        <CardHeader>
+          <CardTitle>Usuários</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <form method="get" className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium">Filial</label>
+              <Select name="filial" defaultValue={filtros.filial ?? "todas"}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  {FILIAIS_USUARIO.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {FILIAL_LABELS[f]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium">Perfil</label>
+              <Select name="perfil" defaultValue={filtros.perfil ?? "todos"}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {PERFIS_USUARIO.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {PERFIL_LABELS[p]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button type="submit" variant="outline">
+              Filtrar
+            </Button>
+          </form>
+
+          <div className="overflow-x-auto">
+            {usuarios.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Nenhum usuário encontrado.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-muted-foreground border-b text-left">
+                    <th className="py-2 pr-4 font-medium">Nome</th>
+                    <th className="py-2 pr-4 font-medium">E-mail</th>
+                    <th className="py-2 pr-4 font-medium">Perfil</th>
+                    <th className="py-2 pr-4 font-medium">Filial</th>
+                    <th className="py-2 pr-4 font-medium">Status</th>
+                    {podeEditar && <th className="py-2 pr-4 font-medium">Ações</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {usuarios.map((u) => (
+                    <UsuarioRow key={u.id} usuario={u} podeEditar={podeEditar} />
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

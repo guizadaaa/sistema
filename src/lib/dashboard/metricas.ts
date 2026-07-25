@@ -35,7 +35,8 @@ export async function carregarMetricasDashboard(): Promise<MetricasDashboard> {
 
   const { data: casos, error: casosError } = await supabase
     .from("casos")
-    .select("id, protocolo, cliente_nome, status_atual, prazo_vigencia");
+    .select("id, protocolo, cliente_nome, status_atual, prazo_vigencia")
+    .eq("caso_teste", false);
   if (casosError) throw casosError;
 
   const lista = casos ?? [];

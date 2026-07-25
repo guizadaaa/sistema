@@ -67,6 +67,7 @@ const CASOS_FIXTURE: Row[] = [
     filial: "1710",
     vendedor_dono: "v1",
     prazo_vigencia: "2026-12-31",
+    caso_teste: false,
   },
   {
     id: "c2",
@@ -77,6 +78,7 @@ const CASOS_FIXTURE: Row[] = [
     filial: "1714",
     vendedor_dono: "v2",
     prazo_vigencia: "2026-12-31",
+    caso_teste: false,
   },
 ];
 
@@ -147,5 +149,35 @@ describe("carregarMetricasPainel — tempo médio por etapa", () => {
   it("status nunca alcançado por nenhum caso do grupo fica null, não zero", async () => {
     const metricas = await carregarMetricasPainel();
     expect(metricas.tempoMedioPorStatus.ouvidoria).toBeNull();
+  });
+});
+
+describe("carregarMetricasPainel — casos de teste", () => {
+  it("exclui caso_teste=true do total e das métricas, sempre (sem opção de incluir)", async () => {
+    createClientMock.mockResolvedValue(
+      criarSupabaseFake({
+        casos: [
+          ...CASOS_FIXTURE,
+          {
+            id: "c3",
+            protocolo: 3,
+            cliente_nome: "Caso de Teste",
+            status_atual: "resolvido",
+            tipo_caso: "alteracao_data",
+            filial: "1710",
+            vendedor_dono: "v1",
+            prazo_vigencia: "2026-12-31",
+            caso_teste: true,
+          },
+        ],
+        status_historico_com_duracao: HISTORICO_FIXTURE,
+        usuarios: USUARIOS_FIXTURE,
+        implicacoes: [],
+        desfechos_visivel: [],
+      })
+    );
+
+    const metricas = await carregarMetricasPainel();
+    expect(metricas.total).toBe(2);
   });
 });

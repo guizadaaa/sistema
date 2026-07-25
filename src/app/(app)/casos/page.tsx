@@ -18,15 +18,18 @@ export default async function CasosPage({
   const cpf = typeof sp.cpf === "string" ? sp.cpf : undefined;
   const dataInicio = typeof sp.dataInicio === "string" ? sp.dataInicio : undefined;
   const dataFim = typeof sp.dataFim === "string" ? sp.dataFim : undefined;
+  const ehAdmMaster = usuario.perfil === "adm_master";
+  const mostrarTeste = ehAdmMaster && sp.mostrarTeste === "1";
 
-  const casos = await listarCasos({ status, tipo, filial, busca, cpf, dataInicio, dataFim });
+  const casos = await listarCasos({ status, tipo, filial, busca, cpf, dataInicio, dataFim, mostrarTeste });
   const mostrarFiltroFilial = usuario.perfil === "adm" || usuario.perfil === "adm_master";
 
   return (
     <CasosLista
       casos={casos}
-      filtros={{ status, tipo, filial, busca, cpf, dataInicio, dataFim }}
+      filtros={{ status, tipo, filial, busca, cpf, dataInicio, dataFim, mostrarTeste }}
       mostrarFiltroFilial={mostrarFiltroFilial}
+      ehAdmMaster={ehAdmMaster}
     />
   );
 }

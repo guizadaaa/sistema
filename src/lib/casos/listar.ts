@@ -15,6 +15,13 @@ export type FiltrosCasos = {
   /** Data de abertura (criado_em), formato yyyy-mm-dd, inclusive nas duas pontas. */
   dataInicio?: string;
   dataFim?: string;
+  /**
+   * Revela casos marcados como teste — só tem efeito de verdade pra
+   * adm_master (RLS nega a linha pra qualquer outro perfil de qualquer
+   * jeito). Fica em quem chama (a página) garantir que só passa `true`
+   * quando o usuário é adm_master; aqui é só o filtro de exibição.
+   */
+  mostrarTeste?: boolean;
 };
 
 export type CasoListado = {
@@ -28,6 +35,7 @@ export type CasoListado = {
   criado_em: string;
   vendedor_dono: string;
   donoNome: string;
+  caso_teste: boolean;
 };
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -128,8 +136,12 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
 
   let query = supabase
     .from("casos")
-    .select("id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero")
+    .select(
+      "id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero, caso_teste"
+    )
     .order("criado_em", { ascending: false });
+
+  if (!filtros.mostrarTeste) query = query.eq("caso_teste", false);
 
   if (filtros.status) query = query.eq("status_atual", filtros.status);
   if (filtros.tipo) query = query.eq("tipo_caso", filtros.tipo);

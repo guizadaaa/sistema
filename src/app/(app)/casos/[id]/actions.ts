@@ -104,6 +104,30 @@ export async function avancarStatus(casoId: string, novoStatus: StatusCaso): Pro
   return {};
 }
 
+/**
+ * A RLS (enforce_casos_update_permissions) é a autoridade real sobre quem
+ * pode mudar caso_teste (só adm_master, mesmo dentro do bypass de
+ * auth_is_admin() que também cobre "adm") — este action só repassa o erro
+ * de forma legível.
+ */
+export async function marcarCasoTeste(casoId: string, teste: boolean): Promise<{ error?: string }> {
+  await requireCurrentUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("casos").update({ caso_teste: teste }).eq("id", casoId);
+
+  if (error) {
+    console.error("Erro ao alterar categoria de teste do caso:", error);
+    return { error: "Não foi possível alterar a categoria de teste. Verifique se você tem permissão para esta ação." };
+  }
+
+  revalidatePath(`/casos/${casoId}`);
+  revalidatePath("/casos");
+  revalidatePath("/painel");
+  revalidatePath("/");
+  return {};
+}
+
 export type RegistrarDesfechoState = {
   error?: string;
 };
