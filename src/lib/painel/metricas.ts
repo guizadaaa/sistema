@@ -42,10 +42,24 @@ export type CasoAtencaoPrazo = {
   situacao: "vencido" | "vencendo";
 };
 
+/**
+ * Resumo mínimo dos casos de teste — nunca somado/misturado em MetricasPainel
+ * acima. Só é populado quando filtros.mostrarTeste está ativo (Adm Master);
+ * ver carregarMetricasPainel.
+ */
+export type MetricasTeste = {
+  total: number;
+  porStatus: Record<StatusCaso, number>;
+  prazoVencidos: number;
+  prazoVencendo: number;
+};
+
 export type MetricasPainel = {
   total: number;
   porStatus: Record<StatusCaso, number>;
   porTipo: Record<TipoCaso, number>;
+  /** Só populado quando filtros.mostrarTeste está ativo — nunca incluído em nenhum campo acima. */
+  metricasTeste: MetricasTeste | null;
   /** Só populado quando há mais de uma filial nos dados (perfil admin). */
   tipoMaisComumPorFilial: TipoMaisComumPorFilial[];
   tipoMaisComumPorVendedor: TipoMaisComumPorVendedor[];
@@ -69,6 +83,8 @@ export type FiltrosPainel = {
   /** Data de abertura (criado_em), formato yyyy-mm-dd, inclusive nas duas pontas. */
   dataInicio?: string;
   dataFim?: string;
+  /** Exclusivo Adm Master — inclui um resumo à parte de casos_teste=true (nunca misturado nas métricas reais). */
+  mostrarTeste?: boolean;
 };
 
 const DATA_FORMATO = /^\d{4}-\d{2}-\d{2}$/;
@@ -342,10 +358,50 @@ export async function carregarMetricasPainel(filtros: FiltrosPainel = {}): Promi
     }
   }
 
+  // Resumo à parte de casos_teste=true — mesmo recorte (filial/vendedor/
+  // período), mas nunca somado a `lista`/`porStatus`/etc. acima: exclusivo
+  // Adm Master, e só quando o toggle "Mostrar casos de teste" está ativo.
+  let metricasTeste: MetricasTeste | null = null;
+  if (filtros.mostrarTeste) {
+    let queryTeste = supabase
+      .from("casos")
+      .select("id, status_atual, prazo_vigencia")
+      .eq("caso_teste", true);
+    if (filtros.filial) queryTeste = queryTeste.eq("filial", filtros.filial);
+    if (filtros.vendedorId) queryTeste = queryTeste.eq("vendedor_dono", filtros.vendedorId);
+    if (filtros.dataInicio && DATA_FORMATO.test(filtros.dataInicio)) {
+      queryTeste = queryTeste.gte("criado_em", `${filtros.dataInicio}T00:00:00`);
+    }
+    if (filtros.dataFim && DATA_FORMATO.test(filtros.dataFim)) {
+      queryTeste = queryTeste.lte("criado_em", `${filtros.dataFim}T23:59:59.999`);
+    }
+
+    const { data: casosTeste, error: casosTesteError } = await queryTeste;
+    if (casosTesteError) throw casosTesteError;
+
+    const porStatusTeste = Object.fromEntries(STATUS_ORDEM.map((s) => [s, 0])) as Record<StatusCaso, number>;
+    let prazoVencidosTeste = 0;
+    let prazoVencendoTeste = 0;
+    for (const c of casosTeste ?? []) {
+      porStatusTeste[c.status_atual] += 1;
+      const situacaoTeste = situacaoPrazoVigencia(c.prazo_vigencia);
+      if (situacaoTeste === "vencido") prazoVencidosTeste += 1;
+      if (situacaoTeste === "vencendo") prazoVencendoTeste += 1;
+    }
+
+    metricasTeste = {
+      total: (casosTeste ?? []).length,
+      porStatus: porStatusTeste,
+      prazoVencidos: prazoVencidosTeste,
+      prazoVencendo: prazoVencendoTeste,
+    };
+  }
+
   return {
     total: lista.length,
     porStatus,
     porTipo,
+    metricasTeste,
     tipoMaisComumPorFilial,
     tipoMaisComumPorVendedor,
     prazoVencidos,

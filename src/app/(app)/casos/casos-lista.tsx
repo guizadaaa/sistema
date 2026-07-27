@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,7 +45,6 @@ export function CasosLista({
     tipo?: TipoCaso;
     filial?: FilialCvc;
     busca?: string;
-    cpf?: string;
     dataInicio?: string;
     dataFim?: string;
     mostrarTeste?: boolean;
@@ -52,10 +52,15 @@ export function CasosLista({
   mostrarFiltroFilial: boolean;
   ehAdmMaster: boolean;
 }) {
-  const temFiltroSecundarioAtivo = Boolean(filtros.cpf || filtros.dataInicio || filtros.dataFim);
-  const temFiltroAtivo =
-    Boolean(filtros.busca || filtros.status || filtros.tipo || filtros.filial || filtros.mostrarTeste) ||
-    temFiltroSecundarioAtivo;
+  const temFiltroAtivo = Boolean(
+    filtros.busca ||
+      filtros.status ||
+      filtros.tipo ||
+      filtros.filial ||
+      filtros.dataInicio ||
+      filtros.dataFim ||
+      filtros.mostrarTeste
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -81,7 +86,7 @@ export function CasosLista({
                   name="busca"
                   placeholder="Contrato, cliente, protocolo ou CPF"
                   defaultValue={filtros.busca ?? ""}
-                  className="w-56"
+                  className="w-72"
                 />
               </div>
 
@@ -138,6 +143,16 @@ export function CasosLista({
                 </div>
               )}
 
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Aberto entre</label>
+                <DateRangePicker
+                  nomeInicio="dataInicio"
+                  nomeFim="dataFim"
+                  valorInicialInicio={filtros.dataInicio}
+                  valorInicialFim={filtros.dataFim}
+                />
+              </div>
+
               {ehAdmMaster && (
                 <div className="flex items-center gap-2">
                   <Checkbox id="mostrarTeste" name="mostrarTeste" value="1" defaultChecked={filtros.mostrarTeste} />
@@ -159,47 +174,6 @@ export function CasosLista({
                 </Button>
               )}
             </div>
-
-            <details className="group" open={temFiltroSecundarioAtivo}>
-              <summary className="text-muted-foreground hover:text-foreground flex w-fit cursor-pointer list-none items-center gap-1 text-sm font-medium select-none">
-                <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
-                Mais filtros
-              </summary>
-              <div className="mt-3 flex flex-wrap items-end gap-3 border-t pt-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium" htmlFor="cpf">
-                    CPF do cliente
-                  </label>
-                  <Input
-                    id="cpf"
-                    name="cpf"
-                    placeholder="000.000.000-00"
-                    defaultValue={filtros.cpf ?? ""}
-                    className="w-44"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium" htmlFor="dataInicio">
-                    Aberto de
-                  </label>
-                  <Input
-                    id="dataInicio"
-                    name="dataInicio"
-                    type="date"
-                    defaultValue={filtros.dataInicio ?? ""}
-                    className="w-40"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium" htmlFor="dataFim">
-                    até
-                  </label>
-                  <Input id="dataFim" name="dataFim" type="date" defaultValue={filtros.dataFim ?? ""} className="w-40" />
-                </div>
-              </div>
-            </details>
           </form>
         </CardContent>
       </Card>

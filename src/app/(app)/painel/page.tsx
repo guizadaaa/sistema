@@ -6,7 +6,9 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatTile } from "@/components/stat-tile";
 import { corPrazoVigencia, descricaoDiasAteVencimento } from "@/lib/casos/prazo";
@@ -38,14 +40,16 @@ export default async function PainelPage({
 
   const sp = await searchParams;
   const mostrarFiltroFilial = usuario.perfil === "adm" || usuario.perfil === "adm_master";
+  const ehAdmMaster = usuario.perfil === "adm_master";
   const filial: FilialCvc | undefined =
     mostrarFiltroFilial && typeof sp.filial === "string" && isFilialCvc(sp.filial) ? sp.filial : undefined;
   const vendedorId = typeof sp.vendedorId === "string" && sp.vendedorId !== "todos" ? sp.vendedorId : undefined;
   const dataInicio = typeof sp.dataInicio === "string" ? sp.dataInicio : undefined;
   const dataFim = typeof sp.dataFim === "string" ? sp.dataFim : undefined;
+  const mostrarTeste = ehAdmMaster && sp.mostrarTeste === "1";
 
   const [metricas, vendedoresDisponiveis] = await Promise.all([
-    carregarMetricasPainel({ filial, vendedorId, dataInicio, dataFim }),
+    carregarMetricasPainel({ filial, vendedorId, dataInicio, dataFim, mostrarTeste }),
     listarVendedoresParaFiltro(filial),
   ]);
 
@@ -55,6 +59,7 @@ export default async function PainelPage({
     ...(dataInicio ? { dataInicio } : {}),
     ...(dataFim ? { dataFim } : {}),
   }).toString();
+  const statusComCasosTeste = STATUS_ORDEM.filter((s) => (metricas.metricasTeste?.porStatus[s] ?? 0) > 0);
   const tiposOrdenados = [...TIPOS_CASO].sort((a, b) => metricas.porTipo[b] - metricas.porTipo[a]);
 
   return (
@@ -114,6 +119,15 @@ export default async function PainelPage({
               <Input id="dataFim" name="dataFim" type="date" defaultValue={dataFim ?? ""} className="w-40" />
             </div>
 
+            {ehAdmMaster && (
+              <div className="flex items-center gap-2">
+                <Checkbox id="mostrarTeste" name="mostrarTeste" value="1" defaultChecked={mostrarTeste} />
+                <Label htmlFor="mostrarTeste" className="text-sm font-normal">
+                  Mostrar casos de teste
+                </Label>
+              </div>
+            )}
+
             <Button type="submit" variant="outline">
               Filtrar
             </Button>
@@ -162,6 +176,40 @@ export default async function PainelPage({
           <StatTile titulo="Vencendo em breve" valor={metricas.prazoVencendo} tom="atencao" className="flex-1" />
         </div>
       </div>
+
+      {metricas.metricasTeste && (
+        <Card className="border-dashed">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Casos de teste
+              <Badge variant="outline">Teste</Badge>
+            </CardTitle>
+            <CardDescription>
+              Total: {metricas.metricasTeste.total} — nunca somados às métricas reais acima.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {metricas.metricasTeste.total === 0 ? (
+              <p className="text-muted-foreground text-sm">Nenhum caso de teste encontrado no recorte atual.</p>
+            ) : (
+              <>
+                <ul className="flex flex-col gap-2">
+                  {statusComCasosTeste.map((status) => (
+                    <li key={status} className="flex items-center justify-between text-sm">
+                      <Badge className={STATUS_BADGE_CLASSES[status]}>{STATUS_LABELS[status]}</Badge>
+                      <span className="font-medium">{metricas.metricasTeste?.porStatus[status]}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <StatTile titulo="Prazo vencido (teste)" valor={metricas.metricasTeste.prazoVencidos} tom="destructive" />
+                  <StatTile titulo="Vencendo em breve (teste)" valor={metricas.metricasTeste.prazoVencendo} tom="atencao" />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

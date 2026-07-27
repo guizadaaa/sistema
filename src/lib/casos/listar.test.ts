@@ -137,18 +137,13 @@ describe("listarCasos — busca geral (bug B1)", () => {
 });
 
 describe("listarCasos — filtros novos", () => {
-  it("filtro de CPF aceita com máscara e casa só o dígito exato", async () => {
-    const resultado = await listarCasos({ cpf: "111.444.777-35" });
-    expect(resultado.map((c) => c.id)).toEqual(["c1"]);
-  });
-
   it("filtro de período exclui casos abertos fora do intervalo", async () => {
     const resultado = await listarCasos({ dataInicio: "2026-06-01", dataFim: "2026-06-30" });
     expect(resultado.map((c) => c.id)).toEqual(["c2"]);
   });
 
-  it("busca + cpf combinados são interseção (AND), não união", async () => {
-    const resultado = await listarCasos({ busca: "Maria", cpf: "222.333.444-56" });
+  it("busca + período combinados são interseção (AND), não união", async () => {
+    const resultado = await listarCasos({ busca: "Maria", dataInicio: "2026-06-01", dataFim: "2026-06-30" });
     expect(resultado).toEqual([]);
   });
 });

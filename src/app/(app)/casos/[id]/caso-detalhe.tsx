@@ -12,6 +12,7 @@ import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 
 import { AnexosSecao } from "./anexos-secao";
 import { CasoTesteAcoes } from "./caso-teste-acoes";
+import { ComplementosSecao } from "./complementos-secao";
 import { ContratosAdicionaisSecao } from "./contratos-adicionais-secao";
 import { DesfechoForm } from "./desfecho-form";
 import { DesfechosSecao } from "./desfechos-secao";
@@ -38,7 +39,8 @@ export function CasoDetalhe({
   ehAdmin: boolean;
   ehAdmMaster: boolean;
 }) {
-  const { caso, donoNome, criadoPorNome, historico, anexos, contratosAdicionais, desfechos, implicacao } = detalhe;
+  const { caso, donoNome, criadoPorNome, historico, anexos, contratosAdicionais, complementos, desfechos, implicacao } =
+    detalhe;
 
   return (
     <div className="flex flex-col gap-4">
@@ -117,6 +119,7 @@ export function CasoDetalhe({
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <Timeline historico={historico} />
+            <ComplementosSecao casoId={caso.id} complementos={complementos} />
             <StatusAcoes
               casoId={caso.id}
               statusAtual={caso.status_atual}

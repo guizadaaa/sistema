@@ -6,11 +6,13 @@ import type { Database } from "@/lib/supabase/types";
 type CasoRow = Database["public"]["Tables"]["casos"]["Row"];
 type AnexoRow = Database["public"]["Tables"]["anexos"]["Row"];
 type ContratoAdicionalRow = Database["public"]["Tables"]["casos_contratos_adicionais"]["Row"];
+type ComplementoRow = Database["public"]["Tables"]["casos_complementos"]["Row"];
 type StatusHistoricoComDuracaoRow = Database["public"]["Views"]["status_historico_com_duracao"]["Row"];
 export type DesfechoVisivelRow = Database["public"]["Views"]["desfechos_visivel"]["Row"];
 type ImplicacaoRow = Database["public"]["Tables"]["implicacoes"]["Row"];
 
 export type HistoricoComNome = StatusHistoricoComDuracaoRow & { alteradoPorNome: string };
+export type ComplementoComNome = ComplementoRow & { criadoPorNome: string };
 
 export type DetalheCaso = {
   caso: CasoRow;
@@ -19,6 +21,7 @@ export type DetalheCaso = {
   historico: HistoricoComNome[];
   anexos: AnexoRow[];
   contratosAdicionais: ContratoAdicionalRow[];
+  complementos: ComplementoComNome[];
   desfechos: DesfechoVisivelRow[];
   implicacao: ImplicacaoRow | null;
 };
@@ -42,6 +45,7 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
     { data: historico, error: historicoError },
     { data: anexos, error: anexosError },
     { data: contratosAdicionais, error: contratosAdicionaisError },
+    { data: complementos, error: complementosError },
     { data: desfechos, error: desfechosError },
     { data: implicacao, error: implicacaoError },
   ] = await Promise.all([
@@ -56,6 +60,7 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
       .select("*")
       .eq("caso_id", id)
       .order("criado_em", { ascending: true }),
+    supabase.from("casos_complementos").select("*").eq("caso_id", id).order("criado_em", { ascending: true }),
     supabase.from("desfechos_visivel").select("*").eq("caso_id", id).order("criado_em", { ascending: false }),
     supabase.from("implicacoes").select("*").eq("caso_id", id).maybeSingle(),
   ]);
@@ -63,11 +68,17 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
   if (historicoError) throw historicoError;
   if (anexosError) throw anexosError;
   if (contratosAdicionaisError) throw contratosAdicionaisError;
+  if (complementosError) throw complementosError;
   if (desfechosError) throw desfechosError;
   if (implicacaoError) throw implicacaoError;
 
   const idsParaNome = [
-    ...new Set([caso.vendedor_dono, caso.criado_por, ...(historico ?? []).map((h) => h.alterado_por)]),
+    ...new Set([
+      caso.vendedor_dono,
+      caso.criado_por,
+      ...(historico ?? []).map((h) => h.alterado_por),
+      ...(complementos ?? []).map((c) => c.criado_por),
+    ]),
   ];
   const { data: usuarios, error: usuariosError } = await supabase
     .from("usuarios")
@@ -84,6 +95,7 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
     historico: (historico ?? []).map((h) => ({ ...h, alteradoPorNome: nomesPorId.get(h.alterado_por) ?? "—" })),
     anexos: anexos ?? [],
     contratosAdicionais: contratosAdicionais ?? [],
+    complementos: (complementos ?? []).map((c) => ({ ...c, criadoPorNome: nomesPorId.get(c.criado_por) ?? "—" })),
     desfechos: desfechos ?? [],
     implicacao: implicacao ?? null,
   };

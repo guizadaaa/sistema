@@ -22,6 +22,7 @@ const METRICAS_FIXTURE: MetricasPainel = {
   total: 10,
   porStatus: { inicial: 1, recepcionado: 2, em_andamento_interno: 3, reavaliacao: 1, resolvido: 2, ouvidoria: 1 },
   porTipo: { alteracao_data: 4, cancelamento: 2, recadastro_sem_reserva: 3, inadimplencia: 1 },
+  metricasTeste: null,
   tipoMaisComumPorFilial: [{ filial: "1710", tipo: "alteracao_data", quantidade: 4 }],
   tipoMaisComumPorVendedor: [{ vendedorId: "v1", vendedorNome: "Vendedor Um", tipo: "alteracao_data", totalCasos: 5 }],
   prazoVencidos: 1,

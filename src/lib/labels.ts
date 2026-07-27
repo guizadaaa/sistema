@@ -60,6 +60,7 @@ export const TIPO_DESFECHO_LABELS: Record<TipoDesfecho, string> = {
   reembolso: "Reembolso",
   remarcacao: "Remarcação",
   carta_credito: "Carta de crédito",
+  recadastro: "Recadastro",
 };
 
 export const SUBTIPO_REEMBOLSO_LABELS: Record<SubtipoReembolso, string> = {

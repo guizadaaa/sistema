@@ -17,7 +17,7 @@ export type StatusCaso =
   | "reavaliacao"
   | "resolvido"
   | "ouvidoria";
-export type TipoDesfecho = "reembolso" | "remarcacao" | "carta_credito";
+export type TipoDesfecho = "reembolso" | "remarcacao" | "carta_credito" | "recadastro";
 export type SubtipoReembolso = "integral" | "parcial" | "sem_reembolso";
 export type OrigemReembolsoIntegral = "fornecedor" | "saude";
 export type SubtipoRemarcacao = "sem_custo" | "com_custo";
@@ -277,6 +277,24 @@ export interface Database {
         // Sem UPDATE previsto — ver nota em status_historico.Update.
         Update: Partial<{
           contrato_numero: string;
+        }>;
+        Relationships: [];
+      };
+      casos_complementos: {
+        Row: {
+          id: string;
+          caso_id: string;
+          texto: string;
+          criado_por: string;
+          criado_em: string;
+        };
+        Insert: {
+          caso_id: string;
+          texto: string;
+        };
+        // Sem UPDATE previsto — histórico imutável, ver nota em status_historico.Update.
+        Update: Partial<{
+          texto: string;
         }>;
         Relationships: [];
       };
