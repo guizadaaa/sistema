@@ -10,8 +10,6 @@ export type FiltrosCasos = {
   /** Busca universal — cliente, contrato (principal ou adicional), protocolo ou CPF. */
   busca?: string;
   filial?: FilialCvc;
-  /** CPF do cliente — aceita com ou sem máscara, comparado só pelos dígitos (match exato). */
-  cpf?: string;
   /** Data de abertura (criado_em), formato yyyy-mm-dd, inclusive nas duas pontas. */
   dataInicio?: string;
   dataFim?: string;
@@ -146,11 +144,6 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   if (filtros.status) query = query.eq("status_atual", filtros.status);
   if (filtros.tipo) query = query.eq("tipo_caso", filtros.tipo);
   if (filtros.filial) query = query.eq("filial", filtros.filial);
-
-  if (filtros.cpf) {
-    const cpfDigitos = somenteDigitos(filtros.cpf);
-    if (cpfDigitos) query = query.eq("cliente_cpf", cpfDigitos);
-  }
 
   if (filtros.dataInicio && DATA_FORMATO.test(filtros.dataInicio)) {
     query = query.gte("criado_em", `${filtros.dataInicio}T00:00:00`);
