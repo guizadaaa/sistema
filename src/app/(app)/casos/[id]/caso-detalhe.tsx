@@ -125,6 +125,7 @@ export function CasoDetalhe({
               statusAtual={caso.status_atual}
               podeConduzirFluxo={podeConduzirFluxo}
               ehAdmin={ehAdmin}
+              temComentario={complementos.length > 0}
             />
           </CardContent>
         </Card>

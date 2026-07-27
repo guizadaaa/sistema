@@ -84,16 +84,17 @@ describe("gerarPainelExcel", () => {
     // verdade em tempo de execução.
     await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
 
+    // Linha 1 é o título mesclado (tituloSheet) — cabeçalho e dados deslocam uma linha.
     const resumo = workbook.getWorksheet("Resumo");
     expect(resumo).toBeDefined();
-    expect(resumo?.getRow(2).getCell(2).value).toBe(10); // Total de protocolos
-    expect(resumo?.getRow(4).getCell(2).value).toBe(2); // Vencendo em breve
+    expect(resumo?.getRow(3).getCell(2).value).toBe(10); // Total de protocolos
+    expect(resumo?.getRow(5).getCell(2).value).toBe(2); // Vencendo em breve
 
     const porStatus = workbook.getWorksheet("Casos por status");
-    expect(porStatus?.rowCount).toBe(7); // cabeçalho + 6 status
+    expect(porStatus?.rowCount).toBe(8); // título + cabeçalho + 6 status
 
     const porFilial = workbook.getWorksheet("Tipo mais comum por loja");
-    expect(porFilial?.getRow(2).getCell(3).value).toBe(4); // quantidade
+    expect(porFilial?.getRow(3).getCell(3).value).toBe(4); // quantidade
   });
 
   it("não cria a aba 'por loja' quando não há recorte de filial", async () => {
@@ -153,15 +154,16 @@ describe("gerarExtratoVendedorExcel", () => {
     // verdade em tempo de execução.
     await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
 
+    // Linha 1 é o título mesclado (tituloSheet) — cabeçalho e dados deslocam uma linha.
     const resumo = workbook.getWorksheet("Resumo");
-    expect(resumo?.getRow(2).getCell(2).value).toBe("Vendedor Um");
-    expect(resumo?.getRow(3).getCell(2).value).toBe(1); // Total de casos
-    expect(resumo?.getRow(4).getCell(2).value).toBe(300); // Multa total
+    expect(resumo?.getRow(3).getCell(2).value).toBe("Vendedor Um");
+    expect(resumo?.getRow(4).getCell(2).value).toBe(1); // Total de casos
+    expect(resumo?.getRow(5).getCell(2).value).toBe(300); // Multa total
 
     const casos = workbook.getWorksheet("Casos");
-    expect(casos?.rowCount).toBe(2); // cabeçalho + 1 caso
-    expect(casos?.getRow(2).getCell(1).value).toBe(42); // Protocolo
-    expect(casos?.getRow(2).getCell(2).value).toBe("Cliente Teste");
+    expect(casos?.rowCount).toBe(3); // título + cabeçalho + 1 caso
+    expect(casos?.getRow(3).getCell(1).value).toBe(42); // Protocolo
+    expect(casos?.getRow(3).getCell(2).value).toBe("Cliente Teste");
   });
 
   it("não quebra quando o vendedor não tem nenhum caso", async () => {
@@ -169,6 +171,6 @@ describe("gerarExtratoVendedorExcel", () => {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
     const casos = workbook.getWorksheet("Casos");
-    expect(casos?.rowCount).toBe(1); // só o cabeçalho
+    expect(casos?.rowCount).toBe(2); // título + cabeçalho
   });
 });

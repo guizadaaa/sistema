@@ -131,6 +131,11 @@ insert into public.anexos (caso_id, tipo_documento, storage_path, nome_arquivo) 
   ('10000000-0000-0000-0000-000000000003', 'outro', '10000000-0000-0000-0000-000000000003/erro-status.pdf', 'erro-status.pdf'),
   ('10000000-0000-0000-0000-000000000003', 'outro', '10000000-0000-0000-0000-000000000003/http500.pdf', 'http500.pdf');
 
+-- impede_resolvido_sem_comentario (20260727000003) exige ao menos um
+-- comentário antes de aceitar status='resolvido' logo abaixo.
+insert into public.casos_complementos (caso_id, texto) values
+  ('10000000-0000-0000-0000-000000000003', 'Caso resolvido, sem pendências.');
+
 reset role;
 reset request.jwt.claim.sub;
 

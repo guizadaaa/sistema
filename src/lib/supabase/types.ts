@@ -298,6 +298,26 @@ export interface Database {
         }>;
         Relationships: [];
       };
+      materiais_apoio: {
+        Row: {
+          id: string;
+          titulo: string;
+          storage_path: string;
+          nome_arquivo: string;
+          enviado_por: string;
+          enviado_em: string;
+        };
+        Insert: {
+          titulo: string;
+          storage_path: string;
+          nome_arquivo: string;
+        };
+        // Sem UPDATE previsto — ver nota em anexos.Update.
+        Update: Partial<{
+          titulo: string;
+        }>;
+        Relationships: [];
+      };
       auditoria: {
         Row: {
           id: string;

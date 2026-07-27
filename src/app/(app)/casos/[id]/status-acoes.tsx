@@ -15,11 +15,14 @@ export function StatusAcoes({
   statusAtual,
   podeConduzirFluxo,
   ehAdmin,
+  temComentario,
 }: {
   casoId: string;
   statusAtual: StatusCaso;
   podeConduzirFluxo: boolean;
   ehAdmin: boolean;
+  /** Regra de negócio: um caso só pode ir para "Resolvido" com ao menos um comentário registrado (ver Comentários acima). */
+  temComentario: boolean;
 }) {
   const opcoes = proximosStatusValidos(statusAtual, ehAdmin);
   const [novoStatus, setNovoStatus] = useState<StatusCaso | "">("");
@@ -34,8 +37,10 @@ export function StatusAcoes({
     );
   }
 
+  const bloqueadoPorFaltaDeComentario = novoStatus === "resolvido" && !temComentario;
+
   const confirmarAvanco = () => {
-    if (!novoStatus) return;
+    if (!novoStatus || bloqueadoPorFaltaDeComentario) return;
     setErro(undefined);
     startTransition(async () => {
       const resultado = await avancarStatus(casoId, novoStatus);
@@ -66,7 +71,7 @@ export function StatusAcoes({
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={confirmarAvanco} disabled={!novoStatus || isPending}>
+          <Button onClick={confirmarAvanco} disabled={!novoStatus || isPending || bloqueadoPorFaltaDeComentario}>
             {isPending ? "Salvando..." : "Confirmar"}
           </Button>
         </div>
@@ -74,6 +79,13 @@ export function StatusAcoes({
 
       {podeConduzirFluxo && opcoes.length === 0 && (
         <p className="text-muted-foreground text-sm">Nenhuma transição de status disponível no momento.</p>
+      )}
+
+      {bloqueadoPorFaltaDeComentario && (
+        <p className="text-destructive text-sm">
+          Não é possível marcar como Resolvido sem pelo menos um comentário registrado no caso. Adicione um
+          comentário na seção Comentários acima antes de confirmar.
+        </p>
       )}
 
       {erro && <p className="text-destructive text-sm">{erro}</p>}
