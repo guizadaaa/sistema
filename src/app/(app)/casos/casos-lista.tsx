@@ -81,7 +81,7 @@ export function CasosLista({
                   name="busca"
                   placeholder="Contrato, cliente, protocolo ou CPF"
                   defaultValue={filtros.busca ?? ""}
-                  className="w-56"
+                  className="w-72"
                 />
               </div>
 
