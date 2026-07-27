@@ -318,6 +318,62 @@ export interface Database {
         }>;
         Relationships: [];
       };
+      vendas_importadas: {
+        Row: {
+          id: string;
+          filial: FilialCvc;
+          venda_numero: number;
+          vendedor_nome_planilha: string;
+          data_venda: string;
+          pagante: string;
+          produto: string;
+          valor_total: number;
+          importado_por: string;
+          importado_em: string;
+          atualizado_em: string;
+        };
+        Insert: {
+          filial: FilialCvc;
+          venda_numero: number;
+          vendedor_nome_planilha: string;
+          data_venda: string;
+          pagante: string;
+          produto: string;
+          valor_total: number;
+        };
+        // Upsert (on conflict (filial, venda_numero)) só atualiza o conteúdo —
+        // importado_por/importado_em/atualizado_em são geridos pelos triggers.
+        Update: Partial<{
+          vendedor_nome_planilha: string;
+          data_venda: string;
+          pagante: string;
+          produto: string;
+          valor_total: number;
+        }>;
+        Relationships: [];
+      };
+      vendedores_mapeamento: {
+        Row: {
+          id: string;
+          nome_planilha: string;
+          filial: FilialCvc;
+          usuario_id: string | null;
+          vigente_desde: string | null;
+          vigente_ate: string | null;
+          criado_por: string;
+          criado_em: string;
+        };
+        Insert: {
+          nome_planilha: string;
+          filial: FilialCvc;
+          usuario_id?: string | null;
+          vigente_desde?: string | null;
+          vigente_ate?: string | null;
+        };
+        // Sem UPDATE previsto — histórico imutável, ver nota em status_historico.Update.
+        Update: never;
+        Relationships: [];
+      };
       auditoria: {
         Row: {
           id: string;
@@ -406,6 +462,24 @@ export interface Database {
           substituido_por: string | null;
           substituido_em: string | null;
           cancelado_em: string | null;
+        };
+        Relationships: [];
+      };
+      vendas_com_vendedor: {
+        Row: {
+          id: string;
+          filial: FilialCvc;
+          venda_numero: number;
+          vendedor_nome_planilha: string;
+          data_venda: string;
+          pagante: string;
+          produto: string;
+          valor_total: number;
+          importado_por: string;
+          importado_em: string;
+          atualizado_em: string;
+          mapeamento_id: string | null;
+          usuario_id: string | null;
         };
         Relationships: [];
       };
