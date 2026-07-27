@@ -218,7 +218,9 @@ async function parseDesfechoFormData(
             valorTaxas: formData.get("valorTaxas") || undefined,
             valorDiferencaTarifaria: formData.get("valorDiferencaTarifaria") || undefined,
           }
-        : { tipo, valor: formData.get("valor") || undefined };
+        : tipo === "recadastro"
+          ? { tipo }
+          : { tipo, valor: formData.get("valor") || undefined };
 
   const parsed = desfechoSchema.safeParse(raw);
   if (!parsed.success) {

@@ -5,7 +5,7 @@ import { cpfValido, somenteDigitos } from "./cpf";
 import { moedaParaNumero } from "./moeda";
 import type { TipoDocumentoAnexo } from "@/lib/supabase/types";
 
-export const TIPOS_DESFECHO = ["reembolso", "remarcacao", "carta_credito"] as const;
+export const TIPOS_DESFECHO = ["reembolso", "remarcacao", "carta_credito", "recadastro"] as const;
 export const SUBTIPOS_REEMBOLSO = ["integral", "parcial", "sem_reembolso"] as const;
 export const ORIGENS_REEMBOLSO_INTEGRAL = ["fornecedor", "saude"] as const;
 export const SUBTIPOS_REMARCACAO = ["sem_custo", "com_custo"] as const;
@@ -109,10 +109,17 @@ const cartaCreditoSchema = z.object({
     .refine((v) => v > 0, "Informe o valor"),
 });
 
+// Sem campos adicionais — só marca que o caso foi resolvido recadastrando o
+// produto/reserva (ver desfechos_campos_por_tipo na migration correspondente).
+const recadastroSchema = z.object({
+  tipo: z.literal("recadastro"),
+});
+
 export const desfechoSchema = z.discriminatedUnion("tipo", [
   reembolsoSchema,
   remarcacaoSchema,
   cartaCreditoSchema,
+  recadastroSchema,
 ]);
 
 export type DesfechoFormValues = z.infer<typeof desfechoSchema>;

@@ -17,7 +17,7 @@ export type StatusCaso =
   | "reavaliacao"
   | "resolvido"
   | "ouvidoria";
-export type TipoDesfecho = "reembolso" | "remarcacao" | "carta_credito";
+export type TipoDesfecho = "reembolso" | "remarcacao" | "carta_credito" | "recadastro";
 export type SubtipoReembolso = "integral" | "parcial" | "sem_reembolso";
 export type OrigemReembolsoIntegral = "fornecedor" | "saude";
 export type SubtipoRemarcacao = "sem_custo" | "com_custo";
