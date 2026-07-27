@@ -55,6 +55,41 @@ export async function adicionarContratosAoCaso(
   return { avisos: avisos.length > 0 ? avisos : undefined };
 }
 
+export type AdicionarComplementoState = {
+  error?: string;
+};
+
+/**
+ * Complemento é sempre um registro novo, nunca uma edição dos campos
+ * originais do caso — cobre o vendedor ter esquecido de preencher algo na
+ * criação sem perder o rastro de quando/quem completou depois (aparece na
+ * linha do tempo, criado_por nunca vem do client — trigger
+ * set_complemento_criado_por lê auth.uid()). RLS (casos_complementos_insert)
+ * é a autoridade real sobre quem pode adicionar — liberado pra qualquer
+ * perfil que já enxerga o caso, mesmo padrão de anexos/contratos adicionais.
+ */
+export async function adicionarComplementoAoCaso(
+  casoId: string,
+  _prevState: AdicionarComplementoState,
+  formData: FormData
+): Promise<AdicionarComplementoState> {
+  await requireCurrentUser();
+
+  const texto = String(formData.get("texto") ?? "").trim();
+  if (!texto) return { error: "Informe a informação complementar." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("casos_complementos").insert({ caso_id: casoId, texto });
+
+  if (error) {
+    console.error("Erro ao adicionar complemento ao caso:", error);
+    return { error: "Não foi possível adicionar a informação complementar." };
+  }
+
+  revalidatePath(`/casos/${casoId}`);
+  return {};
+}
+
 /**
  * Loga o acesso (LGPD §12 — log de quem baixou documento sensível) e só
  * então gera a signed URL. A checagem de visibilidade acontece dentro da

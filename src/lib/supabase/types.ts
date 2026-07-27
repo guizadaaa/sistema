@@ -280,6 +280,24 @@ export interface Database {
         }>;
         Relationships: [];
       };
+      casos_complementos: {
+        Row: {
+          id: string;
+          caso_id: string;
+          texto: string;
+          criado_por: string;
+          criado_em: string;
+        };
+        Insert: {
+          caso_id: string;
+          texto: string;
+        };
+        // Sem UPDATE previsto — histórico imutável, ver nota em status_historico.Update.
+        Update: Partial<{
+          texto: string;
+        }>;
+        Relationships: [];
+      };
       auditoria: {
         Row: {
           id: string;
