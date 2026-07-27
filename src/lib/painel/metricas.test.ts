@@ -153,31 +153,53 @@ describe("carregarMetricasPainel — tempo médio por etapa", () => {
 });
 
 describe("carregarMetricasPainel — casos de teste", () => {
-  it("exclui caso_teste=true do total e das métricas, sempre (sem opção de incluir)", async () => {
+  const CASOS_COM_TESTE_FIXTURE: Row[] = [
+    ...CASOS_FIXTURE,
+    {
+      id: "c3",
+      protocolo: 3,
+      cliente_nome: "Caso de Teste",
+      status_atual: "resolvido",
+      tipo_caso: "alteracao_data",
+      filial: "1710",
+      vendedor_dono: "v1",
+      prazo_vigencia: "2026-12-31",
+      caso_teste: true,
+    },
+  ];
+
+  beforeEach(() => {
     createClientMock.mockResolvedValue(
       criarSupabaseFake({
-        casos: [
-          ...CASOS_FIXTURE,
-          {
-            id: "c3",
-            protocolo: 3,
-            cliente_nome: "Caso de Teste",
-            status_atual: "resolvido",
-            tipo_caso: "alteracao_data",
-            filial: "1710",
-            vendedor_dono: "v1",
-            prazo_vigencia: "2026-12-31",
-            caso_teste: true,
-          },
-        ],
+        casos: CASOS_COM_TESTE_FIXTURE,
         status_historico_com_duracao: HISTORICO_FIXTURE,
         usuarios: USUARIOS_FIXTURE,
         implicacoes: [],
         desfechos_visivel: [],
       })
     );
+  });
 
+  it("exclui caso_teste=true do total e das métricas por padrão (sem mostrarTeste)", async () => {
     const metricas = await carregarMetricasPainel();
     expect(metricas.total).toBe(2);
+    expect(metricas.metricasTeste).toBeNull();
+  });
+
+  it("com mostrarTeste ativo, mantém as métricas reais sem o caso de teste, mas popula metricasTeste à parte", async () => {
+    const metricas = await carregarMetricasPainel({ mostrarTeste: true });
+
+    expect(metricas.total).toBe(2);
+    expect(metricas.porStatus.resolvido).toBe(2);
+
+    expect(metricas.metricasTeste).not.toBeNull();
+    expect(metricas.metricasTeste?.total).toBe(1);
+    expect(metricas.metricasTeste?.porStatus.resolvido).toBe(1);
+  });
+
+  it("metricasTeste respeita os mesmos filtros de filial/vendedor do recorte real", async () => {
+    const metricas = await carregarMetricasPainel({ mostrarTeste: true, filial: "1714" });
+
+    expect(metricas.metricasTeste?.total).toBe(0);
   });
 });
