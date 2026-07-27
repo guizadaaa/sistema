@@ -5,7 +5,8 @@ import { FILIAL_LABELS, QUEM_PAGA_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from
 import { STATUS_ORDEM, type MetricasPainel } from "@/lib/painel/metricas";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 
-import { gerarPdfBuffer, linhaChaveValor, secaoRelatorio, tituloRelatorio } from "./pdf-util";
+import { badgeInline, gerarPdfBuffer, linhaChaveValor, secaoRelatorio, tabelaRelatorio, tituloRelatorio } from "./pdf-util";
+import { PRAZO_INK_HEX, REPORT_COLORS, STATUS_HEX } from "./report-style";
 
 const STATUS_MARCOS = STATUS_ORDEM.filter((s) => s !== "inicial");
 
@@ -37,7 +38,13 @@ export async function gerarPainelPdf(metricas: MetricasPainel, filtros: ResumoFi
 
     secaoRelatorio(doc, "Casos por status");
     for (const status of STATUS_ORDEM) {
-      linhaChaveValor(doc, STATUS_LABELS[status], String(metricas.porStatus[status]));
+      const x0 = doc.x;
+      const y = doc.y;
+      badgeInline(doc, x0, y, STATUS_LABELS[status], STATUS_HEX[status].bg, STATUS_HEX[status].ink);
+      doc.font("Helvetica").fontSize(10).fillColor(REPORT_COLORS.foreground);
+      doc.text(String(metricas.porStatus[status]), x0 + 240, y + 3, { lineBreak: false });
+      doc.x = x0;
+      doc.y = y + 20;
     }
 
     secaoRelatorio(doc, "Tipos de caso mais comuns");
@@ -62,16 +69,44 @@ export async function gerarPainelPdf(metricas: MetricasPainel, filtros: ResumoFi
 
     if (metricas.tipoMaisComumPorFilial.length > 0) {
       secaoRelatorio(doc, "Tipo mais comum por loja");
-      for (const f of metricas.tipoMaisComumPorFilial) {
-        linhaChaveValor(doc, FILIAL_LABELS[f.filial], `${TIPO_CASO_LABELS[f.tipo]} (${f.quantidade})`);
-      }
+      tabelaRelatorio(
+        doc,
+        [
+          { titulo: "Filial", largura: 140 },
+          { titulo: "Tipo mais comum", largura: 220 },
+          { titulo: "Quantidade", largura: 115 },
+        ],
+        metricas.tipoMaisComumPorFilial.map((f) => [FILIAL_LABELS[f.filial], TIPO_CASO_LABELS[f.tipo], String(f.quantidade)])
+      );
     }
 
     if (metricas.casosAtencaoPrazo.length > 0) {
       secaoRelatorio(doc, "Casos que precisam de atenção");
-      for (const c of metricas.casosAtencaoPrazo) {
-        linhaChaveValor(doc, `#${c.protocolo} — ${c.clienteNome}`, `${c.vendedorNome} · ${c.prazoVigencia}`);
-      }
+      tabelaRelatorio(
+        doc,
+        [
+          { titulo: "Protocolo", largura: 65 },
+          { titulo: "Cliente", largura: 130 },
+          { titulo: "Vendedor", largura: 120 },
+          { titulo: "Prazo de vigência", largura: 80 },
+          { titulo: "Situação", largura: 80 },
+        ],
+        metricas.casosAtencaoPrazo.map((c) => [
+          `#${c.protocolo}`,
+          c.clienteNome,
+          c.vendedorNome,
+          c.prazoVigencia,
+          c.situacao,
+        ]),
+        (doc, colIdx, linha, x, y) => {
+          if (colIdx !== 4) return false;
+          const situacao = linha[4] as "vencido" | "vencendo";
+          doc.font("Helvetica-Bold").fontSize(9).fillColor(PRAZO_INK_HEX[situacao]);
+          doc.text(situacao === "vencido" ? "Vencido" : "Vencendo", x, y, { lineBreak: false });
+          doc.fillColor(REPORT_COLORS.foreground);
+          return true;
+        }
+      );
     }
   });
 }

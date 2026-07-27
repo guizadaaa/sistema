@@ -5,17 +5,13 @@ import ExcelJS from "exceljs";
 import { STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 
 import type { ExtratoVendedor } from "./extrato-vendedor";
+import { cabecalho, celulaPrazo, celulaStatus, tituloSheet } from "./excel-util";
 
 const SITUACAO_PRAZO_LABELS: Record<ExtratoVendedor["casos"][number]["situacaoPrazo"], string> = {
   vencido: "Vencido",
   vencendo: "Vencendo",
   normal: "Em dia",
 };
-
-function cabecalho(sheet: ExcelJS.Worksheet, colunas: string[]) {
-  sheet.addRow(colunas);
-  sheet.getRow(sheet.rowCount).font = { bold: true };
-}
 
 /** Mesmos dados do extrato em PDF (gerarExtratoVendedorPdf), em Excel. */
 export async function gerarExtratoVendedorExcel(extrato: ExtratoVendedor): Promise<Buffer> {
@@ -24,6 +20,7 @@ export async function gerarExtratoVendedorExcel(extrato: ExtratoVendedor): Promi
   workbook.created = new Date();
 
   const resumo = workbook.addWorksheet("Resumo");
+  tituloSheet(resumo, `Extrato — ${extrato.vendedorNome}`, 2);
   cabecalho(resumo, ["Métrica", "Valor"]);
   resumo.addRow(["Vendedor", extrato.vendedorNome]);
   resumo.addRow(["Total de casos", extrato.totalCasos]);
@@ -33,17 +30,12 @@ export async function gerarExtratoVendedorExcel(extrato: ExtratoVendedor): Promi
   resumo.columns = [{ width: 32 }, { width: 24 }];
 
   const casos = workbook.addWorksheet("Casos");
+  tituloSheet(casos, "Casos", 7);
   cabecalho(casos, ["Protocolo", "Cliente", "Tipo", "Status", "Prazo de vigência", "Situação do prazo", "Multa total"]);
   for (const c of extrato.casos) {
-    casos.addRow([
-      c.protocolo,
-      c.clienteNome,
-      TIPO_CASO_LABELS[c.tipoCaso],
-      STATUS_LABELS[c.statusAtual],
-      c.prazoVigencia,
-      SITUACAO_PRAZO_LABELS[c.situacaoPrazo],
-      c.multaTotal,
-    ]);
+    const row = casos.addRow([c.protocolo, c.clienteNome, TIPO_CASO_LABELS[c.tipoCaso], "", c.prazoVigencia, "", c.multaTotal]);
+    celulaStatus(row.getCell(4), c.statusAtual, STATUS_LABELS[c.statusAtual]);
+    celulaPrazo(row.getCell(6), c.situacaoPrazo, SITUACAO_PRAZO_LABELS[c.situacaoPrazo]);
   }
   casos.columns = [{ width: 12 }, { width: 28 }, { width: 26 }, { width: 20 }, { width: 18 }, { width: 16 }, { width: 14 }];
 
