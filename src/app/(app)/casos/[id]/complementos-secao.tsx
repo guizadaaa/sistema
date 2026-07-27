@@ -16,11 +16,12 @@ export function ComplementosSecao({ casoId, complementos }: { casoId: string; co
 
   return (
     <div className="flex flex-col gap-3 border-t pt-4">
-      <span className="text-sm font-medium">Informações complementares</span>
+      <span className="text-sm font-medium">Comentários</span>
 
       {complementos.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          Nenhuma informação complementar ainda — use o campo abaixo se algo ficou faltando no registro original.
+          Nenhum comentário registrado ainda — use o campo abaixo para registrar o andamento do caso (é preciso ao
+          menos um comentário para marcar o caso como Resolvido).
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -36,18 +37,18 @@ export function ComplementosSecao({ casoId, complementos }: { casoId: string; co
       )}
 
       {/* key remonta o form (limpando o Textarea não controlado) sempre que
-          um complemento novo chega via revalidatePath — mesma técnica de
+          um comentário novo chega via revalidatePath — mesma técnica de
           caso-form.tsx, aqui só precisando da contagem, não do state inteiro. */}
       <form key={complementos.length} action={formAction} className="flex flex-col gap-2">
         <Textarea
           name="texto"
-          placeholder="Ex.: o vendedor esqueceu de registrar que o cliente pediu retorno por e-mail"
+          placeholder="Ex.: retornei o contato com o cliente, aguardando resposta do fornecedor"
           rows={3}
           required
         />
         {state.error && <p className="text-destructive text-sm">{state.error}</p>}
         <Button type="submit" disabled={isPending} className="w-fit">
-          {isPending ? "Salvando..." : "Adicionar informação"}
+          {isPending ? "Salvando..." : "Adicionar comentário"}
         </Button>
       </form>
     </div>

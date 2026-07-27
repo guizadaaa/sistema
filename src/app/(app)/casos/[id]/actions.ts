@@ -60,13 +60,16 @@ export type AdicionarComplementoState = {
 };
 
 /**
- * Complemento é sempre um registro novo, nunca uma edição dos campos
- * originais do caso — cobre o vendedor ter esquecido de preencher algo na
- * criação sem perder o rastro de quando/quem completou depois (aparece na
- * linha do tempo, criado_por nunca vem do client — trigger
- * set_complemento_criado_por lê auth.uid()). RLS (casos_complementos_insert)
- * é a autoridade real sobre quem pode adicionar — liberado pra qualquer
- * perfil que já enxerga o caso, mesmo padrão de anexos/contratos adicionais.
+ * Comentário é sempre um registro novo, nunca uma edição dos campos
+ * originais do caso — cobre tanto o vendedor ter esquecido de preencher algo
+ * na criação quanto anotações de quem conduz a resolução, sem perder o
+ * rastro de quando/quem escreveu (aparece na linha do tempo, criado_por
+ * nunca vem do client — trigger set_complemento_criado_por lê auth.uid()).
+ * RLS (casos_complementos_insert) é a autoridade real sobre quem pode
+ * adicionar — liberado pra qualquer perfil que já enxerga o caso, mesmo
+ * padrão de anexos/contratos adicionais. A tabela/nome da função continuam
+ * "complemento" (histórico do PR que introduziu a tabela) — só o texto
+ * visível ao usuário virou "comentário", ver complementos-secao.tsx.
  */
 export async function adicionarComplementoAoCaso(
   casoId: string,
@@ -76,14 +79,14 @@ export async function adicionarComplementoAoCaso(
   await requireCurrentUser();
 
   const texto = String(formData.get("texto") ?? "").trim();
-  if (!texto) return { error: "Informe a informação complementar." };
+  if (!texto) return { error: "Escreva um comentário antes de enviar." };
 
   const supabase = await createClient();
   const { error } = await supabase.from("casos_complementos").insert({ caso_id: casoId, texto });
 
   if (error) {
-    console.error("Erro ao adicionar complemento ao caso:", error);
-    return { error: "Não foi possível adicionar a informação complementar." };
+    console.error("Erro ao adicionar comentário ao caso:", error);
+    return { error: "Não foi possível adicionar o comentário." };
   }
 
   revalidatePath(`/casos/${casoId}`);
@@ -123,6 +126,11 @@ export async function gerarUrlAssinadaAnexo(
  * quê (admin, ou gerente com delegação ativa restrito à própria filial, e
  * Ouvidoria só admin) — este action não reimplementa essa checagem, só
  * repassa o erro do Postgres de forma legível quando ela rejeitar.
+ *
+ * "Resolvido" sem comentário: a UI (status-acoes.tsx) já bloqueia antes de
+ * chamar este action, mas o trigger impede_resolvido_sem_comentario
+ * (20260727000003) é quem de fato garante a regra — esta checagem de
+ * mensagem só troca o texto técnico da exceção por um específico.
  */
 export async function avancarStatus(casoId: string, novoStatus: StatusCaso): Promise<{ error?: string }> {
   await requireCurrentUser();
@@ -132,6 +140,9 @@ export async function avancarStatus(casoId: string, novoStatus: StatusCaso): Pro
 
   if (error) {
     console.error("Erro ao avançar status:", error);
+    if (error.message.includes("pelo menos um comentário")) {
+      return { error: "Não é possível marcar como Resolvido sem pelo menos um comentário registrado no caso." };
+    }
     return { error: "Não foi possível avançar o status. Verifique se você tem permissão para esta ação." };
   }
 

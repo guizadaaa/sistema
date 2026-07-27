@@ -67,6 +67,11 @@ select public._test_assert(
   (select status_atual = 'ouvidoria' from public.casos where id = '10000000-0000-0000-0000-000000000004')
 );
 
+-- impede_resolvido_sem_comentario (20260727000003) exige ao menos um
+-- comentário antes de aceitar status='resolvido' logo abaixo.
+insert into public.casos_complementos (caso_id, texto) values
+  ('10000000-0000-0000-0000-000000000004', 'Ouvidoria concluiu a análise, encerrando o caso.');
+
 insert into public.status_historico (caso_id, status) values ('10000000-0000-0000-0000-000000000004', 'resolvido');
 
 select public._test_assert(
