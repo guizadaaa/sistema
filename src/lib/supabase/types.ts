@@ -374,6 +374,62 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      linkly_links: {
+        Row: {
+          id: string;
+          workspace_secret: string;
+          linkly_link_id: string;
+          short_url: string;
+          tipo: "vendedor" | "vitrine";
+          filial: FilialCvc | null;
+          criado_por: string;
+          criado_em: string;
+        };
+        Insert: {
+          workspace_secret: string;
+          linkly_link_id: string;
+          short_url: string;
+          tipo: "vendedor" | "vitrine";
+          filial?: FilialCvc | null;
+        };
+        Update: Partial<{
+          workspace_secret: string;
+          linkly_link_id: string;
+          short_url: string;
+          tipo: "vendedor" | "vitrine";
+          filial: FilialCvc | null;
+        }>;
+        Relationships: [];
+      };
+      linkly_cliques_totais: {
+        Row: {
+          link_id: string;
+          total_cliques: number;
+          atualizado_em: string;
+        };
+        // Só a sincronização (service_role) escreve aqui — sem grant nenhum
+        // pra authenticated.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      linkly_vendedor_mapeamento: {
+        Row: {
+          id: string;
+          link_id: string;
+          usuario_id: string;
+          cliques_totais_no_inicio: number;
+          vigente_desde: string;
+          vigente_ate: string | null;
+          criado_por: string;
+          criado_em: string;
+        };
+        // Sem INSERT/UPDATE direto — único caminho de escrita é a RPC
+        // atribuir_vendedor_link() (ver bloco Functions).
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       auditoria: {
         Row: {
           id: string;
@@ -483,8 +539,37 @@ export interface Database {
         };
         Relationships: [];
       };
+      linkly_cliques_por_periodo: {
+        Row: {
+          mapeamento_id: string;
+          link_id: string;
+          filial: FilialCvc;
+          short_url: string;
+          usuario_id: string;
+          vigente_desde: string;
+          vigente_ate: string | null;
+          cliques_totais_no_inicio: number;
+          cliques_totais_no_fim: number;
+          cliques_periodo: number;
+          cliques_atualizado_em: string;
+        };
+        Relationships: [];
+      };
+      linkly_cliques_vitrine: {
+        Row: {
+          link_id: string;
+          short_url: string;
+          total_cliques: number;
+          atualizado_em: string;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
+      atribuir_vendedor_link: {
+        Args: { p_link_id: string; p_usuario_id: string; p_vigente_desde?: string };
+        Returns: string;
+      };
       log_anexo_signed_url: {
         Args: { p_anexo_id: string };
         Returns: void;
