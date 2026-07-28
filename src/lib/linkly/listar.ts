@@ -105,13 +105,19 @@ export type CliquesVitrine = {
   shortUrl: string;
   totalCliques: number;
   atualizadoEm: string;
+  filial: FilialCvc;
 };
 
-/** linkly_cliques_vitrine já restringe a leitura a adm/adm_master no WHERE da view. */
+/**
+ * Um link de vitrine por loja (mesmo workspace Linkly nos 3) — a view já
+ * restringe a leitura: adm/adm_master veem os 3, gerente só o da própria loja.
+ */
 export async function listarCliquesVitrine(): Promise<CliquesVitrine[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase.from("linkly_cliques_vitrine").select("link_id, short_url, total_cliques, atualizado_em");
+  const { data, error } = await supabase
+    .from("linkly_cliques_vitrine")
+    .select("link_id, short_url, total_cliques, atualizado_em, filial");
   if (error) throw error;
 
   return (data ?? []).map((r) => ({
@@ -119,5 +125,6 @@ export async function listarCliquesVitrine(): Promise<CliquesVitrine[]> {
     shortUrl: r.short_url,
     totalCliques: r.total_cliques,
     atualizadoEm: r.atualizado_em,
+    filial: r.filial,
   }));
 }

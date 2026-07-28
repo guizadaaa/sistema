@@ -381,7 +381,7 @@ export interface Database {
           linkly_link_id: string;
           short_url: string;
           tipo: "vendedor" | "vitrine";
-          filial: FilialCvc | null;
+          filial: FilialCvc;
           criado_por: string;
           criado_em: string;
         };
@@ -390,14 +390,14 @@ export interface Database {
           linkly_link_id: string;
           short_url: string;
           tipo: "vendedor" | "vitrine";
-          filial?: FilialCvc | null;
+          filial: FilialCvc;
         };
         Update: Partial<{
           workspace_secret: string;
           linkly_link_id: string;
           short_url: string;
           tipo: "vendedor" | "vitrine";
-          filial: FilialCvc | null;
+          filial: FilialCvc;
         }>;
         Relationships: [];
       };
@@ -561,6 +561,7 @@ export interface Database {
           short_url: string;
           total_cliques: number;
           atualizado_em: string;
+          filial: FilialCvc;
         };
         Relationships: [];
       };

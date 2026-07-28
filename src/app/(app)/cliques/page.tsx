@@ -55,7 +55,10 @@ export default async function CliquesPage({
 
   // Gerente/adm/adm_master sem vendedor selecionado: resumo agregado.
   const resumo = await listarResumoPorVendedor({});
-  const vitrine = usuario.perfil === "adm" || usuario.perfil === "adm_master" ? await listarCliquesVitrine() : [];
+  // Só gerente/adm/adm_master chegam até aqui (vendedor já retornou acima).
+  // linkly_cliques_vitrine já restringe por RLS: gerente vê só a própria
+  // loja, adm/adm_master veem as 3.
+  const vitrine = await listarCliquesVitrine();
 
   return (
     <div className="flex flex-col gap-4">

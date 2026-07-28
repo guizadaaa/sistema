@@ -18,8 +18,8 @@ import { atribuirVendedor, cadastrarLink, type AtribuirVendedorState, type Cadas
 const initialCadastrarState: CadastrarLinkState = {};
 const initialAtribuirState: AtribuirVendedorState = {};
 
-function labelLoja(link: Pick<LinkComVendedorAtual, "tipo" | "filial">): string {
-  return link.tipo === "vitrine" ? "Vitrine (todas as lojas)" : link.filial ? FILIAL_LABELS[link.filial] : "—";
+function labelLoja(link: Pick<LinkComVendedorAtual, "filial">): string {
+  return FILIAL_LABELS[link.filial];
 }
 
 function LinhaLink({ link }: { link: LinkComVendedorAtual }) {
@@ -29,6 +29,9 @@ function LinhaLink({ link }: { link: LinkComVendedorAtual }) {
   return (
     <tr className="border-b align-top last:border-0">
       <td className="py-2 pr-4">{labelLoja(link)}</td>
+      <td className="py-2 pr-4">
+        <Badge variant="outline">{link.tipo === "vitrine" ? "Vitrine" : "Vendedor"}</Badge>
+      </td>
       <td className="py-2 pr-4">
         <a href={link.shortUrl} target="_blank" rel="noreferrer" className="hover:underline">
           {link.shortUrl}
@@ -102,6 +105,7 @@ export function MapeamentoLista({ links, historico }: { links: LinkComVendedorAt
               <thead>
                 <tr className="text-muted-foreground border-b text-left">
                   <th className="py-2 pr-4 font-medium">Loja</th>
+                  <th className="py-2 pr-4 font-medium">Tipo</th>
                   <th className="py-2 pr-4 font-medium">URL curta</th>
                   <th className="py-2 pr-4 font-medium">Vendedor atual</th>
                   <th className="py-2 pr-4 font-medium">Ação</th>
@@ -131,29 +135,32 @@ export function MapeamentoLista({ links, historico }: { links: LinkComVendedorAt
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="vendedor">Vendedor (de uma loja)</SelectItem>
-                    <SelectItem value="vitrine">Vitrine (QR comum às lojas)</SelectItem>
+                    <SelectItem value="vendedor">Vendedor</SelectItem>
+                    <SelectItem value="vitrine">Vitrine (grupo de WhatsApp da loja)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {tipo === "vendedor" && (
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="filial">Loja</Label>
-                  <Select name="filial">
-                    <SelectTrigger id="filial">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FILIAIS.map((f) => (
-                        <SelectItem key={f} value={f}>
-                          {FILIAL_LABELS[f]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="filial">Loja</Label>
+                <Select name="filial">
+                  <SelectTrigger id="filial">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FILIAIS.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {FILIAL_LABELS[f]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {tipo === "vitrine" && (
+                  <p className="text-muted-foreground text-xs">
+                    Cada loja tem seu próprio link de vitrine — as 3 usam o mesmo workspace, mas são links diferentes.
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">

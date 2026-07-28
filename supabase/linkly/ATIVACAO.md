@@ -1,8 +1,10 @@
 # Cliques do Linkly — ativação
 
 Feature de divulgação (28/07): rastreia cliques de 4 contas/workspaces do
-Linkly — uma comum ao QR da vitrine física (3 lojas), três uma por loja, cada
-uma com um link por vendedor. Mesmo mecanismo de sincronização periódica de
+Linkly — uma é a conta "vitrine" (usada pelos 3 links de vitrine, um por
+loja, cada um levando ao grupo de WhatsApp de ofertas daquela loja
+específica — a conta é comum, os links não), três são uma por loja com um
+link por vendedor. Mesmo mecanismo de sincronização periódica de
 `backup-dados-sensiveis`/`purgar_anexos_retencao_vencida` (pg_cron + pg_net).
 
 ## AVISO — API do Linkly não testada contra uma conta real

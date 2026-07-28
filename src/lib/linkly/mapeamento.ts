@@ -9,7 +9,7 @@ export type LinkComVendedorAtual = {
   linklyLinkId: string;
   shortUrl: string;
   tipo: "vendedor" | "vitrine";
-  filial: FilialCvc | null;
+  filial: FilialCvc;
   vendedorAtualId: string | null;
   vendedorAtualNome: string | null;
   vendedorAtualEmail: string | null;
