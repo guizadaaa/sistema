@@ -23,6 +23,7 @@ const LINKS: Array<{ href: string; label: string; visivel: (perfil: PerfilUsuari
   },
   { href: "/auditoria", label: "Auditoria", visivel: (perfil) => perfil === "adm_master" },
   { href: "/vendas", label: "Vendas", visivel: () => true },
+  { href: "/cliques", label: "Cliques", visivel: () => true },
   { href: "/materiais", label: "Materiais de apoio", visivel: () => true },
   { href: "/seguranca", label: "Segurança", visivel: () => true },
 ];
