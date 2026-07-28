@@ -9,19 +9,20 @@
 // service_role_key já disponível no servidor Next.js — ver
 // src/lib/linkly/sincronizar.ts. Nunca chamada pelo browser.
 //
-// AVISO IMPORTANTE (deixado deliberadamente explícito): o formato exato da
-// API do Linkly usado aqui (buscarWorkspaceId/buscarLinks/
-// extrairContagemDeCliques) foi montado a partir da documentação pública
-// (linklyhq.com/support/api, /support/analytics-api,
-// /url-shortener-api-reference), sem acesso a uma conta/API key real pra
-// testar — o sandbox de desenvolvimento não tem acesso de rede a
-// linklyhq.com. Cada função abaixo foi isolada e comentada exatamente pra
-// ficar fácil de ajustar assim que o primeiro teste com uma chave real
-// mostrar o formato de resposta verdadeiro. Rode manualmente uma vez (ver
-// supabase/linkly/ATIVACAO.md) e confira o campo `erros` do retorno antes de
-// confiar no agendamento do pg_cron.
+// A lógica de parsing/correspondência (workspace, links, contagem de
+// cliques) mora em ./matching.ts — isolada ali especificamente pra poder ser
+// testada com vitest (matching.test.ts) a partir do Node normal, já que este
+// arquivo importa "jsr:..." e roda só sob o runtime do Deno.
+//
+// ATUALIZAÇÃO (28/07, pós primeiro teste manual real): os nomes de campo
+// abaixo foram confirmados contra uma resposta REAL da API (capturada pelo
+// usuário via net.http_get direto no SQL Editor, workspace 1710) — não são
+// mais suposição da documentação pública. Ver o comentário no topo de
+// matching.ts para o que mudou (clicks_total, full_url, slug sempre null).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+
+import { encontrarLinkCorrespondente, extrairContagemDeCliques, extrairLista, extrairWorkspaceId } from "./matching.ts";
 
 const LINKLY_API_BASE = "https://app.linklyhq.com/api/v1";
 
@@ -38,17 +39,6 @@ type ResultadoSincronizacao = {
   erros: { escopo: string; mensagem: string }[];
 };
 
-// A doc pública do Linkly não deixa 100% claro o nome do campo do id do
-// workspace na resposta de GET /workspaces — tenta as variações mais
-// prováveis antes de desistir.
-function extrairWorkspaceId(payload: unknown): string | null {
-  const lista = Array.isArray(payload) ? payload : (payload as { workspaces?: unknown[] })?.workspaces;
-  if (!Array.isArray(lista) || lista.length === 0) return null;
-  const primeiro = lista[0] as Record<string, unknown>;
-  const candidato = primeiro.id ?? primeiro.workspace_id;
-  return candidato != null ? String(candidato) : null;
-}
-
 async function buscarWorkspaceId(apiKey: string): Promise<string> {
   const resp = await fetch(`${LINKLY_API_BASE}/workspaces?api_key=${encodeURIComponent(apiKey)}`);
   if (!resp.ok) throw new Error(`GET /workspaces falhou (HTTP ${resp.status}): ${await resp.text()}`);
@@ -57,58 +47,12 @@ async function buscarWorkspaceId(apiKey: string): Promise<string> {
   return workspaceId;
 }
 
-// Mesma incerteza de nome de campo pro array de links e pra contagem de
-// cliques em cada um — tenta as variações mais prováveis (id/link_id,
-// clicks/click_count/total_clicks/visits) e falha alto (não assume 0) se
-// nenhuma bater, pra nunca gravar um total errado silenciosamente.
-function extrairLista(payload: unknown): Record<string, unknown>[] {
-  if (Array.isArray(payload)) return payload as Record<string, unknown>[];
-  const links = (payload as { links?: unknown[] })?.links;
-  return Array.isArray(links) ? (links as Record<string, unknown>[]) : [];
-}
-
 async function buscarLinks(workspaceId: string, apiKey: string): Promise<Record<string, unknown>[]> {
   const resp = await fetch(
     `${LINKLY_API_BASE}/workspace/${encodeURIComponent(workspaceId)}/list_links?api_key=${encodeURIComponent(apiKey)}`
   );
   if (!resp.ok) throw new Error(`GET /list_links falhou (HTTP ${resp.status}): ${await resp.text()}`);
   return extrairLista(await resp.json());
-}
-
-function idDoLink(link: Record<string, unknown>): string | null {
-  const candidato = link.id ?? link.link_id;
-  return candidato != null ? String(candidato) : null;
-}
-
-// Fallback de correspondência: se o id retornado pela API não bater com o
-// linkly_link_id cadastrado (formato ainda incerto — ver aviso no topo do
-// arquivo), tenta casar pelo último segmento da URL curta (o "slug", ex.:
-// "2nlst9" em https://linkly.link/2nlst9) — algo que o Adm Master lê direto
-// da tela do Linkly, então tende a ser mais confiável de cadastrar certo do
-// que um id interno opaco.
-function ultimoSegmento(url: string): string | null {
-  const partes = url.split("/").filter(Boolean);
-  return partes.length > 0 ? partes[partes.length - 1] : null;
-}
-
-function slugDoLinkApi(link: Record<string, unknown>): string | null {
-  for (const campo of ["slug", "short_url", "url", "path"]) {
-    const valor = link[campo];
-    if (typeof valor === "string") {
-      const segmento = ultimoSegmento(valor);
-      if (segmento) return segmento;
-    }
-  }
-  return null;
-}
-
-function extrairContagemDeCliques(link: Record<string, unknown>): number | null {
-  for (const campo of ["clicks", "click_count", "total_clicks", "visits"]) {
-    const valor = link[campo];
-    if (typeof valor === "number") return valor;
-    if (typeof valor === "string" && /^\d+$/.test(valor)) return Number(valor);
-  }
-  return null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -147,20 +91,13 @@ Deno.serve(async (req: Request) => {
 
         const workspaceId = await buscarWorkspaceId(apiKey as string);
         const linksDaApi = await buscarLinks(workspaceId, apiKey as string);
-        const porLinklyId = new Map(
-          linksDaApi.map((l) => [idDoLink(l), l]).filter((par): par is [string, Record<string, unknown>] => par[0] !== null)
-        );
-        const porSlug = new Map(
-          linksDaApi.map((l) => [slugDoLinkApi(l), l]).filter((par): par is [string, Record<string, unknown>] => par[0] !== null)
-        );
 
         for (const linkRow of linksDoWorkspace) {
-          const slugCadastrado = ultimoSegmento(linkRow.short_url);
-          const linkDaApi = porLinklyId.get(linkRow.linkly_link_id) ?? (slugCadastrado ? porSlug.get(slugCadastrado) : undefined);
+          const linkDaApi = encontrarLinkCorrespondente(linksDaApi, linkRow.linkly_link_id, linkRow.short_url);
           if (!linkDaApi) {
             resultado.erros.push({
               escopo: `${workspaceSecret}/${linkRow.linkly_link_id}`,
-              mensagem: "Link não encontrado na resposta da API do Linkly (nem por id, nem por slug da URL curta).",
+              mensagem: "Link não encontrado na resposta da API do Linkly (nem por id, nem por URL curta).",
             });
             continue;
           }
