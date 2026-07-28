@@ -7,24 +7,29 @@ específica — a conta é comum, os links não), três são uma por loja com um
 link por vendedor. Mesmo mecanismo de sincronização periódica de
 `backup-dados-sensiveis`/`purgar_anexos_retencao_vencida` (pg_cron + pg_net).
 
-## AVISO — API do Linkly não testada contra uma conta real
+## Formato da API — confirmado contra uma resposta real (28/07)
 
-O sandbox de desenvolvimento não tem acesso de rede a `linklyhq.com`
-(bloqueado pela política de rede do ambiente), e nenhuma API key real estava
-disponível durante a implementação. O código em
-`supabase/functions/sincronizar-linkly/index.ts` foi escrito a partir da
-documentação pública do Linkly (`linklyhq.com/support/api`,
-`/support/analytics-api`, `/url-shortener-api-reference`), mas os nomes
-exatos de campo da resposta (id do workspace, id de cada link, campo de
-contagem de cliques) **não foram confirmados contra uma resposta real**.
+O primeiro teste manual (item 6, antes desta atualização) falhou nos 18
+links com "Link não encontrado" — sinal de que autenticação, descoberta do
+workspace e a chamada de listagem funcionavam, mas a correspondência de
+campos (baseada só na documentação pública, nunca testada contra uma conta
+real) estava errada. O usuário capturou uma resposta real via `net.http_get`
+direto no SQL Editor (mesma técnica de diagnóstico já usada antes neste
+projeto) e o código foi corrigido com base nela:
 
-Tudo que depende disso está isolado em funções pequenas e comentadas
-(`buscarWorkspaceId`, `buscarLinks`, `idDoLink`/`slugDoLinkApi`,
-`extrairContagemDeCliques`) especificamente para serem fáceis de ajustar. A
-função tenta várias variações de nome de campo e, quando nenhuma bate, **falha
-alto por link** (registra em `erros`, não grava um total errado/zero
-silenciosamente) — o primeiro teste manual (passo 6 abaixo) vai mostrar
-exatamente o que precisa de ajuste, se precisar.
+- Contagem de cliques: campo **`clicks_total`** (não `clicks`/`click_count`/
+  `total_clicks`/`visits`, que eram só suposições).
+- Identificador único do link: campo **`id`** (numérico).
+- URL curta completa: campo **`full_url`** (ex.: `"https://linkly.link/2nlqB"`)
+  — o campo `slug` existe mas vem sempre `null` nesta conta, e o campo `url`
+  é o **destino** do link (ex.: o grupo de WhatsApp), não a URL curta do
+  Linkly — usar `url` pra correspondência seria um bug silencioso (todos os
+  links de uma loja apontam pro mesmo destino).
+
+A lógica de parsing/correspondência agora mora em
+`supabase/functions/sincronizar-linkly/matching.ts` (funções puras, sem
+`fetch`/`Deno.*`) com testes automatizados em `matching.test.ts` usando a
+resposta real capturada como fixture — `npx vitest run` cobre isso.
 
 ## O que já está pronto
 
@@ -56,19 +61,20 @@ exatamente o que precisa de ajuste, se precisar.
    reaproveitada do backup/retenção de anexos).
 3. **Fazer o deploy da Edge Function**: `supabase functions deploy sincronizar-linkly`.
 4. **Cadastrar os links** na tela `/cliques/mapeamento` (Adm Master): loja,
-   URL curta (ex.: `https://linkly.link/2nlst9`) e o identificador do link
-   segundo o Linkly, se souber — se não souber ou não tiver certeza, cadastre
-   só a URL curta mesmo assim, o fallback por slug (passo 6) cobre isso.
+   URL curta (ex.: `https://linkly.link/2nlst9`) e o identificador do link no
+   Linkly, se souber — a URL curta sozinha já é suficiente na prática (é o
+   que a correspondência usa como fallback, e o `id` interno do Linkly não é
+   algo que normalmente se sabe de cabeça).
 5. **Atribuir o vendedor atual de cada link** (mesma tela).
 6. **Testar manualmente antes de confiar no agendamento** — prefira o botão
    "Atualizar agora" na tela `/cliques` em vez de chamar a procedure pelo SQL
    Editor: o botão mostra o resultado detalhado (`atualizados`/`erros`); a
    procedure só devolve o status HTTP, sem o corpo da resposta. Se `erros`
    vier com "Nenhum campo de contagem de cliques reconhecido" ou "Link não
-   encontrado", ver o aviso no topo deste documento — normalmente é só ajustar
-   os nomes de campo em `extrairContagemDeCliques`/`idDoLink` na Edge Function
-   depois de inspecionar uma resposta real (`console.log` temporário + `supabase
-   functions logs sincronizar-linkly`).
+   encontrado" mesmo depois da correção de 28/07 (ver seção acima), a API do
+   Linkly pode ter mudado de novo — capture uma resposta real de novo (mesma
+   técnica de `net.http_get` + `net._http_collect_response` direto no SQL
+   Editor) e ajuste `matching.ts` com base nela, igual da última vez.
 7. **Agendar o pg_cron** (depois do passo 6 confirmar que funciona):
    ```sql
    select cron.schedule(
