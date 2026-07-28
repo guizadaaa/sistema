@@ -58,21 +58,30 @@ set role authenticated;
 
 \set ON_ERROR_STOP 0
 insert into public.linkly_links (workspace_secret, linkly_link_id, short_url, tipo, filial)
-values ('linkly_api_key_1710', 'zzz999', 'https://linkly.link/zzz999', 'vitrine', '1710');
-\set ON_ERROR_STOP 1
-
-select public._test_assert('check constraint: vitrine com filial preenchida é bloqueado', :'ERROR' = 'true');
-
-\set ON_ERROR_STOP 0
-insert into public.linkly_links (workspace_secret, linkly_link_id, short_url, tipo, filial)
 values ('linkly_api_key_1710', 'yyy888', 'https://linkly.link/yyy888', 'vendedor', null);
 \set ON_ERROR_STOP 1
 
 select public._test_assert('check constraint: vendedor sem filial é bloqueado', :'ERROR' = 'true');
 
+\set ON_ERROR_STOP 0
+insert into public.linkly_links (workspace_secret, linkly_link_id, short_url, tipo, filial)
+values ('linkly_api_key_vitrine', 'www777', 'https://linkly.link/www777', 'vitrine', null);
+\set ON_ERROR_STOP 1
+
+select public._test_assert(
+  'check constraint: vitrine SEM filial é bloqueado (cada loja tem seu próprio link de vitrine, não existe mais link comum)',
+  :'ERROR' = 'true'
+);
+
 insert into public.linkly_links (id, workspace_secret, linkly_link_id, short_url, tipo, filial) values
   ('60000000-0000-0000-0000-000000000001', 'linkly_api_key_1710', 'abc123', 'https://linkly.link/abc123', 'vendedor', '1710'),
-  ('60000000-0000-0000-0000-000000000002', 'linkly_api_key_vitrine', 'vtr999', 'https://linkly.link/vtr999', 'vitrine', null);
+  ('60000000-0000-0000-0000-000000000002', 'linkly_api_key_vitrine', 'vtr999', 'https://linkly.link/vtr999', 'vitrine', '1710'),
+  ('60000000-0000-0000-0000-000000000003', 'linkly_api_key_vitrine', 'vtr888', 'https://linkly.link/vtr888', 'vitrine', '1714');
+
+select public._test_assert(
+  'vitrine COM filial é permitido (3 links de vitrine, um por loja, mesmo workspace)',
+  (select count(*) = 2 from public.linkly_links where tipo = 'vitrine')
+);
 
 reset role;
 reset request.jwt.claim.sub;
@@ -269,19 +278,35 @@ reset role;
 reset request.jwt.claim.sub;
 
 -- ----------------------------------------------------------------------------
--- 5. linkly_cliques_vitrine: só adm/adm_master.
+-- 5. linkly_cliques_vitrine: 3 links (um por loja, mesmo workspace) — adm/
+-- adm_master veem os 3, gerente só o da própria loja.
 -- ----------------------------------------------------------------------------
 
 set role service_role;
-insert into public.linkly_cliques_totais (link_id, total_cliques) values ('60000000-0000-0000-0000-000000000002', 42);
+insert into public.linkly_cliques_totais (link_id, total_cliques) values
+  ('60000000-0000-0000-0000-000000000002', 42),
+  ('60000000-0000-0000-0000-000000000003', 17);
 reset role;
 
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003'; -- gerente 1710
 set role authenticated;
 
 select public._test_assert(
-  'gerente: NAO enxerga linkly_cliques_vitrine',
-  (select count(*) = 0 from public.linkly_cliques_vitrine) = true
+  'gerente 1710: enxerga só a vitrine da própria loja (total 42), não a da 1714',
+  (select count(*) = 1 from public.linkly_cliques_vitrine)
+  and (select total_cliques = 42 from public.linkly_cliques_vitrine where link_id = '60000000-0000-0000-0000-000000000002')
+);
+
+reset role;
+reset request.jwt.claim.sub;
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000005'; -- gerente 1714
+set role authenticated;
+
+select public._test_assert(
+  'gerente 1714: enxerga só a vitrine da própria loja (total 17), não a da 1710',
+  (select count(*) = 1 from public.linkly_cliques_vitrine)
+  and (select total_cliques = 17 from public.linkly_cliques_vitrine where link_id = '60000000-0000-0000-0000-000000000003')
 );
 
 reset role;
@@ -291,8 +316,8 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004'; -- adm_maste
 set role authenticated;
 
 select public._test_assert(
-  'adm_master: enxerga linkly_cliques_vitrine (total 42)',
-  (select total_cliques = 42 from public.linkly_cliques_vitrine where link_id = '60000000-0000-0000-0000-000000000002')
+  'adm_master: enxerga as 2 vitrines cadastradas (todas as lojas)',
+  (select count(*) = 2 from public.linkly_cliques_vitrine)
 );
 
 reset role;

@@ -151,12 +151,14 @@ export function VitrineCard({ vitrine }: { vitrine: CliquesVitrine[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Vitrine (QR comum às lojas)</CardTitle>
+        <CardTitle>Vitrine (grupo de WhatsApp por loja)</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         {vitrine.map((v) => (
           <div key={v.linkId} className="flex items-center justify-between text-sm">
-            <span>{v.shortUrl}</span>
+            <span>
+              {FILIAL_LABELS[v.filial]} · {v.shortUrl}
+            </span>
             <span className="text-muted-foreground">
               {v.totalCliques} cliques · atualizado em {formatarDataHora(v.atualizadoEm)}
             </span>

@@ -27,8 +27,12 @@ export async function cadastrarLink(_prevState: CadastrarLinkState, formData: Fo
   if (tipo !== "vendedor" && tipo !== "vitrine") {
     return { error: "Selecione o tipo do link." };
   }
-  if (tipo === "vendedor" && !(FILIAIS as readonly string[]).includes(filialRaw)) {
-    return { error: "Selecione a loja para um link de vendedor." };
+  // Toda loja tem seu próprio link de vitrine (grupo de WhatsApp da loja) —
+  // não existe mais um link comum às 3, então filial é obrigatória pros dois
+  // tipos (mesma regra que o banco aplica via linkly_links_filial_por_tipo...
+  // renomeada — ver 20260728000002_linkly_vitrine_por_loja.sql).
+  if (!(FILIAIS as readonly string[]).includes(filialRaw)) {
+    return { error: "Selecione a loja." };
   }
   if (!workspaceSecret || !linklyLinkId || !shortUrl) {
     return { error: "Preencha o workspace (nome do secret), o identificador do link e a URL curta." };
@@ -37,7 +41,7 @@ export async function cadastrarLink(_prevState: CadastrarLinkState, formData: Fo
   const supabase = await createClient();
   const { error } = await supabase.from("linkly_links").insert({
     tipo: tipo as "vendedor" | "vitrine",
-    filial: tipo === "vendedor" ? (filialRaw as FilialCvc) : null,
+    filial: filialRaw as FilialCvc,
     workspace_secret: workspaceSecret,
     linkly_link_id: linklyLinkId,
     short_url: shortUrl,
