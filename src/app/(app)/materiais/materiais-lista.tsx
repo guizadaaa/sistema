@@ -1,22 +1,48 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { FileText } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { FileSpreadsheet, FileText, Image as ImageIcon, Link as LinkIcon, type LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { MATERIAL_APOIO_MIME_TYPES } from "@/lib/validation/material-apoio";
-import type { MaterialApoio } from "@/lib/materiais-apoio/listar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { CategoriaMaterialApoio, MaterialApoio } from "@/lib/materiais-apoio/listar";
+import type { TipoMaterialApoio } from "@/lib/supabase/types";
+import { TIPO_MATERIAL_APOIO_LABELS } from "@/lib/validation/material-apoio";
 
-import { enviarMaterialApoio, gerarUrlAssinadaMaterialApoio, type EnviarMaterialApoioState } from "./actions";
+import { excluirMaterialApoio, gerarUrlAssinadaMaterialApoio } from "./actions";
+import { CategoriasSecao } from "./categorias-secao";
+import { EditarMaterialDialog, NovoMaterialForm } from "./material-form";
 
-function BotaoDownload({ material }: { material: MaterialApoio }) {
+const ICONE_POR_TIPO: Record<TipoMaterialApoio, LucideIcon> = {
+  pdf: FileText,
+  docx: FileText,
+  imagem: ImageIcon,
+  xlsx: FileSpreadsheet,
+  link: LinkIcon,
+};
+
+const TODOS = "todos";
+const SEM_CATEGORIA = "sem-categoria";
+
+function BotaoAbrir({ material }: { material: MaterialApoio }) {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | undefined>();
 
+  if (material.tipo === "link" && material.url) {
+    return (
+      <Button asChild variant="outline" size="sm">
+        <a href={material.url} target="_blank" rel="noopener noreferrer">
+          Abrir
+        </a>
+      </Button>
+    );
+  }
+
   const baixar = async () => {
+    if (!material.storage_path) return;
     setCarregando(true);
     setErro(undefined);
     const resultado = await gerarUrlAssinadaMaterialApoio(material.storage_path);
@@ -38,10 +64,94 @@ function BotaoDownload({ material }: { material: MaterialApoio }) {
   );
 }
 
-const initialState: EnviarMaterialApoioState = {};
+function AcoesAdmin({ material, categorias }: { material: MaterialApoio; categorias: CategoriaMaterialApoio[] }) {
+  const [editando, setEditando] = useState(false);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [erro, setErro] = useState<string | undefined>();
+  const [excluindo, startExclusao] = useTransition();
 
-export function MateriaisApoioLista({ materiais, ehAdmin }: { materiais: MaterialApoio[]; ehAdmin: boolean }) {
-  const [state, formAction, isPending] = useActionState(enviarMaterialApoio, initialState);
+  const excluir = () => {
+    setErro(undefined);
+    startExclusao(async () => {
+      const resultado = await excluirMaterialApoio(material.id);
+      if (resultado.error) setErro(resultado.error);
+      else setConfirmandoExclusao(false);
+    });
+  };
+
+  return (
+    <>
+      <Button type="button" variant="ghost" size="sm" onClick={() => setEditando(true)}>
+        Editar
+      </Button>
+      <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setConfirmandoExclusao(true)}>
+        Excluir
+      </Button>
+
+      {editando && (
+        <EditarMaterialDialog material={material} categorias={categorias} aberto={editando} onOpenChange={setEditando} />
+      )}
+
+      <Dialog open={confirmandoExclusao} onOpenChange={setConfirmandoExclusao}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir &ldquo;{material.titulo}&rdquo;?</DialogTitle>
+            <DialogDescription>
+              {material.tipo === "link"
+                ? "O link sai da lista para todos os perfis."
+                : "O registro e o arquivo são apagados definitivamente para todos os perfis."}
+            </DialogDescription>
+          </DialogHeader>
+          {erro && <p className="text-destructive text-sm">{erro}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmandoExclusao(false)} disabled={excluindo}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={excluir} disabled={excluindo}>
+              {excluindo ? "Excluindo..." : "Excluir"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function descricaoOrigem(material: MaterialApoio): string {
+  if (material.tipo !== "link") return material.nome_arquivo ?? "";
+  try {
+    return new URL(material.url ?? "").host;
+  } catch {
+    return material.url ?? "";
+  }
+}
+
+export function MateriaisApoioLista({
+  materiais,
+  categorias,
+  ehAdmin,
+  ehAdmMaster,
+}: {
+  materiais: MaterialApoio[];
+  categorias: CategoriaMaterialApoio[];
+  ehAdmin: boolean;
+  ehAdmMaster: boolean;
+}) {
+  const [filtroTipo, setFiltroTipo] = useState<string>(TODOS);
+  const [filtroCategoria, setFiltroCategoria] = useState<string>(TODOS);
+
+  const nomeCategoria = useMemo(() => new Map(categorias.map((c) => [c.id, c.nome])), [categorias]);
+  const tiposPresentes = useMemo(
+    () => (Object.keys(TIPO_MATERIAL_APOIO_LABELS) as TipoMaterialApoio[]).filter((t) => materiais.some((m) => m.tipo === t)),
+    [materiais]
+  );
+
+  const filtrados = materiais.filter((m) => {
+    if (filtroTipo !== TODOS && m.tipo !== filtroTipo) return false;
+    if (filtroCategoria === SEM_CATEGORIA) return m.categoria_id === null;
+    if (filtroCategoria !== TODOS) return m.categoria_id === filtroCategoria;
+    return true;
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -51,25 +161,74 @@ export function MateriaisApoioLista({ materiais, ehAdmin }: { materiais: Materia
         <CardHeader>
           <CardTitle>Documentos</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          {materiais.length > 0 && (
+            <div className="flex flex-wrap gap-4">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="filtro-tipo">Tipo</Label>
+                <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+                  <SelectTrigger id="filtro-tipo" className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={TODOS}>Todos</SelectItem>
+                    {tiposPresentes.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {TIPO_MATERIAL_APOIO_LABELS[t]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="filtro-categoria">Categoria</Label>
+                <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                  <SelectTrigger id="filtro-categoria" className="w-56">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={TODOS}>Todas</SelectItem>
+                    <SelectItem value={SEM_CATEGORIA}>Sem categoria</SelectItem>
+                    {categorias.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
           {materiais.length === 0 ? (
             <p className="text-muted-foreground text-sm">Nenhum documento enviado ainda.</p>
+          ) : filtrados.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Nenhum material com esses filtros.</p>
           ) : (
             <ul className="flex flex-col gap-2">
-              {materiais.map((m) => (
-                <li key={m.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                  <div className="flex items-center gap-2">
-                    <FileText className="text-muted-foreground size-4 shrink-0" />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">{m.titulo}</span>
-                      <span className="text-muted-foreground text-xs">
-                        {m.nome_arquivo} · {new Date(m.enviado_em).toLocaleDateString("pt-BR")}
-                      </span>
+              {filtrados.map((m) => {
+                const Icone = ICONE_POR_TIPO[m.tipo];
+                const categoria = m.categoria_id ? nomeCategoria.get(m.categoria_id) : undefined;
+                return (
+                  <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Icone className="text-muted-foreground size-4 shrink-0" aria-label={TIPO_MATERIAL_APOIO_LABELS[m.tipo]} />
+                      <div className="flex min-w-0 flex-col">
+                        <span className="text-sm font-medium">{m.titulo}</span>
+                        <span className="text-muted-foreground truncate text-xs">
+                          {[categoria, descricaoOrigem(m), new Date(m.enviado_em).toLocaleDateString("pt-BR")]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <BotaoDownload material={m} />
-                </li>
-              ))}
+                    <div className="flex items-center gap-1">
+                      {ehAdmin && <AcoesAdmin material={m} categorias={categorias} />}
+                      <BotaoAbrir material={m} />
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardContent>
@@ -78,29 +237,15 @@ export function MateriaisApoioLista({ materiais, ehAdmin }: { materiais: Materia
       {ehAdmin && (
         <Card>
           <CardHeader>
-            <CardTitle>Enviar novo documento</CardTitle>
+            <CardTitle>Enviar novo material</CardTitle>
           </CardHeader>
           <CardContent>
-            <form key={materiais.length} action={formAction} className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="titulo">Título</Label>
-                <Input id="titulo" name="titulo" placeholder="Ex.: Manual de atendimento ao cliente" required />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="arquivo">Arquivo (PDF)</Label>
-                <Input id="arquivo" name="arquivo" type="file" accept={MATERIAL_APOIO_MIME_TYPES.join(",")} required />
-              </div>
-
-              {state.error && <p className="text-destructive text-sm">{state.error}</p>}
-
-              <Button type="submit" disabled={isPending} className="w-fit">
-                {isPending ? "Enviando..." : "Enviar documento"}
-              </Button>
-            </form>
+            <NovoMaterialForm categorias={categorias} />
           </CardContent>
         </Card>
       )}
+
+      {ehAdmMaster && <CategoriasSecao categorias={categorias} />}
     </div>
   );
 }

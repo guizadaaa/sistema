@@ -30,6 +30,7 @@ export type TipoDocumentoAnexo =
   | "outro";
 export type AcaoAuditoria = "insert" | "update" | "delete" | "download_signed_url";
 export type TipoNotificacao = "prazo_vencendo" | "caso_novo" | "delegacao_expirando";
+export type TipoMaterialApoio = "pdf" | "imagem" | "docx" | "xlsx" | "link";
 
 export interface Database {
   public: {
@@ -302,19 +303,48 @@ export interface Database {
         Row: {
           id: string;
           titulo: string;
-          storage_path: string;
-          nome_arquivo: string;
+          tipo: TipoMaterialApoio;
+          // storage_path/nome_arquivo só pra arquivo, url só pra link
+          // (constraint materiais_apoio_tipo_coerente).
+          storage_path: string | null;
+          nome_arquivo: string | null;
+          url: string | null;
+          categoria_id: string | null;
           enviado_por: string;
           enviado_em: string;
+          atualizado_por: string | null;
+          atualizado_em: string | null;
         };
         Insert: {
           titulo: string;
-          storage_path: string;
-          nome_arquivo: string;
+          tipo: TipoMaterialApoio;
+          storage_path?: string | null;
+          nome_arquivo?: string | null;
+          url?: string | null;
+          categoria_id?: string | null;
         };
-        // Sem UPDATE previsto — ver nota em anexos.Update.
+        // atualizado_por/_em são preenchidos pelo trigger materiais_apoio_set_atualizado.
         Update: Partial<{
           titulo: string;
+          tipo: TipoMaterialApoio;
+          storage_path: string | null;
+          nome_arquivo: string | null;
+          url: string | null;
+          categoria_id: string | null;
+        }>;
+        Relationships: [];
+      };
+      materiais_apoio_categorias: {
+        Row: {
+          id: string;
+          nome: string;
+          criado_em: string;
+        };
+        Insert: {
+          nome: string;
+        };
+        Update: Partial<{
+          nome: string;
         }>;
         Relationships: [];
       };

@@ -11,7 +11,8 @@
 --   4. Vendedor (qualquer filial) CONSEGUE ver e listar os materiais —
 --      sem nenhum recorte de filial/dono, ao contrário de casos.
 --   5. Gerente também consegue ver (mesma regra "qualquer perfil ativo").
---   6. Sem UPDATE/DELETE — nenhuma policy pra nenhum dos dois.
+--   6. Vendedor NÃO consegue editar nem excluir (UPDATE/DELETE de admin,
+--      categorias e tipos novos: ver 16_assertions_materiais_apoio_extensao.sql).
 -- ============================================================================
 
 set role postgres;
@@ -33,8 +34,8 @@ $$;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
 set role authenticated;
 
-insert into public.materiais_apoio (id, titulo, storage_path, nome_arquivo, enviado_por) values (
-  '30000000-0000-0000-0000-000000000001', 'Manual de atendimento', 'manual-atendimento.pdf', 'manual-atendimento.pdf',
+insert into public.materiais_apoio (id, titulo, tipo, storage_path, nome_arquivo, enviado_por) values (
+  '30000000-0000-0000-0000-000000000001', 'Manual de atendimento', 'pdf', 'manual-atendimento.pdf', 'manual-atendimento.pdf',
   '00000000-0000-0000-0000-000000000002'
 );
 
@@ -66,8 +67,8 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 set role authenticated;
 
 \set ON_ERROR_STOP 0
-insert into public.materiais_apoio (titulo, storage_path, nome_arquivo) values (
-  'tentativa vendedor', 'tentativa.pdf', 'tentativa.pdf'
+insert into public.materiais_apoio (titulo, tipo, storage_path, nome_arquivo) values (
+  'tentativa vendedor', 'pdf', 'tentativa.pdf', 'tentativa.pdf'
 );
 \set ON_ERROR_STOP 1
 
@@ -115,32 +116,24 @@ reset role;
 reset request.jwt.claim.sub;
 
 -- ----------------------------------------------------------------------------
--- Sem UPDATE/DELETE — nenhuma policy pra nenhum dos dois.
+-- Vendedor NÃO edita nem exclui — UPDATE/DELETE só pra admin. Sem policy
+-- que case, o Postgres filtra as linhas em silêncio (0 afetadas) em vez de
+-- lançar erro, então a checagem é pelo estado da linha depois.
 -- ----------------------------------------------------------------------------
 
-set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 set role authenticated;
 
-\set ON_ERROR_STOP 0
 update public.materiais_apoio set titulo = 'editado' where id = '30000000-0000-0000-0000-000000000001';
-\set ON_ERROR_STOP 1
-
-select public._test_assert(
-  'nenhum UPDATE permitido em materiais_apoio (sem policy de update)',
-  :'ERROR' = 'true'
-);
-
-\set ON_ERROR_STOP 0
 delete from public.materiais_apoio where id = '30000000-0000-0000-0000-000000000001';
-\set ON_ERROR_STOP 1
-
-select public._test_assert(
-  'nenhum DELETE permitido em materiais_apoio (sem policy de delete)',
-  :'ERROR' = 'true'
-);
 
 reset role;
 reset request.jwt.claim.sub;
+
+select public._test_assert(
+  'vendedor: NAO consegue editar nem excluir material de apoio',
+  (select titulo = 'Manual de atendimento' from public.materiais_apoio where id = '30000000-0000-0000-0000-000000000001')
+);
 
 select 'todos os asserts de materiais_apoio passaram' as status;
 
