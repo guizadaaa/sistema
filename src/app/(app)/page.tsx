@@ -9,10 +9,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { STATUS_LABELS } from "@/lib/labels";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 import { StatTile } from "@/components/stat-tile";
+import { Paginacao } from "@/components/paginacao";
+import { paginar } from "@/lib/paginacao";
 
-export default async function HomePage() {
+const PARADOS_POR_PAGINA = 10;
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const usuario = await requireCurrentUser();
   const metricas = await carregarMetricasDashboard();
+  const sp = await searchParams;
+  const parados = paginar(metricas.casosParados, sp.parados, PARADOS_POR_PAGINA);
 
   return (
     <div className="flex flex-col gap-4">
@@ -68,10 +78,10 @@ export default async function HomePage() {
         <Card>
           <CardHeader>
             <CardTitle>Parados há mais tempo</CardTitle>
-            <CardDescription>Casos com mais tempo na etapa atual</CardDescription>
+            <CardDescription>Casos não resolvidos com mais tempo na etapa atual</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            {metricas.casosParados.length === 0 ? (
+            {parados.itens.length === 0 ? (
               <p className="text-muted-foreground text-sm">Nenhum caso encontrado.</p>
             ) : (
               <table className="w-full text-sm">
@@ -84,7 +94,7 @@ export default async function HomePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {metricas.casosParados.map((c) => (
+                  {parados.itens.map((c) => (
                     <tr key={c.id} className="border-b last:border-0 hover:bg-accent/50">
                       <td className="py-2 pr-4">
                         <Link href={`/casos/${c.id}`} className="font-medium hover:underline">
@@ -101,6 +111,11 @@ export default async function HomePage() {
                 </tbody>
               </table>
             )}
+            <Paginacao
+              pagina={parados.pagina}
+              totalPaginas={parados.totalPaginas}
+              hrefPagina={(n) => (n === 1 ? "/" : `/?parados=${n}`)}
+            />
           </CardContent>
         </Card>
       </div>

@@ -21,8 +21,51 @@ export type MetricasDashboard = {
   porStatus: Record<StatusCaso, number>;
   prazoVencidos: number;
   prazoVencendo: number;
+  /** Todos os casos não resolvidos, do mais parado ao menos — a paginação é da tela (ver paginar()). */
   casosParados: CasoParado[];
 };
+
+type CasoResumo = {
+  id: string;
+  protocolo: number;
+  cliente_nome: string;
+  status_atual: StatusCaso;
+};
+
+type HistoricoComDuracao = { caso_id: string; entrou_em: string; duracao: string };
+
+/**
+ * Ordena pelo tempo na etapa ATUAL (agora - entrou_em do status vigente,
+ * que zera a cada mudança de status). "Resolvido" sai só desta lista — um
+ * caso encerrado não está parado — mas continua contando em total/porStatus.
+ */
+export function ordenarCasosParados(lista: CasoResumo[], historico: HistoricoComDuracao[]): CasoParado[] {
+  // A primeira ocorrência de cada caso_id (ordenado desc por entrou_em) é a
+  // etapa atual — status_historico_com_duracao já calcula "agora - entrou_em"
+  // para ela (coalesce em 20260716000001_schema.sql).
+  const duracaoAtualPorCaso = new Map<string, string>();
+  for (const h of [...historico].sort((a, b) => (a.entrou_em < b.entrou_em ? 1 : a.entrou_em > b.entrou_em ? -1 : 0))) {
+    if (!duracaoAtualPorCaso.has(h.caso_id)) {
+      duracaoAtualPorCaso.set(h.caso_id, h.duracao);
+    }
+  }
+
+  return lista
+    .filter((c) => c.status_atual !== "resolvido")
+    .map((c) => {
+      const duracao = duracaoAtualPorCaso.get(c.id);
+      return {
+        id: c.id,
+        protocolo: c.protocolo,
+        clienteNome: c.cliente_nome,
+        statusAtual: c.status_atual,
+        duracaoDias: duracao ? duracaoEmDiasFracionarios(duracao) : 0,
+        duracaoTexto: duracao ? formatarDuracaoEmDias(duracao) : "—",
+      };
+    })
+    .sort((a, b) => b.duracaoDias - a.duracaoDias)
+    .map(({ duracaoDias: _duracaoDias, ...resto }) => resto);
+}
 
 /**
  * Mesmo escopo de dados de Acompanhar Casos — a RLS já decide o que cada
@@ -62,31 +105,7 @@ export async function carregarMetricasDashboard(): Promise<MetricasDashboard> {
     .order("entrou_em", { ascending: false });
   if (historicoError) throw historicoError;
 
-  // A primeira ocorrência de cada caso_id (ordenado desc por entrou_em) é a
-  // etapa atual — status_historico_com_duracao já calcula "agora - entrou_em"
-  // para ela (coalesce em 20260716000001_schema.sql).
-  const duracaoAtualPorCaso = new Map<string, string>();
-  for (const h of historico ?? []) {
-    if (!duracaoAtualPorCaso.has(h.caso_id)) {
-      duracaoAtualPorCaso.set(h.caso_id, h.duracao);
-    }
-  }
-
-  const casosParados = lista
-    .map((c) => {
-      const duracao = duracaoAtualPorCaso.get(c.id);
-      return {
-        id: c.id,
-        protocolo: c.protocolo,
-        clienteNome: c.cliente_nome,
-        statusAtual: c.status_atual,
-        duracaoDias: duracao ? duracaoEmDiasFracionarios(duracao) : 0,
-        duracaoTexto: duracao ? formatarDuracaoEmDias(duracao) : "—",
-      };
-    })
-    .sort((a, b) => b.duracaoDias - a.duracaoDias)
-    .slice(0, 10)
-    .map(({ duracaoDias: _duracaoDias, ...resto }) => resto);
+  const casosParados = ordenarCasosParados(lista, historico ?? []);
 
   return { total: lista.length, porStatus, prazoVencidos, prazoVencendo, casosParados };
 }
