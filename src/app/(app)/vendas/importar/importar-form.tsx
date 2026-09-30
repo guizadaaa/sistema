@@ -53,11 +53,22 @@ export function ImportarForm() {
           {state.error && <p className="text-destructive text-sm">{state.error}</p>}
 
           {state.resultado && (
-            <p className="text-sm">
-              Importação concluída: <strong>{state.resultado.novas}</strong> nova(s),{" "}
-              <strong>{state.resultado.atualizadas}</strong> atualizada(s), {state.resultado.ignoradas} linha(s)
-              ignorada(s) (rodapé/dados incompletos).
-            </p>
+            <div className="flex flex-col gap-2 text-sm">
+              <p>
+                Importação concluída: <strong>{state.resultado.novas}</strong> nova(s),{" "}
+                <strong>{state.resultado.atualizadas}</strong> atualizada(s).
+              </p>
+              {state.resultado.avisos.length > 0 && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                  <p className="font-medium">{state.resultado.avisos.length} linha(s) não importada(s):</p>
+                  <ul className="mt-1 list-disc pl-5">
+                    {state.resultado.avisos.map((aviso) => (
+                      <li key={aviso}>{aviso}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           )}
 
           <Button type="submit" disabled={isPending} className="w-fit">

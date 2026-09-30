@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
-import { importarVendasPlanilha, type ResultadoImportacaoVendas } from "@/lib/vendas/importar";
+import { ErroImportacaoVendas, importarVendasPlanilha, type ResultadoImportacaoVendas } from "@/lib/vendas/importar";
 import { FILIAIS } from "@/lib/validation/caso";
 import type { FilialCvc } from "@/lib/supabase/types";
 
@@ -47,9 +47,11 @@ export async function importarVendas(_prevState: ImportarVendasState, formData: 
     return { resultado };
   } catch (erro) {
     console.error("Erro ao importar vendas:", erro);
-    const mensagem = erro instanceof Error ? erro.message : undefined;
-    // Mensagens de localizarColunas() já vêm escritas pra humanos — as demais
-    // (erro de banco, arquivo corrompido) caem no genérico.
-    return { error: mensagem?.includes("fora do formato esperado") ? mensagem : "Não foi possível importar o arquivo. Verifique se é o .xlsx exportado pela CVC." };
+    // ErroImportacaoVendas já traz a causa real escrita pra humanos (coluna
+    // faltando, arquivo ilegível, erro de banco) — qualquer outra coisa é
+    // inesperada, mas a mensagem original ainda ajuda mais que um genérico.
+    if (erro instanceof ErroImportacaoVendas) return { error: erro.message };
+    const detalhe = erro instanceof Error ? erro.message : String(erro);
+    return { error: `Erro inesperado ao importar o arquivo: ${detalhe}` };
   }
 }
