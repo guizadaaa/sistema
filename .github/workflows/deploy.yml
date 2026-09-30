@@ -2,7 +2,7 @@ name: Deploy Supabase
 
 on:
   push:
-    branches: [main]
+    branches: [claude/new-session-x4vojn]
   workflow_dispatch:
 
 jobs:
