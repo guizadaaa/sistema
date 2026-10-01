@@ -82,3 +82,10 @@ export function prazoNaResolucao(prazoVigencia: string, resolvidoEm: string): Pr
 export function descricaoDias(dias: number): string {
   return `${dias} dia${dias === 1 ? "" : "s"}`;
 }
+
+/** Texto combinado pra badge de resolvido: "Resolvido 10 dias antes"/"Resolvido 1 dia depois"/"Resolvido no prazo". */
+export function descricaoResolucao(antesDoPrazo: boolean, dias: number): string {
+  if (dias === 0) return "Resolvido no prazo";
+  const unidade = dias === 1 ? "dia" : "dias";
+  return `Resolvido ${dias} ${unidade} ${antesDoPrazo ? "antes" : "depois"}`;
+}

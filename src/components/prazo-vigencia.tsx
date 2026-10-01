@@ -1,10 +1,11 @@
+import { Badge } from "@/components/ui/badge";
 import {
   corPrazoVigencia,
-  descricaoDias,
   descricaoDiasAteVencimento,
+  descricaoResolucao,
   prazoNaResolucao,
 } from "@/lib/casos/prazo";
-import { PRAZO_COR_TEXT_CLASSES } from "@/lib/prazo-colors";
+import { PRAZO_COR_BADGE_CLASSES } from "@/lib/prazo-colors";
 import type { StatusCaso } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 
@@ -13,10 +14,13 @@ function formatarPrazo(prazoVigencia: string): string {
 }
 
 /**
- * Célula "Prazo de vigência" das listas. Caso Resolvido compara o prazo com
- * a data de resolução (o relógio para ali): "Resolvido antes/depois do
- * prazo" + distância em dias. Demais status (ou Resolvido sem data de
- * resolução conhecida) seguem comparando com hoje.
+ * Célula "Prazo de vigência" das listas. A data em si fica neutra (sem cor)
+ * — só a situação, abaixo, carrega a cor, no mesmo estilo "pill" dos badges
+ * de status (fundo suave + texto), para não competir visualmente com eles.
+ *
+ * Caso Resolvido compara o prazo com a data de resolução (o relógio para
+ * ali): "Resolvido X dias antes/depois". Demais status (ou Resolvido sem
+ * data de resolução conhecida) seguem comparando com hoje.
  */
 export function PrazoVigencia({
   prazoVigencia,
@@ -30,20 +34,21 @@ export function PrazoVigencia({
   if (statusAtual === "resolvido" && resolvidoEm) {
     const { antesDoPrazo, dias } = prazoNaResolucao(prazoVigencia, resolvidoEm);
     return (
-      <div
-        className={cn("flex flex-col", PRAZO_COR_TEXT_CLASSES[antesDoPrazo ? "verde" : "vermelho"])}
-        title={`Prazo de vigência: ${formatarPrazo(prazoVigencia)}`}
-      >
-        <span className="font-medium">{antesDoPrazo ? "Resolvido antes do prazo" : "Resolvido depois do prazo"}</span>
-        <span className="text-xs">{descricaoDias(dias)}</span>
+      <div className="flex flex-col gap-0.5" title={`Prazo de vigência: ${formatarPrazo(prazoVigencia)}`}>
+        <span className="font-medium">{formatarPrazo(prazoVigencia)}</span>
+        <Badge className={cn("w-fit", PRAZO_COR_BADGE_CLASSES[antesDoPrazo ? "verde" : "vermelho"])}>
+          {descricaoResolucao(antesDoPrazo, dias)}
+        </Badge>
       </div>
     );
   }
 
   return (
-    <div className={cn("flex flex-col", PRAZO_COR_TEXT_CLASSES[corPrazoVigencia(prazoVigencia)])}>
+    <div className="flex flex-col gap-0.5">
       <span className="font-medium">{formatarPrazo(prazoVigencia)}</span>
-      <span className="text-xs">{descricaoDiasAteVencimento(prazoVigencia)}</span>
+      <Badge className={cn("w-fit", PRAZO_COR_BADGE_CLASSES[corPrazoVigencia(prazoVigencia)])}>
+        {descricaoDiasAteVencimento(prazoVigencia)}
+      </Badge>
     </div>
   );
 }
