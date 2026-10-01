@@ -159,3 +159,28 @@ describe("listarCasos — casos de teste", () => {
     expect(resultado.map((c) => c.id).sort()).toEqual(["c1", "c2", "c3"]);
   });
 });
+
+describe("listarCasos — data de resolução", () => {
+  it("caso Resolvido recebe resolvidoEm = entrada mais recente em Resolvido; demais ficam null", async () => {
+    createClientMock.mockResolvedValue(
+      criarSupabaseFake({
+        casos: [{ ...CASOS_FIXTURE[0], status_atual: "resolvido" }, CASOS_FIXTURE[1]],
+        casos_contratos_adicionais: [],
+        usuarios: USUARIOS_FIXTURE,
+        status_historico: [
+          // Resolvido, reaberto e resolvido de novo — vale a resolução vigente (a mais recente).
+          { caso_id: "c1", status: "resolvido", entrou_em: "2026-08-01T15:00:00Z" },
+          { caso_id: "c1", status: "reavaliacao", entrou_em: "2026-08-05T15:00:00Z" },
+          { caso_id: "c1", status: "resolvido", entrou_em: "2026-08-10T15:00:00Z" },
+          { caso_id: "c2", status: "resolvido", entrou_em: "2026-07-01T15:00:00Z" },
+        ],
+      })
+    );
+
+    const resultado = await listarCasos({});
+
+    expect(resultado.find((c) => c.id === "c1")?.resolvidoEm).toBe("2026-08-10T15:00:00Z");
+    // c2 não está Resolvido hoje (status_atual inicial) — histórico antigo não conta.
+    expect(resultado.find((c) => c.id === "c2")?.resolvidoEm).toBeNull();
+  });
+});

@@ -49,3 +49,36 @@ export function descricaoDiasAteVencimento(prazoVigencia: string, hoje: Date = n
   const dias = Math.abs(diffDias);
   return `Vencido há ${dias} dia${dias === 1 ? "" : "s"}`;
 }
+
+/** Data civil (yyyy-mm-dd) de um timestamptz no fuso da operação — evita virar o dia por causa de UTC no servidor. */
+export function dataLocalSaoPaulo(instante: string | Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(instante));
+}
+
+export type PrazoResolvido = {
+  /** Resolvido no próprio dia do prazo conta como antes (dentro) do prazo. */
+  antesDoPrazo: boolean;
+  /** Sempre >= 0: distância em dias entre a resolução e o prazo, no sentido de `antesDoPrazo`. */
+  dias: number;
+};
+
+/**
+ * Para caso Resolvido o relógio para na resolução: compara prazo_vigencia
+ * com a data em que o caso entrou em Resolvido, nunca com hoje — senão um
+ * caso resolvido dentro do prazo "vence" dias depois de encerrado.
+ */
+export function prazoNaResolucao(prazoVigencia: string, resolvidoEm: string): PrazoResolvido {
+  const prazo = Date.parse(`${prazoVigencia}T00:00:00Z`);
+  const resolucao = Date.parse(`${dataLocalSaoPaulo(resolvidoEm)}T00:00:00Z`);
+  const diff = Math.round((prazo - resolucao) / (1000 * 60 * 60 * 24));
+  return { antesDoPrazo: diff >= 0, dias: Math.abs(diff) };
+}
+
+export function descricaoDias(dias: number): string {
+  return `${dias} dia${dias === 1 ? "" : "s"}`;
+}

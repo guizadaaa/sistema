@@ -16,6 +16,8 @@ const CASO_ATENCAO: CasoAtencaoPrazo = {
   vendedorNome: "Vendedor Um",
   prazoVigencia: "2026-01-01",
   situacao: "vencido",
+  statusAtual: "inicial",
+  resolvidoEm: null,
 };
 
 const METRICAS_FIXTURE: MetricasPainel = {

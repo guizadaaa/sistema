@@ -10,14 +10,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PrazoVigencia } from "@/components/prazo-vigencia";
 import { StatTile } from "@/components/stat-tile";
-import { corPrazoVigencia, descricaoDiasAteVencimento } from "@/lib/casos/prazo";
-import { formatarDataBr, formatarDias, formatarMoeda } from "@/lib/formatacao";
+import { formatarDias, formatarMoeda } from "@/lib/formatacao";
 import { FILIAL_LABELS, QUEM_PAGA_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { carregarMetricasPainel, listarVendedoresParaFiltro, STATUS_ORDEM } from "@/lib/painel/metricas";
-import { PRAZO_COR_TEXT_CLASSES } from "@/lib/prazo-colors";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
-import { cn } from "@/lib/utils";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 import type { FilialCvc } from "@/lib/supabase/types";
 
@@ -418,10 +416,7 @@ export default async function PainelPage({
                     <td className="py-2 pr-4">{c.clienteNome}</td>
                     <td className="py-2 pr-4">{c.vendedorNome}</td>
                     <td className="py-2 pr-4">
-                      <div className={cn("flex flex-col", PRAZO_COR_TEXT_CLASSES[corPrazoVigencia(c.prazoVigencia)])}>
-                        <span className="font-medium">{formatarDataBr(c.prazoVigencia)}</span>
-                        <span className="text-xs">{descricaoDiasAteVencimento(c.prazoVigencia)}</span>
-                      </div>
+                      <PrazoVigencia prazoVigencia={c.prazoVigencia} statusAtual={c.statusAtual} resolvidoEm={c.resolvidoEm} />
                     </td>
                   </tr>
                 ))}

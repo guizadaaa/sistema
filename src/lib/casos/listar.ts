@@ -1,5 +1,6 @@
 import "server-only";
 
+import { carregarResolvidoEm } from "@/lib/casos/resolucao";
 import { createClient } from "@/lib/supabase/server";
 import { somenteDigitos } from "@/lib/validation/cpf";
 import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
@@ -34,6 +35,8 @@ export type CasoListado = {
   vendedor_dono: string;
   donoNome: string;
   caso_teste: boolean;
+  /** Só preenchido para status Resolvido — data em que entrou em Resolvido (ver carregarResolvidoEm). */
+  resolvidoEm: string | null;
 };
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -170,9 +173,14 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   if (donosError) throw donosError;
 
   const nomesPorId = new Map((donos ?? []).map((d) => [d.id, d.nome_completo]));
+  const resolvidoEm = await carregarResolvidoEm(
+    supabase,
+    casos.filter((c) => c.status_atual === "resolvido").map((c) => c.id)
+  );
 
   return casos.map((c) => ({
     ...c,
     donoNome: nomesPorId.get(c.vendedor_dono) ?? "—",
+    resolvidoEm: c.status_atual === "resolvido" ? (resolvidoEm.get(c.id) ?? null) : null,
   }));
 }
