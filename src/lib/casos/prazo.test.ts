@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { corPrazoVigencia, descricaoDiasAteVencimento, diasAteVencimento, situacaoPrazoVigencia } from "./prazo";
+import {
+  corPrazoVigencia,
+  descricaoDiasAteVencimento,
+  diasAteVencimento,
+  prazoNaResolucao,
+  situacaoPrazoVigencia,
+} from "./prazo";
 
 const HOJE = new Date(2026, 6, 25); // 25/07/2026
 
@@ -76,5 +82,37 @@ describe("descricaoDiasAteVencimento", () => {
   it("vencido há N dias (singular e plural)", () => {
     expect(descricaoDiasAteVencimento(dataEmDias(-1), HOJE)).toBe("Vencido há 1 dia");
     expect(descricaoDiasAteVencimento(dataEmDias(-5), HOJE)).toBe("Vencido há 5 dias");
+  });
+});
+
+describe("prazoNaResolucao", () => {
+  it("resolvido antes do prazo: dias = prazo - resolução", () => {
+    expect(prazoNaResolucao("2026-08-20", "2026-08-10T15:00:00Z")).toEqual({ antesDoPrazo: true, dias: 10 });
+  });
+
+  it("resolvido depois do prazo: dias = resolução - prazo", () => {
+    expect(prazoNaResolucao("2026-08-20", "2026-08-23T15:00:00Z")).toEqual({ antesDoPrazo: false, dias: 3 });
+  });
+
+  it("resolvido no próprio dia do prazo conta como antes (0 dias)", () => {
+    expect(prazoNaResolucao("2026-08-20", "2026-08-20T23:00:00Z")).toEqual({ antesDoPrazo: true, dias: 0 });
+  });
+
+  it("um dia depois do prazo já é depois (1 dia)", () => {
+    expect(prazoNaResolucao("2026-08-20", "2026-08-21T12:00:00Z")).toEqual({ antesDoPrazo: false, dias: 1 });
+  });
+
+  it("usa o dia em São Paulo: 01:30 UTC do dia 21 ainda é dia 20 em Brasília", () => {
+    expect(prazoNaResolucao("2026-08-20", "2026-08-21T01:30:00Z")).toEqual({ antesDoPrazo: true, dias: 0 });
+  });
+
+  it("o relógio para na resolução — não depende de hoje", () => {
+    // Resolvido 5 dias antes de um prazo que já passou há muito tempo.
+    expect(prazoNaResolucao("2025-01-10", "2025-01-05T12:00:00Z")).toEqual({ antesDoPrazo: true, dias: 5 });
+  });
+
+  it("conta dias certos atravessando virada de mês e horário de verão", () => {
+    expect(prazoNaResolucao("2026-03-02", "2026-02-20T12:00:00Z")).toEqual({ antesDoPrazo: true, dias: 10 });
+    expect(prazoNaResolucao("2025-10-31", "2026-01-05T12:00:00Z")).toEqual({ antesDoPrazo: false, dias: 66 });
   });
 });

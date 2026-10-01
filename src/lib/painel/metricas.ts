@@ -2,6 +2,7 @@ import "server-only";
 
 import { duracaoEmDiasFracionarios } from "@/lib/casos/duracao";
 import { diasAteVencimento, situacaoPrazoVigencia } from "@/lib/casos/prazo";
+import { carregarResolvidoEm } from "@/lib/casos/resolucao";
 import { STATUS_ORDEM } from "@/lib/casos/status";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 import { createClient } from "@/lib/supabase/server";
@@ -40,6 +41,9 @@ export type CasoAtencaoPrazo = {
   vendedorNome: string;
   prazoVigencia: string;
   situacao: "vencido" | "vencendo";
+  statusAtual: StatusCaso;
+  /** Só para Resolvido — o badge de prazo compara com a resolução, não com hoje. */
+  resolvidoEm: string | null;
 };
 
 /**
@@ -268,11 +272,20 @@ export async function carregarMetricasPainel(filtros: FiltrosPainel = {}): Promi
         vendedorNome: nomesPorVendedor.get(c.vendedor_dono) ?? "—",
         prazoVigencia: c.prazo_vigencia,
         situacao,
+        statusAtual: c.status_atual,
+        resolvidoEm: null,
         diasAteVencimento: diasAteVencimento(c.prazo_vigencia),
       });
     }
   }
   casosAtencaoPrazo.sort((a, b) => a.diasAteVencimento - b.diasAteVencimento);
+  const resolvidoEmAtencao = await carregarResolvidoEm(
+    supabase,
+    casosAtencaoPrazo.filter((c) => c.statusAtual === "resolvido").map((c) => c.id)
+  );
+  for (const c of casosAtencaoPrazo) {
+    if (c.statusAtual === "resolvido") c.resolvidoEm = resolvidoEmAtencao.get(c.id) ?? null;
+  }
 
   // implicacoes/desfechos não têm filial/vendedor_dono — o recorte por
   // filtro passa pelos ids de `lista` (já filtrada acima), não por uma

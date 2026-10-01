@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
 
+import { PrazoVigencia } from "@/components/prazo-vigencia";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,11 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FILIAL_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
-import { corPrazoVigencia, descricaoDiasAteVencimento } from "@/lib/casos/prazo";
 import { STATUS_ORDEM } from "@/lib/casos/status";
-import { PRAZO_COR_TEXT_CLASSES } from "@/lib/prazo-colors";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
-import { cn } from "@/lib/utils";
 import type { CasoListado } from "@/lib/casos/listar";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
@@ -195,35 +193,31 @@ export function CasosLista({
                 </tr>
               </thead>
               <tbody>
-                {casos.map((c) => {
-                  const cor = corPrazoVigencia(c.prazo_vigencia);
-                  return (
-                    <tr key={c.id} className="border-b last:border-0 hover:bg-accent/50">
-                      <td className="py-2 pr-4">
-                        <div className="flex items-center gap-2">
-                          <Link href={`/casos/${c.id}`} className="font-medium hover:underline">
-                            #{c.protocolo}
-                          </Link>
-                          {c.caso_teste && <Badge variant="outline">Teste</Badge>}
-                        </div>
-                      </td>
-                      <td className="py-2 pr-4">{TIPO_CASO_LABELS[c.tipo_caso]}</td>
-                      <td className="py-2 pr-4">{c.cliente_nome}</td>
-                      <td className="py-2 pr-4">{c.donoNome}</td>
-                      <td className="py-2 pr-4">
-                        <Badge className={STATUS_BADGE_CLASSES[c.status_atual]}>{STATUS_LABELS[c.status_atual]}</Badge>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <div className={cn("flex flex-col", PRAZO_COR_TEXT_CLASSES[cor])}>
-                          <span className="font-medium">
-                            {new Date(`${c.prazo_vigencia}T00:00:00`).toLocaleDateString("pt-BR")}
-                          </span>
-                          <span className="text-xs">{descricaoDiasAteVencimento(c.prazo_vigencia)}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {casos.map((c) => (
+                  <tr key={c.id} className="border-b last:border-0 hover:bg-accent/50">
+                    <td className="py-2 pr-4">
+                      <div className="flex items-center gap-2">
+                        <Link href={`/casos/${c.id}`} className="font-medium hover:underline">
+                          #{c.protocolo}
+                        </Link>
+                        {c.caso_teste && <Badge variant="outline">Teste</Badge>}
+                      </div>
+                    </td>
+                    <td className="py-2 pr-4">{TIPO_CASO_LABELS[c.tipo_caso]}</td>
+                    <td className="py-2 pr-4">{c.cliente_nome}</td>
+                    <td className="py-2 pr-4">{c.donoNome}</td>
+                    <td className="py-2 pr-4">
+                      <Badge className={STATUS_BADGE_CLASSES[c.status_atual]}>{STATUS_LABELS[c.status_atual]}</Badge>
+                    </td>
+                    <td className="py-2 pr-4">
+                      <PrazoVigencia
+                        prazoVigencia={c.prazo_vigencia}
+                        statusAtual={c.status_atual}
+                        resolvidoEm={c.resolvidoEm}
+                      />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
