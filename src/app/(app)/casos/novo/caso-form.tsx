@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { ANEXO_TIPO_LABELS, MOTIVO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import type { DonoElegivel } from "@/lib/casos/dono-elegivel";
 import { cpfValido, formatarCpf, somenteDigitos } from "@/lib/validation/cpf";
@@ -23,6 +22,7 @@ import {
 import type { PerfilUsuario, TipoCaso } from "@/lib/supabase/types";
 
 import { criarCaso, type CasoFormValores, type CriarCasoState } from "./actions";
+import { DescricaoComImagens } from "./descricao-com-imagens";
 
 const initialState: CriarCasoState = {};
 
@@ -497,7 +497,7 @@ function CasoFormCampos({
       {(exigeMotivoDescricao || exigeSoDescricao) && (
         <div className="flex flex-col gap-2">
           <Label htmlFor="descricao">Descrição</Label>
-          <Textarea
+          <DescricaoComImagens
             id="descricao"
             name="descricao"
             required

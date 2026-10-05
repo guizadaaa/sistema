@@ -27,7 +27,10 @@ export type TipoDocumentoAnexo =
   | "carta_cancelamento"
   | "atestado_saude"
   | "certidao_obito"
-  | "outro";
+  | "outro"
+  // Imagem colada na Descrição ao criar o caso — mostrada abaixo da
+  // Descrição, fora da lista de Anexos (20261006000001).
+  | "imagem_descricao";
 export type AcaoAuditoria = "insert" | "update" | "delete" | "download_signed_url";
 export type TipoNotificacao = "prazo_vencendo" | "caso_novo" | "delegacao_expirando";
 export type TipoMaterialApoio = "pdf" | "imagem" | "docx" | "xlsx" | "link";

@@ -45,6 +45,7 @@ export const ANEXO_TIPO_LABELS: Record<TipoDocumentoAnexo, string> = {
   atestado_saude: "Atestado de saúde",
   certidao_obito: "Certidão de óbito",
   outro: "Outro",
+  imagem_descricao: "Imagem da descrição",
 };
 
 export const STATUS_LABELS: Record<StatusCaso, string> = {

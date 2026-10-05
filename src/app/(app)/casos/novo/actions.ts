@@ -4,7 +4,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
-import { validarEEnviarAnexos } from "@/lib/casos/anexos";
+import { enviarImagensDescricao, validarEEnviarAnexos } from "@/lib/casos/anexos";
 import { validarEInserirContratosAdicionais } from "@/lib/casos/contratos-adicionais";
 import { casoSchema, tiposCasoPermitidos } from "@/lib/validation/caso";
 
@@ -178,7 +178,10 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     return { error: analisado.error, fieldErrors: analisado.fieldErrors, valores: valoresSubmetidos };
   }
 
-  const avisosAnexos = await validarEEnviarAnexos(supabase, data.id, formData);
+  const avisosAnexos = [
+    ...(await enviarImagensDescricao(supabase, data.id, formData)),
+    ...(await validarEEnviarAnexos(supabase, data.id, formData)),
+  ];
   const avisosContratos = await validarEInserirContratosAdicionais(supabase, data.id, formData);
 
   return {

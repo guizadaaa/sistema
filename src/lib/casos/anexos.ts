@@ -3,7 +3,13 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import type { createClient } from "@/lib/supabase/server";
-import { ANEXO_MIME_TYPES, ANEXO_TAMANHO_MAXIMO_BYTES, ANEXO_TIPOS_DOCUMENTO } from "@/lib/validation/caso";
+import {
+  ANEXO_MIME_TYPES,
+  ANEXO_TAMANHO_MAXIMO_BYTES,
+  ANEXO_TIPOS_DOCUMENTO,
+  DESCRICAO_IMAGEM_MIME_TYPES,
+  DESCRICAO_IMAGENS_MAXIMO,
+} from "@/lib/validation/caso";
 import type { TipoDocumentoAnexo } from "@/lib/supabase/types";
 
 export function isTipoDocumentoAnexo(valor: string): valor is TipoDocumentoAnexo {
@@ -71,6 +77,60 @@ export async function validarEEnviarAnexos(
     if (insertError) {
       console.error("Erro ao registrar anexo:", insertError);
       avisos.push(`${arquivo.name}: enviado mas não registrado, tente novamente na tela do caso.`);
+    }
+  }
+
+  return avisos;
+}
+
+/**
+ * Imagens coladas na Descrição (formData.getAll("descricaoImagem")). Viram
+ * anexos com tipo_documento "imagem_descricao" no mesmo bucket e na mesma
+ * convenção de path dos anexos — herdam RLS, Storage, auditoria e retenção
+ * (ver 20261006000001). Mesmo melhor-esforço de validarEEnviarAnexos: falha
+ * numa imagem vira aviso, o caso já criado não é desfeito.
+ */
+export async function enviarImagensDescricao(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  casoId: string,
+  formData: FormData
+): Promise<string[]> {
+  const imagens = formData.getAll("descricaoImagem").filter((v): v is File => v instanceof File && v.size > 0);
+  const avisos: string[] = [];
+
+  if (imagens.length > DESCRICAO_IMAGENS_MAXIMO) {
+    avisos.push(`Só as ${DESCRICAO_IMAGENS_MAXIMO} primeiras imagens da descrição foram enviadas.`);
+  }
+
+  for (const imagem of imagens.slice(0, DESCRICAO_IMAGENS_MAXIMO)) {
+    if (!(DESCRICAO_IMAGEM_MIME_TYPES as readonly string[]).includes(imagem.type)) {
+      avisos.push(`${imagem.name}: só imagens JPG ou PNG na descrição, não enviada.`);
+      continue;
+    }
+    if (imagem.size > ANEXO_TAMANHO_MAXIMO_BYTES) {
+      avisos.push(`${imagem.name}: maior que 10 MB, não enviada.`);
+      continue;
+    }
+
+    const storagePath = `${casoId}/${randomUUID()}-${imagem.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("anexos")
+      .upload(storagePath, imagem, { contentType: imagem.type });
+    if (uploadError) {
+      console.error("Erro ao enviar imagem da descrição:", uploadError);
+      avisos.push(`${imagem.name}: falha no envio da imagem da descrição.`);
+      continue;
+    }
+
+    const { error: insertError } = await supabase.from("anexos").insert({
+      caso_id: casoId,
+      tipo_documento: "imagem_descricao",
+      storage_path: storagePath,
+      nome_arquivo: imagem.name,
+    });
+    if (insertError) {
+      console.error("Erro ao registrar imagem da descrição:", insertError);
+      avisos.push(`${imagem.name}: imagem enviada mas não registrada.`);
     }
   }
 

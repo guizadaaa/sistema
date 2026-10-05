@@ -5,15 +5,12 @@ import { ClipboardPaste } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MATERIAL_APOIO_EXTENSOES_POR_TIPO, type TipoArquivoMaterialApoio } from "@/lib/validation/material-apoio";
-
-const EXTENSAO_POR_MIME: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg" };
-
-function nomeImagemColada(mime: string): string {
-  const agora = new Date();
-  const carimbo = agora.toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "-");
-  return `imagem-colada-${carimbo}.${EXTENSAO_POR_MIME[mime] ?? "png"}`;
-}
+import { imagensDaAreaDeTransferencia } from "@/lib/colar-imagem";
+import {
+  MATERIAL_APOIO_EXTENSOES_POR_TIPO,
+  MATERIAL_APOIO_MIME_POR_TIPO,
+  type TipoArquivoMaterialApoio,
+} from "@/lib/validation/material-apoio";
 
 /**
  * Input de arquivo que, para tipo Imagem, também aceita Ctrl+V de uma
@@ -49,11 +46,10 @@ export function CampoArquivo({
     if (!aceitaColar || !form) return;
 
     const aoColar = (evento: ClipboardEvent) => {
-      const imagem = Array.from(evento.clipboardData?.files ?? []).find((f) => f.type.startsWith("image/"));
-      if (!imagem || !inputRef.current) return;
+      const [arquivo] = imagensDaAreaDeTransferencia(evento.clipboardData, MATERIAL_APOIO_MIME_POR_TIPO.imagem);
+      if (!arquivo || !inputRef.current) return;
       evento.preventDefault();
 
-      const arquivo = new File([imagem], nomeImagemColada(imagem.type), { type: imagem.type });
       const transferencia = new DataTransfer();
       transferencia.items.add(arquivo);
       inputRef.current.files = transferencia.files;

@@ -91,4 +91,8 @@ export const ANEXO_TIPOS_DOCUMENTO = [
 export const ANEXO_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;
 export const ANEXO_TAMANHO_MAXIMO_BYTES = 10 * 1024 * 1024; // 10 MB — mesmo limite do bucket
 
+/** Imagens coladas na Descrição: só os formatos de imagem já aceitos em anexos, mesmo limite de tamanho. */
+export const DESCRICAO_IMAGEM_MIME_TYPES = ["image/jpeg", "image/png"] as const;
+export const DESCRICAO_IMAGENS_MAXIMO = 5;
+
 export const FILIAIS: readonly FilialCvc[] = ["1710", "1714", "1730"];
