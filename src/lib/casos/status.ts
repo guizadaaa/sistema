@@ -18,7 +18,8 @@ export const STATUS_ORDEM: readonly StatusCaso[] = [
  * garante quem pode inserir o quê; esta tabela só evita que a tela ofereça
  * saltos sem sentido (ex.: Inicial → Resolvido direto). A partir de "Em
  * andamento interno" há dois desvios opcionais, ambos levando a Resolvido:
- * Reavaliação (qualquer um que conduz o fluxo) ou Ouvidoria (só admin — ver
+ * Reavaliação (qualquer um que avança status: admin, gerente delegado ou
+ * vendedor dono — ver auth_pode_avancar_status) ou Ouvidoria (só admin — ver
  * policy status_historico_insert).
  */
 const PROXIMOS_STATUS: Record<StatusCaso, StatusCaso[]> = {

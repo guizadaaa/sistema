@@ -13,13 +13,13 @@ import { avancarStatus } from "./actions";
 export function StatusAcoes({
   casoId,
   statusAtual,
-  podeConduzirFluxo,
+  podeAvancarStatus,
   ehAdmin,
   temComentario,
 }: {
   casoId: string;
   statusAtual: StatusCaso;
-  podeConduzirFluxo: boolean;
+  podeAvancarStatus: boolean;
   ehAdmin: boolean;
   /** Regra de negócio: um caso só pode ir para "Resolvido" com ao menos um comentário registrado (ver Comentários acima). */
   temComentario: boolean;
@@ -29,10 +29,10 @@ export function StatusAcoes({
   const [erro, setErro] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
 
-  if (!podeConduzirFluxo && !ehAdmin) {
+  if (!podeAvancarStatus) {
     return (
       <p className="text-muted-foreground text-sm">
-        Somente o adm ou o gerente em delegação ativa pode avançar o status deste caso.
+        Somente o vendedor dono do caso, o gerente em delegação ativa ou o adm podem avançar o status deste caso.
       </p>
     );
   }
@@ -54,7 +54,7 @@ export function StatusAcoes({
 
   return (
     <div className="flex flex-col gap-3">
-      {podeConduzirFluxo && opcoes.length > 0 && (
+      {podeAvancarStatus && opcoes.length > 0 && (
         <div className="flex items-end gap-2">
           <div className="flex flex-col gap-1">
             <span className="text-sm font-medium">Avançar status</span>
@@ -77,7 +77,7 @@ export function StatusAcoes({
         </div>
       )}
 
-      {podeConduzirFluxo && opcoes.length === 0 && (
+      {podeAvancarStatus && opcoes.length === 0 && (
         <p className="text-muted-foreground text-sm">Nenhuma transição de status disponível no momento.</p>
       )}
 

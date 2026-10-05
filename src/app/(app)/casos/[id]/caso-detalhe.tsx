@@ -31,11 +31,15 @@ function formatarMoeda(valor: number) {
 export function CasoDetalhe({
   detalhe,
   podeConduzirFluxo,
+  podeAvancarStatus,
   ehAdmin,
   ehAdmMaster,
 }: {
   detalhe: DetalheCaso;
+  /** Desfecho e implicações: admin ou gerente com delegação. */
   podeConduzirFluxo: boolean;
+  /** Avançar status: os mesmos de podeConduzirFluxo + o vendedor dono do caso. */
+  podeAvancarStatus: boolean;
   ehAdmin: boolean;
   ehAdmMaster: boolean;
 }) {
@@ -149,7 +153,7 @@ export function CasoDetalhe({
             <StatusAcoes
               casoId={caso.id}
               statusAtual={caso.status_atual}
-              podeConduzirFluxo={podeConduzirFluxo}
+              podeAvancarStatus={podeAvancarStatus}
               ehAdmin={ehAdmin}
               temComentario={complementos.length > 0}
             />

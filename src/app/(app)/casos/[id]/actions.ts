@@ -123,8 +123,9 @@ export async function gerarUrlAssinadaAnexo(
 
 /**
  * A RLS de status_historico é a autoridade real sobre quem pode inserir o
- * quê (admin, ou gerente com delegação ativa restrito à própria filial, e
- * Ouvidoria só admin) — este action não reimplementa essa checagem, só
+ * quê (auth_pode_avancar_status: admin, gerente com delegação ativa na
+ * própria filial ou vendedor dono do caso; Ouvidoria só admin) — este
+ * action não reimplementa essa checagem, só
  * repassa o erro do Postgres de forma legível quando ela rejeitar.
  *
  * "Resolvido" sem comentário: a UI (status-acoes.tsx) já bloqueia antes de

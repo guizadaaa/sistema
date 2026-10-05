@@ -22,3 +22,19 @@ Motivo: o sistema lida com CPF e dado bancário de clientes (contas para reembol
 **Implementação**: dois cookies `httpOnly` (`sessao_inicio`, `ultima_atividade` — `src/lib/auth/sessao.ts`), checados a cada requisição autenticada em `src/proxy.ts` (é onde a sessão já é revalidada hoje — Next.js 16 renomeou `middleware.ts`/`middleware` para `proxy.ts`/`proxy`, ver `AGENTS.md`). Ao expirar qualquer um dos dois limites, a sessão é encerrada (`signOut()`) e a pessoa volta para `/login` com uma mensagem explicando o motivo. `login()` grava `sessao_inicio` explicitamente no momento do login; os cookies são "self-healing" nos demais pontos de entrada de sessão (ex.: `/auth/confirm`) — se ausentes, só começam a contar a partir daquele momento, sem forçar logout.
 
 **Limitação conhecida e aceita**: a checagem de inatividade só enxerga requisições ao servidor, não digitação/scroll no cliente — alguém preenchendo um formulário longo por mais de 30 minutos sem nenhum submit ou navegação seria desconectado mesmo "ativo" na tela. Não implementamos um heartbeat (ping periódico em JS) para cobrir esse caso porque os formulários deste sistema não são longos o suficiente para isso ser um problema real na prática.
+
+## Quem avança o status de um caso
+
+Desde a migration `20261006000002_vendedor_avanca_status.sql`, avançar status (inserir em `status_historico`) é permitido a:
+
+- **adm / adm_master**: qualquer caso, incluindo **Ouvidoria** (exclusiva do admin).
+- **gerente com delegação ativa**: casos da própria filial, enquanto a delegação vale. Sem delegação, o gerente só acompanha.
+- **vendedor**: somente os casos dos quais é **dono** (`vendedor_dono`) e que já enxerga. Nunca caso de colega nem de outra filial.
+
+Regras iguais para todos: "Resolvido" exige ao menos um comentário (trigger `impede_resolvido_sem_comentario`). O histórico grava quem avançou (`alterado_por`); `via_delegacao` só é verdadeiro para gerente delegado. A mudança aparece na `auditoria` com o autor real.
+
+**Onde é imposto (banco, não só tela)**: função `auth_pode_avancar_status(caso)` usada pela policy `status_historico_insert`; o trigger `enforce_casos_update_permissions` só aceita a troca de `status_atual` feita pelo vendedor quando ela vem do histórico (`sync_caso_status`), nunca por UPDATE direto em `casos`. A tela só espelha isso (`podeAvancarStatus` em `src/lib/casos/permissoes.ts`).
+
+**Fora do escopo do vendedor**: registrar/corrigir desfecho e lançar implicações financeiras continuam restritos a admin ou gerente com delegação (`podeConduzirFluxo` e policies `desfechos_*` / `implicacoes_*`).
+
+**Limitação conhecida**: a ordem das transições (Inicial → Recepcionado → …) é validada só na tela (`src/lib/casos/status.ts`). Pelo banco, quem pode avançar consegue inserir qualquer status ≠ Inicial — vale para admin, gerente delegado e, agora, vendedor.
