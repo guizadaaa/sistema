@@ -9,6 +9,19 @@ type Row = Record<string, unknown>;
 
 function criarSupabaseFake(tabelas: Record<string, Row[]>) {
   return {
+    // nomes_usuarios_casos: no banco real só devolve nomes de participantes
+    // de casos visíveis (testado em supabase/tests/17_*); aqui basta
+    // devolver (id, nome) dos donos dos casos pedidos.
+    rpc(funcao: string, args: { p_caso_ids: string[] }) {
+      if (funcao !== "nomes_usuarios_casos") throw new Error(`rpc inesperada: ${funcao}`);
+      const donos = new Set(
+        (tabelas.casos ?? []).filter((c) => args.p_caso_ids.includes(c.id as string)).map((c) => c.vendedor_dono)
+      );
+      const data = (tabelas.usuarios ?? [])
+        .filter((u) => donos.has(u.id))
+        .map((u) => ({ id: u.id, nome_completo: u.nome_completo }));
+      return Promise.resolve({ data, error: null });
+    },
     from(tabela: string) {
       let filtrado = tabelas[tabela] ?? [];
       const builder = {
@@ -182,5 +195,23 @@ describe("listarCasos — data de resolução", () => {
     expect(resultado.find((c) => c.id === "c1")?.resolvidoEm).toBe("2026-08-10T15:00:00Z");
     // c2 não está Resolvido hoje (status_atual inicial) — histórico antigo não conta.
     expect(resultado.find((c) => c.id === "c2")?.resolvidoEm).toBeNull();
+  });
+});
+
+describe("listarCasos — nome do dono", () => {
+  it("resolve o nome via nomes_usuarios_casos, nunca SELECT direto em usuarios (RLS escondia de vendedor/gerente)", async () => {
+    const fake = criarSupabaseFake({ casos: CASOS_FIXTURE, casos_contratos_adicionais: [], usuarios: USUARIOS_FIXTURE });
+    const fromOriginal = fake.from.bind(fake);
+    const tabelasLidas: string[] = [];
+    fake.from = (tabela: string) => {
+      tabelasLidas.push(tabela);
+      return fromOriginal(tabela);
+    };
+    createClientMock.mockResolvedValue(fake);
+
+    const resultado = await listarCasos({});
+
+    expect(resultado.map((c) => c.donoNome)).toEqual(["Vendedor Um", "Vendedor Um"]);
+    expect(tabelasLidas).not.toContain("usuarios");
   });
 });

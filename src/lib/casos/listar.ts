@@ -1,5 +1,6 @@
 import "server-only";
 
+import { carregarNomesUsuariosCasos } from "@/lib/casos/nomes";
 import { carregarResolvidoEm } from "@/lib/casos/resolucao";
 import { createClient } from "@/lib/supabase/server";
 import { somenteDigitos } from "@/lib/validation/cpf";
@@ -165,14 +166,7 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   if (error) throw error;
   if (!casos || casos.length === 0) return [];
 
-  const donoIds = [...new Set(casos.map((c) => c.vendedor_dono))];
-  const { data: donos, error: donosError } = await supabase
-    .from("usuarios")
-    .select("id, nome_completo")
-    .in("id", donoIds);
-  if (donosError) throw donosError;
-
-  const nomesPorId = new Map((donos ?? []).map((d) => [d.id, d.nome_completo]));
+  const nomesPorId = await carregarNomesUsuariosCasos(supabase, casos.map((c) => c.id));
   const resolvidoEm = await carregarResolvidoEm(
     supabase,
     casos.filter((c) => c.status_atual === "resolvido").map((c) => c.id)

@@ -597,6 +597,10 @@ export interface Database {
       };
     };
     Functions: {
+      nomes_usuarios_casos: {
+        Args: { p_caso_ids: string[] };
+        Returns: { id: string; nome_completo: string }[];
+      };
       atribuir_vendedor_link: {
         Args: { p_link_id: string; p_usuario_id: string; p_vigente_desde?: string };
         Returns: string;
