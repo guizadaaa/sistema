@@ -597,6 +597,10 @@ export interface Database {
       };
     };
     Functions: {
+      vendedores_filtro_casos: {
+        Args: { p_filial?: FilialCvc | null };
+        Returns: { id: string; nome_completo: string }[];
+      };
       nomes_usuarios_casos: {
         Args: { p_caso_ids: string[] };
         Returns: { id: string; nome_completo: string }[];

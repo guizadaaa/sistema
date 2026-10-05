@@ -215,3 +215,19 @@ describe("listarCasos — nome do dono", () => {
     expect(tabelasLidas).not.toContain("usuarios");
   });
 });
+
+describe("listarCasos — filtro Vendedor (dono do caso)", () => {
+  it("filtra por vendedor_dono e combina com os demais filtros (AND)", async () => {
+    createClientMock.mockResolvedValue(
+      criarSupabaseFake({
+        casos: [...CASOS_FIXTURE, { ...CASOS_FIXTURE[1], id: "c4", protocolo: 103, vendedor_dono: "v2" }],
+        casos_contratos_adicionais: [],
+        usuarios: [...USUARIOS_FIXTURE, { id: "v2", nome_completo: "Vendedor Dois" }],
+      })
+    );
+
+    expect((await listarCasos({ vendedor: "v2" })).map((c) => c.id)).toEqual(["c4"]);
+    expect((await listarCasos({ vendedor: "v1" })).map((c) => c.id)).toEqual(["c1", "c2"]);
+    expect(await listarCasos({ vendedor: "v2", busca: "Maria" })).toEqual([]);
+  });
+});

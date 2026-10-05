@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { createClient } from "@/lib/supabase/server";
+import type { FilialCvc } from "@/lib/supabase/types";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -21,4 +22,20 @@ export async function carregarNomesUsuariosCasos(
   if (error) throw error;
 
   return new Map((data ?? []).map((u) => [u.id, u.nome_completo]));
+}
+
+export type OpcaoVendedor = { id: string; nome: string };
+
+/**
+ * Opções do filtro "Vendedor" (dono do caso) via vendedores_filtro_casos:
+ * vendedor/gerente só recebem gente da própria filial; admin recebe todos,
+ * ou só os da `filial` quando informada. Só id + nome.
+ */
+export async function listarOpcoesVendedorFiltro(
+  supabase: SupabaseClient,
+  filial?: FilialCvc
+): Promise<OpcaoVendedor[]> {
+  const { data, error } = await supabase.rpc("vendedores_filtro_casos", { p_filial: filial ?? null });
+  if (error) throw error;
+  return (data ?? []).map((u) => ({ id: u.id, nome: u.nome_completo }));
 }
