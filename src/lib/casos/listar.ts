@@ -1,5 +1,6 @@
 import "server-only";
 
+import { carregarNomesUsuariosCasos } from "@/lib/casos/nomes";
 import { carregarResolvidoEm } from "@/lib/casos/resolucao";
 import { createClient } from "@/lib/supabase/server";
 import { somenteDigitos } from "@/lib/validation/cpf";
@@ -11,6 +12,8 @@ export type FiltrosCasos = {
   /** Busca universal — cliente, contrato (principal ou adicional), protocolo ou CPF. */
   busca?: string;
   filial?: FilialCvc;
+  /** Dono do caso (vendedor_dono). A RLS de casos continua decidindo o que aparece. */
+  vendedor?: string;
   /** Data de abertura (criado_em), formato yyyy-mm-dd, inclusive nas duas pontas. */
   dataInicio?: string;
   dataFim?: string;
@@ -147,6 +150,7 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   if (filtros.status) query = query.eq("status_atual", filtros.status);
   if (filtros.tipo) query = query.eq("tipo_caso", filtros.tipo);
   if (filtros.filial) query = query.eq("filial", filtros.filial);
+  if (filtros.vendedor) query = query.eq("vendedor_dono", filtros.vendedor);
 
   if (filtros.dataInicio && DATA_FORMATO.test(filtros.dataInicio)) {
     query = query.gte("criado_em", `${filtros.dataInicio}T00:00:00`);
@@ -165,14 +169,7 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   if (error) throw error;
   if (!casos || casos.length === 0) return [];
 
-  const donoIds = [...new Set(casos.map((c) => c.vendedor_dono))];
-  const { data: donos, error: donosError } = await supabase
-    .from("usuarios")
-    .select("id, nome_completo")
-    .in("id", donoIds);
-  if (donosError) throw donosError;
-
-  const nomesPorId = new Map((donos ?? []).map((d) => [d.id, d.nome_completo]));
+  const nomesPorId = await carregarNomesUsuariosCasos(supabase, casos.map((c) => c.id));
   const resolvidoEm = await carregarResolvidoEm(
     supabase,
     casos.filter((c) => c.status_atual === "resolvido").map((c) => c.id)

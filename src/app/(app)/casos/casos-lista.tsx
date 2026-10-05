@@ -14,6 +14,7 @@ import { FILIAL_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { STATUS_ORDEM } from "@/lib/casos/status";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 import type { CasoListado } from "@/lib/casos/listar";
+import type { OpcaoVendedor } from "@/lib/casos/nomes";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
 
@@ -34,6 +35,7 @@ export function isFilialCvc(v: string): v is FilialCvc {
 export function CasosLista({
   casos,
   filtros,
+  opcoesVendedor,
   mostrarFiltroFilial,
   ehAdmMaster,
 }: {
@@ -42,11 +44,13 @@ export function CasosLista({
     status?: StatusCaso;
     tipo?: TipoCaso;
     filial?: FilialCvc;
+    vendedor?: string;
     busca?: string;
     dataInicio?: string;
     dataFim?: string;
     mostrarTeste?: boolean;
   };
+  opcoesVendedor: OpcaoVendedor[];
   mostrarFiltroFilial: boolean;
   ehAdmMaster: boolean;
 }) {
@@ -55,6 +59,7 @@ export function CasosLista({
       filtros.status ||
       filtros.tipo ||
       filtros.filial ||
+      filtros.vendedor ||
       filtros.dataInicio ||
       filtros.dataFim ||
       filtros.mostrarTeste
@@ -140,6 +145,23 @@ export function CasosLista({
                   </Select>
                 </div>
               )}
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Vendedor</label>
+                <Select name="vendedor" defaultValue={filtros.vendedor ?? "todos"}>
+                  <SelectTrigger className="w-56">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    {opcoesVendedor.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium">Aberto entre</label>

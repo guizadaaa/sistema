@@ -1,5 +1,6 @@
 import "server-only";
 
+import { carregarNomesUsuariosCasos } from "@/lib/casos/nomes";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
@@ -72,21 +73,7 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
   if (desfechosError) throw desfechosError;
   if (implicacaoError) throw implicacaoError;
 
-  const idsParaNome = [
-    ...new Set([
-      caso.vendedor_dono,
-      caso.criado_por,
-      ...(historico ?? []).map((h) => h.alterado_por),
-      ...(complementos ?? []).map((c) => c.criado_por),
-    ]),
-  ];
-  const { data: usuarios, error: usuariosError } = await supabase
-    .from("usuarios")
-    .select("id, nome_completo")
-    .in("id", idsParaNome);
-  if (usuariosError) throw usuariosError;
-
-  const nomesPorId = new Map((usuarios ?? []).map((u) => [u.id, u.nome_completo]));
+  const nomesPorId = await carregarNomesUsuariosCasos(supabase, [caso.id]);
 
   return {
     caso,

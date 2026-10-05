@@ -1,5 +1,7 @@
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { listarCasos } from "@/lib/casos/listar";
+import { listarOpcoesVendedorFiltro } from "@/lib/casos/nomes";
+import { createClient } from "@/lib/supabase/server";
 
 import { CasosLista, isFilialCvc, isStatusCaso, isTipoCaso } from "./casos-lista";
 
@@ -20,13 +22,22 @@ export default async function CasosPage({
   const ehAdmMaster = usuario.perfil === "adm_master";
   const mostrarTeste = ehAdmMaster && sp.mostrarTeste === "1";
 
-  const casos = await listarCasos({ status, tipo, filial, busca, dataInicio, dataFim, mostrarTeste });
   const mostrarFiltroFilial = usuario.perfil === "adm" || usuario.perfil === "adm_master";
+
+  // Opções já vêm limitadas pelo banco (vendedores_filtro_casos): própria
+  // filial para vendedor/gerente; para admin, a filial filtrada (ou todas).
+  // Um id na URL fora dessas opções é ignorado em vez de aplicado.
+  const opcoesVendedor = await listarOpcoesVendedorFiltro(await createClient(), mostrarFiltroFilial ? filial : undefined);
+  const vendedor =
+    typeof sp.vendedor === "string" && opcoesVendedor.some((o) => o.id === sp.vendedor) ? sp.vendedor : undefined;
+
+  const casos = await listarCasos({ status, tipo, filial, vendedor, busca, dataInicio, dataFim, mostrarTeste });
 
   return (
     <CasosLista
       casos={casos}
-      filtros={{ status, tipo, filial, busca, dataInicio, dataFim, mostrarTeste }}
+      filtros={{ status, tipo, filial, vendedor, busca, dataInicio, dataFim, mostrarTeste }}
+      opcoesVendedor={opcoesVendedor}
       mostrarFiltroFilial={mostrarFiltroFilial}
       ehAdmMaster={ehAdmMaster}
     />
