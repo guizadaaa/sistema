@@ -19,7 +19,7 @@ export const STATUS_ORDEM: readonly StatusCaso[] = [
  * Resolvido (só admin, no banco) não aparece aqui de propósito: não há
  * botão para isso. A partir de "Em
  * andamento interno" há dois desvios opcionais, ambos levando a Resolvido:
- * Reavaliação (qualquer um que avança status: admin, gerente delegado ou
+ * Reavaliação (qualquer um que avança status: admin, gerente da filial ou
  * vendedor dono — ver auth_pode_avancar_status) ou Ouvidoria (só admin — ver
  * policy status_historico_insert).
  */

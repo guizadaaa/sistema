@@ -206,12 +206,14 @@ select public._test_assert(
   and (select status_atual = 'recepcionado' from public.casos where id = '20000000-0000-0000-0000-00000000000b')
 );
 
+-- Desde 20261006000004 o gerente avança na própria filial sem delegação
+-- (coberto em 22_*); aqui fica o negativo de outra filial.
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000005';
 set role authenticated;
 \set ON_ERROR_STOP 0
-insert into public.status_historico (caso_id, status) values ('20000000-0000-0000-0000-00000000000c', 'recepcionado');
+insert into public.status_historico (caso_id, status) values ('20000000-0000-0000-0000-00000000000b', 'em_andamento_interno');
 \set ON_ERROR_STOP 1
-select public._test_assert('gerente 1714 sem delegação: continua NAO avançando', :'ERROR' = 'true');
+select public._test_assert('gerente 1714: NAO avança caso de outra filial (1710)', :'ERROR' = 'true');
 reset role;
 reset request.jwt.claim.sub;
 

@@ -32,7 +32,7 @@ export function StatusAcoes({
   if (!podeAvancarStatus) {
     return (
       <p className="text-muted-foreground text-sm">
-        Somente o vendedor dono do caso, o gerente em delegação ativa ou o adm podem avançar o status deste caso.
+        Somente o vendedor dono do caso, o gerente da filial ou o adm podem avançar o status deste caso.
       </p>
     );
   }

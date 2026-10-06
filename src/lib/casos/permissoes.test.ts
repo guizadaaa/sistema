@@ -40,11 +40,17 @@ describe("podeAvancarStatus", () => {
     expect(await podeConduzirFluxo(usuario("vendedor", "1710", "u1"), "1710")).toBe(false);
   });
 
-  it("gerente: só com delegação ativa e na própria filial", async () => {
-    expect(await podeAvancarStatus(usuario("gerente", "1710", "g1"), CASO_1710_DO_U1)).toBe(false);
+  it("gerente: na própria filial, com ou sem delegação; nunca em outra filial", async () => {
+    expect(await podeAvancarStatus(usuario("gerente", "1710", "g1"), CASO_1710_DO_U1)).toBe(true);
     delegacoesVigentes = [{ id: "d1" }];
     expect(await podeAvancarStatus(usuario("gerente", "1710", "g1"), CASO_1710_DO_U1)).toBe(true);
     expect(await podeAvancarStatus(usuario("gerente", "1714", "g2"), CASO_1710_DO_U1)).toBe(false);
+  });
+
+  it("gerente sem delegação avança status mas não conduz desfecho/implicações", async () => {
+    expect(await podeConduzirFluxo(usuario("gerente", "1710", "g1"), "1710")).toBe(false);
+    delegacoesVigentes = [{ id: "d1" }];
+    expect(await podeConduzirFluxo(usuario("gerente", "1710", "g1"), "1710")).toBe(true);
   });
 
   it("admin sempre", async () => {

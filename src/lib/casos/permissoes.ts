@@ -34,12 +34,14 @@ export async function podeConduzirFluxo(usuario: CurrentUser, casoFilial: Filial
 type CasoParaPermissao = Pick<Database["public"]["Tables"]["casos"]["Row"], "filial" | "vendedor_dono">;
 
 /**
- * Espelha auth_pode_avancar_status (20261006000002): quem conduz o fluxo
- * (admin ou gerente com delegação na filial) OU o vendedor dono do caso.
- * Só decide o que a tela oferece — a policy status_historico_insert é quem
- * impõe. Desfecho e implicações seguem em podeConduzirFluxo (vendedor não).
+ * Espelha auth_pode_avancar_status (20261006000004): admin; gerente da
+ * própria filial, com ou sem delegação; vendedor dono do caso. Só decide o
+ * que a tela oferece — status_historico_insert e validar_transicao_status
+ * impõem no banco. Desfecho e implicações seguem em podeConduzirFluxo
+ * (gerente só com delegação; vendedor nunca).
  */
 export async function podeAvancarStatus(usuario: CurrentUser, caso: CasoParaPermissao): Promise<boolean> {
-  if (usuario.perfil === "vendedor") return caso.vendedor_dono === usuario.id;
-  return podeConduzirFluxo(usuario, caso.filial);
+  if (usuario.perfil === "adm" || usuario.perfil === "adm_master") return true;
+  if (usuario.perfil === "gerente") return usuario.filial === caso.filial;
+  return usuario.perfil === "vendedor" && caso.vendedor_dono === usuario.id;
 }

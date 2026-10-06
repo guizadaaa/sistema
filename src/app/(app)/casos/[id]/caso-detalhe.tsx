@@ -38,7 +38,7 @@ export function CasoDetalhe({
   detalhe: DetalheCaso;
   /** Desfecho e implicações: admin ou gerente com delegação. */
   podeConduzirFluxo: boolean;
-  /** Avançar status: os mesmos de podeConduzirFluxo + o vendedor dono do caso. */
+  /** Avançar status: admin, gerente da filial (sem exigir delegação) ou vendedor dono do caso. */
   podeAvancarStatus: boolean;
   ehAdmin: boolean;
   ehAdmMaster: boolean;

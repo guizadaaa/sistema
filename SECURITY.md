@@ -25,16 +25,16 @@ Motivo: o sistema lida com CPF e dado bancário de clientes (contas para reembol
 
 ## Quem avança o status de um caso
 
-Desde a migration `20261006000002_vendedor_avanca_status.sql`, avançar status (inserir em `status_historico`) é permitido a:
+Desde as migrations `20261006000002_vendedor_avanca_status.sql` e `20261006000004_gerente_filial_avanca_status.sql`, avançar status (inserir em `status_historico`) é permitido a:
 
 - **adm / adm_master**: qualquer caso, incluindo **Ouvidoria** (exclusiva do admin).
-- **gerente com delegação ativa**: casos da própria filial, enquanto a delegação vale. Sem delegação, o gerente só acompanha.
+- **gerente**: casos da própria filial, **com ou sem delegação** (desde `20261006000004_gerente_filial_avanca_status.sql`). Nunca de outra filial.
 - **vendedor**: somente os casos dos quais é **dono** (`vendedor_dono`) e que já enxerga. Nunca caso de colega nem de outra filial.
 
-Regras iguais para todos: "Resolvido" exige ao menos um comentário (trigger `impede_resolvido_sem_comentario`). O histórico grava quem avançou (`alterado_por`); `via_delegacao` só é verdadeiro para gerente delegado. A mudança aparece na `auditoria` com o autor real.
+Regras iguais para todos: "Resolvido" exige ao menos um comentário (trigger `impede_resolvido_sem_comentario`). O histórico grava quem avançou (`alterado_por`); `via_delegacao` só é verdadeiro para gerente que está com delegação ativa no momento. A mudança aparece na `auditoria` com o autor real.
 
 **Onde é imposto (banco, não só tela)**: função `auth_pode_avancar_status(caso)` usada pela policy `status_historico_insert`; o trigger `enforce_casos_update_permissions` só aceita a troca de `status_atual` feita pelo vendedor quando ela vem do histórico (`sync_caso_status`), nunca por UPDATE direto em `casos`. A tela só espelha isso (`podeAvancarStatus` em `src/lib/casos/permissoes.ts`).
 
-**Fora do escopo do vendedor**: registrar/corrigir desfecho e lançar implicações financeiras continuam restritos a admin ou gerente com delegação (`podeConduzirFluxo` e policies `desfechos_*` / `implicacoes_*`).
+**Delegação ainda importa para**: registrar/corrigir desfecho e lançar implicações financeiras, que continuam restritos a admin ou gerente **com** delegação (o vendedor nunca) (`podeConduzirFluxo` e policies `desfechos_*` / `implicacoes_*`).
 
 **Ordem das transições (imposta no banco desde `20261006000003_ordem_transicoes_status.sql`)**: a trigger `validar_transicao_status` (BEFORE INSERT em `status_historico`) só aceita Inicial → Recepcionado → Em andamento interno → {Reavaliação | Ouvidoria | Resolvido}, Reavaliação → Resolvido e Ouvidoria → Resolvido. Status repetido é recusado; Inicial só existe como primeiro item (criação do caso). **Resolvido não tem saída**, exceto para **adm/adm_master**, que podem reabrir para Em andamento interno ou Reavaliação — só permissão no banco, sem botão na tela. A tela (`src/lib/casos/status.ts`) só oferece as mesmas transições normais.
