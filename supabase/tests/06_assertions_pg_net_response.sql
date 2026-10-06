@@ -146,8 +146,14 @@ reset request.jwt.claim.sub;
 -- trigger sempre roda (SECURITY DEFINER não muda o que auth.uid() resolve,
 -- só o contexto de privilégio/RLS), então precisa de um auth.uid() que
 -- bata com auth_is_admin() de verdade, não só o bypass de role postgres.
+-- Percorre as etapas na ordem (validar_transicao_status, 20261006000003
+-- recusa pular de Inicial direto para Resolvido), também retroativas.
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
+insert into public.status_historico (caso_id, status, alterado_por, entrou_em) values
+  ('10000000-0000-0000-0000-000000000003', 'recepcionado', '00000000-0000-0000-0000-000000000004', now() - interval '102 days');
+insert into public.status_historico (caso_id, status, alterado_por, entrou_em) values
+  ('10000000-0000-0000-0000-000000000003', 'em_andamento_interno', '00000000-0000-0000-0000-000000000004', now() - interval '101 days');
 insert into public.status_historico (caso_id, status, alterado_por, entrou_em)
 values ('10000000-0000-0000-0000-000000000003', 'resolvido', '00000000-0000-0000-0000-000000000004', now() - interval '100 days');
 reset role;

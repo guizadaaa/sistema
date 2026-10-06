@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { buscarDetalheCaso } from "@/lib/casos/detalhe";
-import { podeConduzirFluxo } from "@/lib/casos/permissoes";
+import { podeAvancarStatus, podeConduzirFluxo } from "@/lib/casos/permissoes";
 
 import { CasoDetalhe } from "./caso-detalhe";
 
@@ -15,9 +15,18 @@ export default async function CasoDetalhePage({ params }: { params: Promise<{ id
 
   const ehAdmin = usuario.perfil === "adm" || usuario.perfil === "adm_master";
   const ehAdmMaster = usuario.perfil === "adm_master";
-  const podeConduzir = await podeConduzirFluxo(usuario, detalhe.caso.filial);
+  const [podeConduzir, podeAvancar] = await Promise.all([
+    podeConduzirFluxo(usuario, detalhe.caso.filial),
+    podeAvancarStatus(usuario, detalhe.caso),
+  ]);
 
   return (
-    <CasoDetalhe detalhe={detalhe} podeConduzirFluxo={podeConduzir} ehAdmin={ehAdmin} ehAdmMaster={ehAdmMaster} />
+    <CasoDetalhe
+      detalhe={detalhe}
+      podeConduzirFluxo={podeConduzir}
+      podeAvancarStatus={podeAvancar}
+      ehAdmin={ehAdmin}
+      ehAdmMaster={ehAdmMaster}
+    />
   );
 }

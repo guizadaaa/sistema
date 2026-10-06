@@ -15,8 +15,12 @@ type ImplicacaoRow = Database["public"]["Tables"]["implicacoes"]["Row"];
 export type HistoricoComNome = StatusHistoricoComDuracaoRow & { alteradoPorNome: string };
 export type ComplementoComNome = ComplementoRow & { criadoPorNome: string };
 
+export type ImagemDescricao = { id: string; nome: string; url: string };
+
 export type DetalheCaso = {
   caso: CasoRow;
+  /** Imagens coladas na Descrição ao criar o caso (anexos tipo imagem_descricao), com signed URL curta. */
+  imagensDescricao: ImagemDescricao[];
   donoNome: string;
   criadoPorNome: string;
   historico: HistoricoComNome[];
@@ -75,15 +79,52 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
 
   const nomesPorId = await carregarNomesUsuariosCasos(supabase, [caso.id]);
 
+  // imagem_descricao é anexo só por herança de RLS/Storage/retenção — na tela
+  // vai abaixo da Descrição, nunca na lista de Anexos. Purgada por retenção
+  // (storage_path nulo) simplesmente some.
+  const todosAnexos = anexos ?? [];
+  const anexosDocumentos = todosAnexos.filter((a) => a.tipo_documento !== "imagem_descricao");
+  const imagensDescricao = await gerarUrlsImagensDescricao(
+    supabase,
+    todosAnexos.filter((a) => a.tipo_documento === "imagem_descricao" && a.storage_path)
+  );
+
   return {
     caso,
+    imagensDescricao,
     donoNome: nomesPorId.get(caso.vendedor_dono) ?? "—",
     criadoPorNome: nomesPorId.get(caso.criado_por) ?? "—",
     historico: (historico ?? []).map((h) => ({ ...h, alteradoPorNome: nomesPorId.get(h.alterado_por) ?? "—" })),
-    anexos: anexos ?? [],
+    anexos: anexosDocumentos,
     contratosAdicionais: contratosAdicionais ?? [],
     complementos: (complementos ?? []).map((c) => ({ ...c, criadoPorNome: nomesPorId.get(c.criado_por) ?? "—" })),
     desfechos: desfechos ?? [],
     implicacao: implicacao ?? null,
   };
+}
+
+// Mesmo prazo curto de gerarUrlAssinadaAnexo, com folga para a página ficar aberta.
+const VALIDADE_URL_IMAGEM_SEGUNDOS = 600;
+
+async function gerarUrlsImagensDescricao(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  imagens: AnexoRow[]
+): Promise<ImagemDescricao[]> {
+  if (imagens.length === 0) return [];
+
+  const caminhos = imagens.map((i) => i.storage_path as string);
+  const { data, error } = await supabase.storage
+    .from("anexos")
+    .createSignedUrls(caminhos, VALIDADE_URL_IMAGEM_SEGUNDOS);
+  if (error) {
+    // Imagem é complemento visual — falha aqui não derruba a tela do caso.
+    console.error("Erro ao gerar signed URLs das imagens da descrição:", error);
+    return [];
+  }
+
+  const urlPorCaminho = new Map((data ?? []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
+  return imagens.flatMap((i) => {
+    const url = urlPorCaminho.get(i.storage_path as string);
+    return url ? [{ id: i.id, nome: i.nome_arquivo ?? "imagem", url }] : [];
+  });
 }

@@ -26,6 +26,12 @@ $$;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
 set role authenticated;
 
+-- Leva o caso até Em andamento interno, de onde Resolvido é uma transição
+-- válida (validar_transicao_status, 20261006000003) — assim o único motivo
+-- de recusa abaixo é a falta de comentário.
+insert into public.status_historico (caso_id, status) values ('10000000-0000-0000-0000-000000000001', 'recepcionado');
+insert into public.status_historico (caso_id, status) values ('10000000-0000-0000-0000-000000000001', 'em_andamento_interno');
+
 \set ON_ERROR_STOP 0
 insert into public.status_historico (caso_id, status) values (
   '10000000-0000-0000-0000-000000000001', 'resolvido'

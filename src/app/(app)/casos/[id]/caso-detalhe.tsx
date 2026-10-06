@@ -31,16 +31,30 @@ function formatarMoeda(valor: number) {
 export function CasoDetalhe({
   detalhe,
   podeConduzirFluxo,
+  podeAvancarStatus,
   ehAdmin,
   ehAdmMaster,
 }: {
   detalhe: DetalheCaso;
+  /** Desfecho e implicações: admin ou gerente com delegação. */
   podeConduzirFluxo: boolean;
+  /** Avançar status: admin, gerente da filial (sem exigir delegação) ou vendedor dono do caso. */
+  podeAvancarStatus: boolean;
   ehAdmin: boolean;
   ehAdmMaster: boolean;
 }) {
-  const { caso, donoNome, criadoPorNome, historico, anexos, contratosAdicionais, complementos, desfechos, implicacao } =
-    detalhe;
+  const {
+    caso,
+    imagensDescricao,
+    donoNome,
+    criadoPorNome,
+    historico,
+    anexos,
+    contratosAdicionais,
+    complementos,
+    desfechos,
+    implicacao,
+  } = detalhe;
 
   return (
     <div className="flex flex-col gap-4">
@@ -104,10 +118,26 @@ export function CasoDetalhe({
               )}
             </dl>
 
-            {caso.descricao && (
+            {(caso.descricao || imagensDescricao.length > 0) && (
               <div className="mt-3 flex flex-col gap-1">
                 <span className="text-muted-foreground text-sm">Descrição</span>
-                <p className="text-sm">{caso.descricao}</p>
+                {caso.descricao && <p className="text-sm">{caso.descricao}</p>}
+                {imagensDescricao.length > 0 && (
+                  <ul className="mt-1 flex flex-wrap gap-2" aria-label="Imagens da descrição">
+                    {imagensDescricao.map((imagem) => (
+                      <li key={imagem.id}>
+                        <a href={imagem.url} target="_blank" rel="noopener noreferrer" title="Abrir em tamanho real">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- signed URL do Storage, curta e privada */}
+                          <img
+                            src={imagem.url}
+                            alt={imagem.nome}
+                            className="max-h-48 w-auto max-w-full rounded-md border object-contain"
+                          />
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
           </CardContent>
@@ -123,7 +153,7 @@ export function CasoDetalhe({
             <StatusAcoes
               casoId={caso.id}
               statusAtual={caso.status_atual}
-              podeConduzirFluxo={podeConduzirFluxo}
+              podeAvancarStatus={podeAvancarStatus}
               ehAdmin={ehAdmin}
               temComentario={complementos.length > 0}
             />
