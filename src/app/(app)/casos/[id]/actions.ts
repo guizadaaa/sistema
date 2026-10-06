@@ -133,6 +133,23 @@ export async function gerarUrlAssinadaAnexo(
  * (20260727000003) é quem de fato garante a regra — esta checagem de
  * mensagem só troca o texto técnico da exceção por um específico.
  */
+// Mensagens que o banco já escreve para humanos (triggers
+// impede_resolvido_sem_comentario e validar_transicao_status) — repassadas
+// como estão. Qualquer outra coisa (RLS, erro inesperado) vira o genérico.
+const MENSAGENS_STATUS_DO_BANCO = [
+  "Não é possível marcar como Resolvido sem pelo menos um comentário",
+  "Transição de status inválida",
+  "O caso já está em",
+  "Caso Resolvido não pode mudar de status",
+  "Somente o adm pode mover um caso para Ouvidoria",
+  "O status Inicial só é registrado",
+];
+
+function mensagemErroAvancarStatus(mensagemBanco: string): string {
+  if (MENSAGENS_STATUS_DO_BANCO.some((m) => mensagemBanco.startsWith(m))) return mensagemBanco;
+  return "Não foi possível avançar o status. Verifique se você tem permissão para esta ação.";
+}
+
 export async function avancarStatus(casoId: string, novoStatus: StatusCaso): Promise<{ error?: string }> {
   await requireCurrentUser();
   const supabase = await createClient();
@@ -141,10 +158,7 @@ export async function avancarStatus(casoId: string, novoStatus: StatusCaso): Pro
 
   if (error) {
     console.error("Erro ao avançar status:", error);
-    if (error.message.includes("pelo menos um comentário")) {
-      return { error: "Não é possível marcar como Resolvido sem pelo menos um comentário registrado no caso." };
-    }
-    return { error: "Não foi possível avançar o status. Verifique se você tem permissão para esta ação." };
+    return { error: mensagemErroAvancarStatus(error.message) };
   }
 
   revalidatePath(`/casos/${casoId}`);

@@ -13,10 +13,11 @@ export const STATUS_ORDEM: readonly StatusCaso[] = [
 ];
 
 /**
- * Próximos status válidos a partir do atual (seção 5). Isto é uma regra de
- * qualidade de dados/UX, não uma fronteira de segurança — o RLS já é quem
- * garante quem pode inserir o quê; esta tabela só evita que a tela ofereça
- * saltos sem sentido (ex.: Inicial → Resolvido direto). A partir de "Em
+ * Próximos status válidos a partir do atual (seção 5). Espelha a trigger
+ * validar_transicao_status (20261006000003), que é quem impõe a ordem no
+ * banco — esta tabela só decide o que a tela oferece. A reabertura de
+ * Resolvido (só admin, no banco) não aparece aqui de propósito: não há
+ * botão para isso. A partir de "Em
  * andamento interno" há dois desvios opcionais, ambos levando a Resolvido:
  * Reavaliação (qualquer um que avança status: admin, gerente delegado ou
  * vendedor dono — ver auth_pode_avancar_status) ou Ouvidoria (só admin — ver
