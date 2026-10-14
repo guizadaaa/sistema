@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { mesAtualSaoPaulo, opcoesDeMes, resolverMes, rotuloMes, sincronizacaoAtrasada } from "./mes";
+import {
+  hojeSaoPaulo,
+  mesAtualSaoPaulo,
+  opcoesDeMes,
+  resolverMes,
+  rotuloMes,
+  rotuloMesCapitalizado,
+  sincronizacaoAtrasada,
+} from "./mes";
 
 describe("mesAtualSaoPaulo", () => {
   it("usa o fuso de São Paulo na virada do mês (01/11 02:00 UTC ainda é outubro)", () => {
@@ -44,5 +52,14 @@ describe("sincronizacaoAtrasada", () => {
   });
   it("sem nenhuma sincronização registrada conta como atrasada", () => {
     expect(sincronizacaoAtrasada(null, agora)).toBe(true);
+  });
+});
+
+describe("hojeSaoPaulo / rotuloMesCapitalizado", () => {
+  it("data de hoje no fuso de São Paulo", () => {
+    expect(hojeSaoPaulo(new Date("2026-10-15T02:00:00Z"))).toBe("2026-10-14");
+  });
+  it("só a primeira letra maiúscula", () => {
+    expect(rotuloMesCapitalizado("2026-10-01")).toBe("Outubro de 2026");
   });
 });

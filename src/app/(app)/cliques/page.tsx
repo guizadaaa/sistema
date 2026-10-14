@@ -3,10 +3,25 @@ import Link from "next/link";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { listarCliquesPorPeriodo, listarCliquesVitrine, listarResumoPorVendedor } from "@/lib/linkly/listar";
+import {
+  buscarUltimaSincronizacao,
+  listarCliquesDoMes,
+  listarMesesComRegistro,
+  listarResumoPorVendedorDoMes,
+  listarVitrineDoMes,
+} from "@/lib/linkly/listar";
+import { mesAtualSaoPaulo, opcoesDeMes, parametroMes, resolverMes, sincronizacaoAtrasada } from "@/lib/linkly/mes";
 
 import { CliquesTabs } from "./cliques-tabs";
-import { AtualizarAgoraBotao, ResumoPorVendedorTabela, TabelaPeriodos, VitrineCard } from "./cliques-view";
+import {
+  AtualizarAgoraBotao,
+  AutoAtualizar,
+  ResumoPorVendedorMes,
+  SeletorMes,
+  StatusSincronizacao,
+  TabelaCliquesMes,
+  VitrineMesCard,
+} from "./cliques-view";
 
 export default async function CliquesPage({
   searchParams,
@@ -16,61 +31,77 @@ export default async function CliquesPage({
   const usuario = await requireCurrentUser();
   const sp = await searchParams;
 
-  const mostrarFiltroFilial = usuario.perfil === "adm" || usuario.perfil === "adm_master";
-  const podeAtualizar = usuario.perfil === "adm" || usuario.perfil === "adm_master";
+  const ehAdmin = usuario.perfil === "adm" || usuario.perfil === "adm_master";
 
-  // Vendedor: só os próprios períodos, sem drill-down.
+  // Mês: padrão é o atual (São Paulo); anteriores só se houver registro.
+  const [mesesComRegistro, ultimaSincronizacao] = await Promise.all([listarMesesComRegistro(), buscarUltimaSincronizacao()]);
+  const mesAtual = mesAtualSaoPaulo();
+  const mes = resolverMes(sp.mes, mesesComRegistro, mesAtual);
+  const opcoes = opcoesDeMes(mesesComRegistro, mesAtual);
+
+  const cabecalho = (titulo: string, extra?: React.ReactNode) => (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-xl font-semibold">{titulo}</h1>
+        <SeletorMes mes={mes} opcoes={opcoes} />
+      </div>
+      <div className="flex flex-col items-end gap-1">
+        <StatusSincronizacao
+          ultima={ultimaSincronizacao}
+          atrasada={sincronizacaoAtrasada(ultimaSincronizacao)}
+          mostrarAlerta={ehAdmin}
+        />
+        {extra}
+      </div>
+    </div>
+  );
+
+  // Vendedor: só os próprios trechos do mês (a função do banco já restringe).
   if (usuario.perfil === "vendedor") {
-    const periodos = await listarCliquesPorPeriodo({ vendedorId: usuario.id });
-    const total = periodos.reduce((soma, p) => soma + p.cliquesPeriodo, 0);
-
+    const linhas = await listarCliquesDoMes(mes);
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-xl font-semibold">Meus cliques</h1>
-        <TabelaPeriodos periodos={periodos} total={total} />
+        <AutoAtualizar />
+        {cabecalho("Meus cliques")}
+        <TabelaCliquesMes linhas={linhas} mes={mes} />
       </div>
     );
   }
 
-  // Gerente/adm/adm_master com um vendedor selecionado: detalhe por período.
+  // Gerente/adm/adm_master com um vendedor selecionado: detalhe por link.
   const vendedorId = typeof sp.vendedorId === "string" ? sp.vendedorId : undefined;
   if (vendedorId) {
-    const periodos = await listarCliquesPorPeriodo({ vendedorId });
-    const total = periodos.reduce((soma, p) => soma + p.cliquesPeriodo, 0);
+    const linhas = await listarCliquesDoMes(mes, { vendedorId });
     const nomeVendedor = typeof sp.vendedorNome === "string" ? sp.vendedorNome : "Vendedor";
 
     return (
       <div className="flex flex-col gap-4">
+        <AutoAtualizar />
         <CliquesTabs ativo="cliques" perfil={usuario.perfil} />
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Cliques de {nomeVendedor}</h1>
+        {cabecalho(
+          `Cliques de ${nomeVendedor}`,
           <Button asChild variant="ghost" size="sm">
-            <Link href="/cliques">← Voltar ao resumo</Link>
+            <Link href={`/cliques?mes=${parametroMes(mes)}`}>← Voltar ao resumo</Link>
           </Button>
-        </div>
-        <TabelaPeriodos periodos={periodos} total={total} />
+        )}
+        <TabelaCliquesMes linhas={linhas} mes={mes} />
       </div>
     );
   }
 
-  // Gerente/adm/adm_master sem vendedor selecionado: resumo agregado.
-  const resumo = await listarResumoPorVendedor({});
-  // Só gerente/adm/adm_master chegam até aqui (vendedor já retornou acima).
-  // linkly_cliques_vitrine já restringe por RLS: gerente vê só a própria
-  // loja, adm/adm_master veem as 3.
-  const vitrine = await listarCliquesVitrine();
+  // Resumo do mês por vendedor + vitrine (vitrine: a função restringe a
+  // admin e ao gerente da própria loja).
+  const [resumo, vitrine] = await Promise.all([listarResumoPorVendedorDoMes(mes), listarVitrineDoMes(mes)]);
 
   return (
     <div className="flex flex-col gap-4">
+      <AutoAtualizar />
       <CliquesTabs ativo="cliques" perfil={usuario.perfil} />
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Cliques por vendedor</h1>
-        {podeAtualizar && <AtualizarAgoraBotao />}
-      </div>
+      {cabecalho("Cliques por vendedor", ehAdmin ? <AtualizarAgoraBotao /> : undefined)}
 
-      <ResumoPorVendedorTabela resumo={resumo} mostrarFiltroFilial={mostrarFiltroFilial} />
+      <ResumoPorVendedorMes resumo={resumo} mes={mes} mostrarFilial={ehAdmin} />
 
-      {vitrine.length > 0 && <VitrineCard vitrine={vitrine} />}
+      <VitrineMesCard vitrine={vitrine} mes={mes} />
 
       {usuario.perfil === "adm_master" && (
         <Card className="border-dashed">

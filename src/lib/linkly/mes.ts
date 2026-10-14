@@ -55,3 +55,14 @@ export function sincronizacaoAtrasada(ultima: string | null, agora: Date = new D
   if (!ultima) return true;
   return agora.getTime() - new Date(ultima).getTime() > LIMITE_SINCRONIZACAO_ATRASADA_MS;
 }
+
+/** Data de hoje em São Paulo ("2026-10-14"). */
+export function hojeSaoPaulo(agora: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit" }).format(agora);
+}
+
+/** "outubro de 2026" -> "Outubro de 2026" (só a primeira letra). */
+export function rotuloMesCapitalizado(mes: string): string {
+  const rotulo = rotuloMes(mes);
+  return rotulo.charAt(0).toUpperCase() + rotulo.slice(1);
+}
