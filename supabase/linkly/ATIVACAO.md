@@ -79,7 +79,30 @@ resposta real capturada como fixture — `npx vitest run` cobre isso.
    ```sql
    select cron.schedule(
      'sincronizar-linkly',
-     '0 */4 * * *', -- a cada 4h — ajuste à vontade, cliques não são tão sensíveis a frescor quanto o backup
+     '0 * * * *', -- de hora em hora (agendamento em uso em produção)
      $$ call public.disparar_sincronizacao_linkly(null); $$
    );
    ```
+   Desde `20261006000009_linkly_disparo_timeout.sql` esse agendamento também
+   é registrado pela própria migration (só onde o pg_cron existe; mesmo
+   nome, horário e comando — não duplica o job).
+
+## Timeout do disparo pelo pg_cron (20261006000009)
+
+O job falhava em toda execução com `Timeout of 5000 ms reached`: o
+`net.http_post` usa 5 s por padrão e a sincronização dos 4 workspaces leva
+mais que isso. A procedure agora pede `timeout_milliseconds = 60000` e
+espera até 75 s pela resposta (aguarda enquanto o pg_net disser PENDING ou
+"not found"). Se a Edge Function passar a levar mais de ~50 s, divida a
+sincronização por workspace em vez de aumentar o timeout.
+
+Validar em produção:
+```sql
+call public.disparar_sincronizacao_linkly(null);   -- deve devolver p_status_code 200 (ou 207)
+
+select status, return_message, start_time, end_time
+from cron.job_run_details
+where jobid = (select jobid from cron.job where jobname = 'sincronizar-linkly')
+order by start_time desc
+limit 5;                                           -- próximas execuções: status = succeeded
+```
