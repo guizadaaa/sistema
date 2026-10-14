@@ -11,6 +11,7 @@ import {
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 
 import { AnexosSecao } from "./anexos-secao";
+import { RecibosRecadastradosSecao } from "./recibos-recadastrados-secao";
 import { CasoTesteAcoes } from "./caso-teste-acoes";
 import { ComplementosSecao } from "./complementos-secao";
 import { ContratosAdicionaisSecao } from "./contratos-adicionais-secao";
@@ -51,6 +52,7 @@ export function CasoDetalhe({
     historico,
     anexos,
     contratosAdicionais,
+    recibosRecadastrados,
     complementos,
     desfechos,
     implicacao,
@@ -162,6 +164,10 @@ export function CasoDetalhe({
       </div>
 
       <ContratosAdicionaisSecao casoId={caso.id} contratos={contratosAdicionais} />
+
+      {caso.tipo_caso === "recadastro_sem_reserva" && (
+        <RecibosRecadastradosSecao casoId={caso.id} recibos={recibosRecadastrados} />
+      )}
 
       <AnexosSecao casoId={caso.id} anexos={anexos} />
 

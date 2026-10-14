@@ -23,14 +23,21 @@ export function tiposCasoPermitidos(perfil: PerfilUsuario): readonly TipoCaso[] 
 
 export const MOTIVOS_CASO: readonly MotivoCaso[] = ["pedido_cliente", "erro_vendedor", "fornecedor"];
 
-// Mesma regra do contrato principal (casos_contrato_numero_formato) — usada
-// também para os contratos adicionais (casos_contratos_adicionais_formato).
-const contratoNumeroSchema = z
-  .string()
-  .transform(somenteDigitos)
-  .refine((v) => v.length === 14, "Contrato deve ter exatamente 14 números");
+// Regra única de número de 14 dígitos (casos_contrato_numero_formato) —
+// usada no contrato principal, nos contratos adicionais
+// (casos_contratos_adicionais_formato) e nos recibos recadastrados
+// (casos_recibos_recadastrados_formato). Só o rótulo da mensagem muda.
+function numero14DigitosSchema(rotulo: string) {
+  return z
+    .string()
+    .transform(somenteDigitos)
+    .refine((v) => v.length === 14, `${rotulo} deve ter exatamente 14 números`);
+}
+
+const contratoNumeroSchema = numero14DigitosSchema("Contrato");
 
 export const contratoAdicionalSchema = contratoNumeroSchema;
+export const reciboRecadastradoSchema = numero14DigitosSchema("Recibo");
 
 const camposComuns = {
   vendedorDono: z.string().uuid("Selecione o dono do caso"),

@@ -231,3 +231,18 @@ describe("listarCasos — filtro Vendedor (dono do caso)", () => {
     expect(await listarCasos({ vendedor: "v2", busca: "Maria" })).toEqual([]);
   });
 });
+
+describe("listarCasos — busca por recibo recadastrado", () => {
+  it("busca geral encontra o caso pelo número (ou parte) do recibo recadastrado", async () => {
+    createClientMock.mockResolvedValue(
+      criarSupabaseFake({
+        casos: CASOS_FIXTURE,
+        casos_contratos_adicionais: [],
+        casos_recibos_recadastrados: [{ caso_id: "c2", recibo_numero: "17109999000777" }],
+        usuarios: USUARIOS_FIXTURE,
+      })
+    );
+
+    expect((await listarCasos({ busca: "9999000777" })).map((c) => c.id)).toEqual(["c2"]);
+  });
+});

@@ -9,7 +9,7 @@ import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
 export type FiltrosCasos = {
   status?: StatusCaso;
   tipo?: TipoCaso;
-  /** Busca universal — cliente, contrato (principal ou adicional), protocolo ou CPF. */
+  /** Busca universal — cliente, contrato (principal ou adicional), recibo recadastrado, protocolo ou CPF. */
   busca?: string;
   filial?: FilialCvc;
   /** Dono do caso (vendedor_dono). A RLS de casos continua decidindo o que aparece. */
@@ -82,7 +82,7 @@ async function idsCasosPorContrato(supabase: SupabaseClient, termoDigitos: strin
 }
 
 /**
- * ids de casos que batem com a busca geral (cliente, contrato, protocolo ou
+ * ids de casos que batem com a busca geral (cliente, contrato, recibo recadastrado, protocolo ou
  * CPF). Implementado como várias queries de coluna única (nunca `.or()` com
  * o termo bruto interpolado) — cada `.ilike()`/`.eq()` do supabase-js escapa
  * o valor sozinho; a fragilidade só existia na sintaxe combinada de `.or()`,
@@ -104,6 +104,15 @@ async function idsCasosPorBusca(supabase: SupabaseClient, termoBruto: string): P
   for (const c of porNome ?? []) ids.add(c.id);
 
   for (const id of await idsCasosPorContrato(supabase, termo)) ids.add(id);
+
+  // Recibos recadastrados (casos de Recadastro) — mesma RLS do caso pai,
+  // então só volta caso_id que este usuário já enxerga.
+  const { data: porRecibo, error: porReciboError } = await supabase
+    .from("casos_recibos_recadastrados")
+    .select("caso_id")
+    .ilike("recibo_numero", `%${termo}%`);
+  if (porReciboError) throw porReciboError;
+  for (const r of porRecibo ?? []) ids.add(r.caso_id);
 
   if (/^\d+$/.test(termo)) {
     const { data: porProtocolo, error: porProtocoloError } = await supabase

@@ -302,6 +302,24 @@ export interface Database {
         }>;
         Relationships: [];
       };
+      casos_recibos_recadastrados: {
+        Row: {
+          id: string;
+          caso_id: string;
+          recibo_numero: string;
+          criado_por: string;
+          criado_em: string;
+        };
+        Insert: {
+          caso_id: string;
+          recibo_numero: string;
+        };
+        // Sem UPDATE/DELETE — mesmo racional de casos_contratos_adicionais.
+        Update: Partial<{
+          recibo_numero: string;
+        }>;
+        Relationships: [];
+      };
       materiais_apoio: {
         Row: {
           id: string;

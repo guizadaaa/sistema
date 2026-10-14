@@ -87,7 +87,7 @@ export function CasosLista({
                 <Input
                   id="busca"
                   name="busca"
-                  placeholder="Contrato, cliente, protocolo ou CPF"
+                  placeholder="Contrato, recibo, cliente, protocolo ou CPF"
                   defaultValue={filtros.busca ?? ""}
                   className="w-72"
                 />

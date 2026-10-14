@@ -6,6 +6,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { enviarImagensDescricao, validarEEnviarAnexos } from "@/lib/casos/anexos";
 import { validarEInserirContratosAdicionais } from "@/lib/casos/contratos-adicionais";
+import { validarEInserirRecibosRecadastrados } from "@/lib/casos/recibos-recadastrados";
 import { casoSchema, tiposCasoPermitidos } from "@/lib/validation/caso";
 
 export type CasoFormValores = {
@@ -25,7 +26,7 @@ export type CriarCasoState = {
   error?: string;
   fieldErrors?: Partial<Record<keyof CasoFormValores, string>>;
   valores?: CasoFormValores;
-  sucesso?: { id: string; protocolo: number; avisosAnexos?: string[]; avisosContratos?: string[] };
+  sucesso?: { id: string; protocolo: number; avisosAnexos?: string[]; avisosContratos?: string[]; avisosRecibos?: string[] };
 };
 
 /** Para reidratar o formulário após um erro — nunca undefined, mesmo vazio. */
@@ -183,6 +184,10 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     ...(await validarEEnviarAnexos(supabase, data.id, formData)),
   ];
   const avisosContratos = await validarEInserirContratosAdicionais(supabase, data.id, formData);
+  const avisosRecibos =
+    dados.tipoCaso === "recadastro_sem_reserva"
+      ? await validarEInserirRecibosRecadastrados(supabase, data.id, formData)
+      : [];
 
   return {
     sucesso: {
@@ -190,6 +195,7 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
       protocolo: data.protocolo,
       avisosAnexos: avisosAnexos.length > 0 ? avisosAnexos : undefined,
       avisosContratos: avisosContratos.length > 0 ? avisosContratos : undefined,
+      avisosRecibos: avisosRecibos.length > 0 ? avisosRecibos : undefined,
     },
   };
 }

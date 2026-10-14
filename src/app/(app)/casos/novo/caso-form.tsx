@@ -3,6 +3,7 @@
 import { useActionState, useId, useState, type FocusEvent, type FormEvent } from "react";
 import { FileText, Paperclip, Plus, Trash2, User } from "lucide-react";
 
+import { CampoNumeros14Digitos } from "@/components/campo-numeros-14-digitos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -79,6 +80,13 @@ export function CasoForm({
           {state.sucesso.avisosContratos && (
             <ul className="text-destructive text-sm list-disc pl-4">
               {state.sucesso.avisosContratos.map((aviso) => (
+                <li key={aviso}>{aviso}</li>
+              ))}
+            </ul>
+          )}
+          {state.sucesso.avisosRecibos && (
+            <ul className="text-destructive text-sm list-disc pl-4">
+              {state.sucesso.avisosRecibos.map((aviso) => (
                 <li key={aviso}>{aviso}</li>
               ))}
             </ul>
@@ -508,6 +516,15 @@ function CasoFormCampos({
           />
           <FieldError mensagem={errosLocais.descricao ?? state.fieldErrors?.descricao} />
         </div>
+      )}
+
+      {exigeSoDescricao && (
+        <CampoNumeros14Digitos
+          name="reciboRecadastrado"
+          titulo="Recibos recadastrados (opcional)"
+          rotulo="Recibo"
+          textoBotao="Adicionar recibo"
+        />
       )}
 
       {exigeInadimplencia && (
