@@ -89,6 +89,13 @@ export function CasoDetalhe({
               <dt className="text-muted-foreground">Contrato</dt>
               <dd>{caso.contrato_numero}</dd>
 
+              {caso.contrato_origem && (
+                <>
+                  <dt className="text-muted-foreground">Contrato de origem</dt>
+                  <dd>{caso.contrato_origem}</dd>
+                </>
+              )}
+
               <dt className="text-muted-foreground">Cliente</dt>
               <dd>{caso.cliente_nome}</dd>
 

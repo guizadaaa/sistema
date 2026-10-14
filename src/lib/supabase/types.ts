@@ -86,6 +86,8 @@ export interface Database {
           parcelas_em_aberto: number | null;
           data_cancelamento: string | null;
           caso_teste: boolean;
+          /** Só cancelamento/inadimplência (20261006000007). */
+          contrato_origem: string | null;
         };
         Insert: {
           tipo_caso: TipoCaso;
@@ -99,6 +101,7 @@ export interface Database {
           cliente_cpf: string;
           parcelas_em_aberto?: number | null;
           data_cancelamento?: string | null;
+          contrato_origem?: string | null;
         };
         Update: Partial<{
           prazo_vigencia: string;

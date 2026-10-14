@@ -246,3 +246,20 @@ describe("listarCasos — busca por recibo recadastrado", () => {
     expect((await listarCasos({ busca: "9999000777" })).map((c) => c.id)).toEqual(["c2"]);
   });
 });
+
+describe("listarCasos — busca por contrato de origem", () => {
+  it("busca geral encontra o caso de cancelamento pelo contrato de origem", async () => {
+    createClientMock.mockResolvedValue(
+      criarSupabaseFake({
+        casos: [...CASOS_FIXTURE, { ...CASOS_FIXTURE[1], id: "c5", protocolo: 105, contrato_origem: "17105555000001" }],
+        casos_contratos_adicionais: [],
+        casos_recibos_recadastrados: [],
+        usuarios: USUARIOS_FIXTURE,
+      })
+    );
+
+    const resultado = await listarCasos({ busca: "5555000001" });
+    expect(resultado.map((c) => c.id)).toEqual(["c5"]);
+    expect(resultado[0].contrato_origem).toBe("17105555000001");
+  });
+});

@@ -18,6 +18,7 @@ import {
   ANEXO_TIPOS_DOCUMENTO,
   FILIAIS,
   MOTIVOS_CASO,
+  TIPOS_CASO_CANCELAMENTO,
   tiposCasoPermitidos,
 } from "@/lib/validation/caso";
 import type { PerfilUsuario, TipoCaso } from "@/lib/supabase/types";
@@ -166,6 +167,12 @@ function CasoFormCampos({
   const [anexoRows, setAnexoRows] = useState<string[]>([]);
   const [anexoErros, setAnexoErros] = useState<Record<string, string | undefined>>({});
   const anexoIdBase = useId();
+  const [contratoOrigem, setContratoOrigem] = useState(
+    somenteDigitos(state.valores?.contratoOrigem ?? "").slice(0, 14)
+  );
+  // Opcional: vazio é válido; preenchido precisa dos 14 dígitos (mesma regra do contrato).
+  const erroContratoOrigem =
+    contratoOrigem.length > 0 && contratoOrigem.length < 14 ? "Contrato de origem deve ter exatamente 14 números" : undefined;
   const [contratoAdicionalRows, setContratoAdicionalRows] = useState<string[]>([]);
   const [contratoAdicionalValores, setContratoAdicionalValores] = useState<Record<string, string>>({});
   const [contratoAdicionalErros, setContratoAdicionalErros] = useState<Record<string, string | undefined>>({});
@@ -286,6 +293,7 @@ function CasoFormCampos({
   const exigeMotivoDescricao = tipoCaso === "alteracao_data" || tipoCaso === "cancelamento";
   const exigeSoDescricao = tipoCaso === "recadastro_sem_reserva";
   const exigeInadimplencia = tipoCaso === "inadimplencia";
+  const aceitaContratoOrigem = tipoCaso !== "" && TIPOS_CASO_CANCELAMENTO.includes(tipoCaso);
 
   return (
     <form action={formAction} onSubmit={validarAntesDeEnviar} className="flex flex-col gap-4">
@@ -558,6 +566,24 @@ function CasoFormCampos({
             />
             <FieldError mensagem={errosLocais.dataCancelamento ?? state.fieldErrors?.dataCancelamento} />
           </div>
+        </div>
+      )}
+
+      {aceitaContratoOrigem && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="contratoOrigem">Contrato de origem (opcional)</Label>
+          <Input
+            id="contratoOrigem"
+            name="contratoOrigem"
+            inputMode="numeric"
+            maxLength={14}
+            placeholder="Número do contrato de origem"
+            value={contratoOrigem}
+            aria-invalid={Boolean(erroContratoOrigem || state.fieldErrors?.contratoOrigem)}
+            ref={(el) => el?.setCustomValidity(erroContratoOrigem ?? "")}
+            onChange={(e) => setContratoOrigem(somenteDigitos(e.target.value).slice(0, 14))}
+          />
+          <FieldError mensagem={erroContratoOrigem ?? state.fieldErrors?.contratoOrigem} />
         </div>
       )}
       </div>

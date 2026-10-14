@@ -210,6 +210,7 @@ export function CasosLista({
                   <th className="py-2 pr-4 font-medium">Tipo</th>
                   <th className="py-2 pr-4 font-medium">Cliente</th>
                   <th className="py-2 pr-4 font-medium">Dono</th>
+                  <th className="py-2 pr-4 font-medium">Contrato de origem</th>
                   <th className="py-2 pr-4 font-medium">Status</th>
                   <th className="py-2 pr-4 font-medium">Prazo de vigência</th>
                 </tr>
@@ -228,6 +229,7 @@ export function CasosLista({
                     <td className="py-2 pr-4">{TIPO_CASO_LABELS[c.tipo_caso]}</td>
                     <td className="py-2 pr-4">{c.cliente_nome}</td>
                     <td className="py-2 pr-4">{c.donoNome}</td>
+                    <td className="py-2 pr-4">{c.contrato_origem ?? "—"}</td>
                     <td className="py-2 pr-4">
                       <Badge className={STATUS_BADGE_CLASSES[c.status_atual]}>{STATUS_LABELS[c.status_atual]}</Badge>
                     </td>

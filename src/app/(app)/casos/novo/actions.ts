@@ -20,6 +20,7 @@ export type CasoFormValores = {
   descricao?: string;
   parcelasEmAberto?: string;
   dataCancelamento?: string;
+  contratoOrigem?: string;
 };
 
 export type CriarCasoState = {
@@ -86,6 +87,14 @@ function analisarErroCaso(error: PostgrestError): ErroAnalisado {
       const mensagem = "Contrato deve ter exatamente 14 números.";
       return { error: mensagem, fieldErrors: { contratoNumero: mensagem } };
     }
+    if (error.message.includes("casos_contrato_origem_formato")) {
+      const mensagem = "Contrato de origem deve ter exatamente 14 números.";
+      return { error: mensagem, fieldErrors: { contratoOrigem: mensagem } };
+    }
+    if (error.message.includes("casos_contrato_origem_por_tipo")) {
+      const mensagem = "Contrato de origem só pode ser informado em casos de cancelamento.";
+      return { error: mensagem, fieldErrors: { contratoOrigem: mensagem } };
+    }
     if (error.message.includes("casos_campos_por_tipo")) {
       return { error: "Os dados informados não correspondem ao tipo de caso selecionado." };
     }
@@ -108,6 +117,7 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     descricao: comoTexto(formData.get("descricao")),
     parcelasEmAberto: comoTexto(formData.get("parcelasEmAberto")),
     dataCancelamento: comoTexto(formData.get("dataCancelamento")),
+    contratoOrigem: comoTexto(formData.get("contratoOrigem")),
   };
 
   // Campos obrigatórios vão para o zod como string (mesmo vazia — a própria
@@ -124,6 +134,7 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     descricao: formData.get("descricao") || undefined,
     parcelasEmAberto: formData.get("parcelasEmAberto") || undefined,
     dataCancelamento: formData.get("dataCancelamento") || undefined,
+    contratoOrigem: formData.get("contratoOrigem") || undefined,
   };
 
   const parsed = casoSchema.safeParse(raw);
@@ -169,6 +180,7 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
       descricao: "descricao" in dados ? dados.descricao : null,
       parcelas_em_aberto: "parcelasEmAberto" in dados ? dados.parcelasEmAberto : null,
       data_cancelamento: "dataCancelamento" in dados ? dados.dataCancelamento : null,
+      contrato_origem: "contratoOrigem" in dados ? (dados.contratoOrigem ?? null) : null,
     })
     .select("id, protocolo")
     .single();

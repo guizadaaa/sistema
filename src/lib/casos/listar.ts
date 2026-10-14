@@ -38,6 +38,7 @@ export type CasoListado = {
   vendedor_dono: string;
   donoNome: string;
   caso_teste: boolean;
+  contrato_origem: string | null;
   /** Só preenchido para status Resolvido — data em que entrou em Resolvido (ver carregarResolvidoEm). */
   resolvidoEm: string | null;
 };
@@ -62,7 +63,7 @@ async function idsCasosPorContratoAdicional(supabase: SupabaseClient, termo: str
 }
 
 /**
- * ids de casos cujo contrato (principal ou adicional) bate com o termo
+ * ids de casos cujo contrato (principal, adicional ou de origem) bate com o termo
  * (já só dígitos). Reaproveitado pelo filtro dedicado "Contrato" e pela
  * busca geral.
  */
@@ -77,6 +78,15 @@ async function idsCasosPorContrato(supabase: SupabaseClient, termoDigitos: strin
   for (const c of porPrincipal ?? []) ids.add(c.id);
 
   for (const id of await idsCasosPorContratoAdicional(supabase, termoDigitos)) ids.add(id);
+
+  // Contrato de origem (só casos de cancelamento) — coluna do próprio caso,
+  // mesma RLS.
+  const { data: porOrigem, error: porOrigemError } = await supabase
+    .from("casos")
+    .select("id")
+    .ilike("contrato_origem", `%${termoDigitos}%`);
+  if (porOrigemError) throw porOrigemError;
+  for (const c of porOrigem ?? []) ids.add(c.id);
 
   return [...ids];
 }
@@ -150,7 +160,7 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   let query = supabase
     .from("casos")
     .select(
-      "id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero, caso_teste"
+      "id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero, contrato_origem, caso_teste"
     )
     .order("criado_em", { ascending: false });
 

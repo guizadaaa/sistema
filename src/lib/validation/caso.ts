@@ -39,6 +39,16 @@ const contratoNumeroSchema = numero14DigitosSchema("Contrato");
 export const contratoAdicionalSchema = contratoNumeroSchema;
 export const reciboRecadastradoSchema = numero14DigitosSchema("Recibo");
 
+// Opcional, só nos tipos de cancelamento (casos_contrato_origem_por_tipo).
+// Campo vazio no form chega como "" — vira undefined (não informado).
+const contratoOrigemSchema = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+  numero14DigitosSchema("Contrato de origem").optional()
+);
+
+/** Tipos de caso de cancelamento — os únicos que aceitam "Contrato de origem". */
+export const TIPOS_CASO_CANCELAMENTO: readonly TipoCaso[] = ["cancelamento", "inadimplencia"];
+
 const camposComuns = {
   vendedorDono: z.string().uuid("Selecione o dono do caso"),
   contratoNumero: contratoNumeroSchema,
@@ -77,11 +87,12 @@ const inadimplencia = z.object({
   tipoCaso: z.literal("inadimplencia"),
   parcelasEmAberto: z.coerce.number().int("Deve ser um número inteiro").positive("Deve ser maior que zero"),
   dataCancelamento: z.string().refine((v) => !Number.isNaN(Date.parse(v)), "Data inválida"),
+  contratoOrigem: contratoOrigemSchema,
 });
 
 export const casoSchema = z.discriminatedUnion("tipoCaso", [
   alteracaoDataOuCancelamento.extend({ tipoCaso: z.literal("alteracao_data") }),
-  alteracaoDataOuCancelamento.extend({ tipoCaso: z.literal("cancelamento") }),
+  alteracaoDataOuCancelamento.extend({ tipoCaso: z.literal("cancelamento"), contratoOrigem: contratoOrigemSchema }),
   recadastroSemReserva,
   inadimplencia,
 ]);
