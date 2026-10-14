@@ -625,6 +625,40 @@ export interface Database {
       };
     };
     Functions: {
+      linkly_cliques_mes: {
+        Args: { p_mes: string };
+        Returns: {
+          mapeamento_id: string;
+          link_id: string;
+          filial: FilialCvc;
+          short_url: string;
+          usuario_id: string;
+          inicio: string;
+          fim: string;
+          cliques: number;
+          base_parcial: boolean;
+          contagem_desde: string | null;
+        }[];
+      };
+      linkly_cliques_vitrine_mes: {
+        Args: { p_mes: string };
+        Returns: {
+          link_id: string;
+          filial: FilialCvc;
+          short_url: string;
+          cliques: number;
+          base_parcial: boolean;
+          contagem_desde: string | null;
+        }[];
+      };
+      linkly_meses_com_registro: {
+        Args: Record<string, never>;
+        Returns: { mes: string }[];
+      };
+      linkly_ultima_sincronizacao: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
       vendedores_filtro_casos: {
         Args: { p_filial?: FilialCvc | null };
         Returns: { id: string; nome_completo: string }[];
