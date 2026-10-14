@@ -10,7 +10,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FILIAL_LABELS, STATUS_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
+import { FILIAL_LABELS, STATUS_LABELS, SUBTIPO_RECADASTRO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { STATUS_ORDEM } from "@/lib/casos/status";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 import type { CasoListado } from "@/lib/casos/listar";
@@ -87,7 +87,7 @@ export function CasosLista({
                 <Input
                   id="busca"
                   name="busca"
-                  placeholder="Contrato, cliente, protocolo ou CPF"
+                  placeholder="Contrato, recibo, cliente, protocolo ou CPF"
                   defaultValue={filtros.busca ?? ""}
                   className="w-72"
                 />
@@ -210,6 +210,7 @@ export function CasosLista({
                   <th className="py-2 pr-4 font-medium">Tipo</th>
                   <th className="py-2 pr-4 font-medium">Cliente</th>
                   <th className="py-2 pr-4 font-medium">Dono</th>
+                  <th className="py-2 pr-4 font-medium">Contrato de origem</th>
                   <th className="py-2 pr-4 font-medium">Status</th>
                   <th className="py-2 pr-4 font-medium">Prazo de vigência</th>
                 </tr>
@@ -225,9 +226,19 @@ export function CasosLista({
                         {c.caso_teste && <Badge variant="outline">Teste</Badge>}
                       </div>
                     </td>
-                    <td className="py-2 pr-4">{TIPO_CASO_LABELS[c.tipo_caso]}</td>
+                    <td className="py-2 pr-4">
+                      <div className="flex flex-col">
+                        <span>{TIPO_CASO_LABELS[c.tipo_caso]}</span>
+                        {c.subtipo_recadastro && (
+                          <span className="text-muted-foreground text-xs">
+                            {SUBTIPO_RECADASTRO_LABELS[c.subtipo_recadastro]}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="py-2 pr-4">{c.cliente_nome}</td>
                     <td className="py-2 pr-4">{c.donoNome}</td>
+                    <td className="py-2 pr-4">{c.contrato_origem ?? "—"}</td>
                     <td className="py-2 pr-4">
                       <Badge className={STATUS_BADGE_CLASSES[c.status_atual]}>{STATUS_LABELS[c.status_atual]}</Badge>
                     </td>

@@ -6,6 +6,7 @@ import type {
   PerfilUsuario,
   QuemPagaMulta,
   StatusCaso,
+  SubtipoRecadastro,
   SubtipoReembolso,
   SubtipoRemarcacao,
   TipoCaso,
@@ -30,8 +31,17 @@ export const FILIAL_LABELS: Record<FilialCvc, string> = {
 export const TIPO_CASO_LABELS: Record<TipoCaso, string> = {
   alteracao_data: "Alteração de data",
   cancelamento: "Cancelamento",
-  recadastro_sem_reserva: "Recadastro por não geração de reserva",
+  recadastro_sem_reserva: "Recadastro",
   inadimplencia: "Cancelamento por inadimplência",
+};
+
+// Subtipo do tipo de caso Recadastro (tipo_caso = recadastro_sem_reserva).
+// Não confundir com o desfecho "recadastro" (tipo_desfecho).
+export const SUBTIPO_RECADASTRO_LABELS: Record<SubtipoRecadastro, string> = {
+  troca_passageiro: "Troca de passageiro",
+  inclusao_passageiro: "Inclusão de passageiro",
+  troca_fornecedor: "Troca de fornecedor",
+  inclusao_servicos: "Inclusão de serviços",
 };
 
 export const MOTIVO_LABELS: Record<MotivoCaso, string> = {

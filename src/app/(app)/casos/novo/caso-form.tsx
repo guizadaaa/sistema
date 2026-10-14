@@ -3,12 +3,13 @@
 import { useActionState, useId, useState, type FocusEvent, type FormEvent } from "react";
 import { FileText, Paperclip, Plus, Trash2, User } from "lucide-react";
 
+import { CampoNumeros14Digitos } from "@/components/campo-numeros-14-digitos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ANEXO_TIPO_LABELS, MOTIVO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
+import { ANEXO_TIPO_LABELS, MOTIVO_LABELS, SUBTIPO_RECADASTRO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import type { DonoElegivel } from "@/lib/casos/dono-elegivel";
 import { cpfValido, formatarCpf, somenteDigitos } from "@/lib/validation/cpf";
 import {
@@ -17,6 +18,8 @@ import {
   ANEXO_TIPOS_DOCUMENTO,
   FILIAIS,
   MOTIVOS_CASO,
+  SUBTIPOS_RECADASTRO,
+  TIPOS_CASO_CANCELAMENTO,
   tiposCasoPermitidos,
 } from "@/lib/validation/caso";
 import type { PerfilUsuario, TipoCaso } from "@/lib/supabase/types";
@@ -79,6 +82,13 @@ export function CasoForm({
           {state.sucesso.avisosContratos && (
             <ul className="text-destructive text-sm list-disc pl-4">
               {state.sucesso.avisosContratos.map((aviso) => (
+                <li key={aviso}>{aviso}</li>
+              ))}
+            </ul>
+          )}
+          {state.sucesso.avisosRecibos && (
+            <ul className="text-destructive text-sm list-disc pl-4">
+              {state.sucesso.avisosRecibos.map((aviso) => (
                 <li key={aviso}>{aviso}</li>
               ))}
             </ul>
@@ -158,6 +168,12 @@ function CasoFormCampos({
   const [anexoRows, setAnexoRows] = useState<string[]>([]);
   const [anexoErros, setAnexoErros] = useState<Record<string, string | undefined>>({});
   const anexoIdBase = useId();
+  const [contratoOrigem, setContratoOrigem] = useState(
+    somenteDigitos(state.valores?.contratoOrigem ?? "").slice(0, 14)
+  );
+  // Opcional: vazio é válido; preenchido precisa dos 14 dígitos (mesma regra do contrato).
+  const erroContratoOrigem =
+    contratoOrigem.length > 0 && contratoOrigem.length < 14 ? "Contrato de origem deve ter exatamente 14 números" : undefined;
   const [contratoAdicionalRows, setContratoAdicionalRows] = useState<string[]>([]);
   const [contratoAdicionalValores, setContratoAdicionalValores] = useState<Record<string, string>>({});
   const [contratoAdicionalErros, setContratoAdicionalErros] = useState<Record<string, string | undefined>>({});
@@ -278,6 +294,7 @@ function CasoFormCampos({
   const exigeMotivoDescricao = tipoCaso === "alteracao_data" || tipoCaso === "cancelamento";
   const exigeSoDescricao = tipoCaso === "recadastro_sem_reserva";
   const exigeInadimplencia = tipoCaso === "inadimplencia";
+  const aceitaContratoOrigem = tipoCaso !== "" && TIPOS_CASO_CANCELAMENTO.includes(tipoCaso);
 
   return (
     <form action={formAction} onSubmit={validarAntesDeEnviar} className="flex flex-col gap-4">
@@ -494,6 +511,40 @@ function CasoFormCampos({
         </div>
       )}
 
+      {exigeSoDescricao && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="subtipoRecadastro">Subtipo do Recadastro</Label>
+          <Select
+            name="subtipoRecadastro"
+            required
+            defaultValue={state.valores?.subtipoRecadastro || undefined}
+            onValueChange={() => setErroLocal("subtipoRecadastro", undefined)}
+          >
+            <SelectTrigger
+              id="subtipoRecadastro"
+              onBlur={(e) =>
+                setErroLocal(
+                  "subtipoRecadastro",
+                  (e.target as HTMLButtonElement).getAttribute("data-placeholder") !== null
+                    ? "Selecione o subtipo do Recadastro"
+                    : undefined
+                )
+              }
+            >
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {SUBTIPOS_RECADASTRO.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {SUBTIPO_RECADASTRO_LABELS[s]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldError mensagem={errosLocais.subtipoRecadastro ?? state.fieldErrors?.subtipoRecadastro} />
+        </div>
+      )}
+
       {(exigeMotivoDescricao || exigeSoDescricao) && (
         <div className="flex flex-col gap-2">
           <Label htmlFor="descricao">Descrição</Label>
@@ -508,6 +559,15 @@ function CasoFormCampos({
           />
           <FieldError mensagem={errosLocais.descricao ?? state.fieldErrors?.descricao} />
         </div>
+      )}
+
+      {exigeSoDescricao && (
+        <CampoNumeros14Digitos
+          name="reciboRecadastrado"
+          titulo="Recibos recadastrados (opcional)"
+          rotulo="Recibo"
+          textoBotao="Adicionar recibo"
+        />
       )}
 
       {exigeInadimplencia && (
@@ -541,6 +601,24 @@ function CasoFormCampos({
             />
             <FieldError mensagem={errosLocais.dataCancelamento ?? state.fieldErrors?.dataCancelamento} />
           </div>
+        </div>
+      )}
+
+      {aceitaContratoOrigem && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="contratoOrigem">Contrato de origem (opcional)</Label>
+          <Input
+            id="contratoOrigem"
+            name="contratoOrigem"
+            inputMode="numeric"
+            maxLength={14}
+            placeholder="Número do contrato de origem"
+            value={contratoOrigem}
+            aria-invalid={Boolean(erroContratoOrigem || state.fieldErrors?.contratoOrigem)}
+            ref={(el) => el?.setCustomValidity(erroContratoOrigem ?? "")}
+            onChange={(e) => setContratoOrigem(somenteDigitos(e.target.value).slice(0, 14))}
+          />
+          <FieldError mensagem={erroContratoOrigem ?? state.fieldErrors?.contratoOrigem} />
         </div>
       )}
       </div>

@@ -4,12 +4,12 @@ import { carregarNomesUsuariosCasos } from "@/lib/casos/nomes";
 import { carregarResolvidoEm } from "@/lib/casos/resolucao";
 import { createClient } from "@/lib/supabase/server";
 import { somenteDigitos } from "@/lib/validation/cpf";
-import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
+import type { FilialCvc, StatusCaso, SubtipoRecadastro, TipoCaso } from "@/lib/supabase/types";
 
 export type FiltrosCasos = {
   status?: StatusCaso;
   tipo?: TipoCaso;
-  /** Busca universal — cliente, contrato (principal ou adicional), protocolo ou CPF. */
+  /** Busca universal — cliente, contrato (principal ou adicional), recibo recadastrado, protocolo ou CPF. */
   busca?: string;
   filial?: FilialCvc;
   /** Dono do caso (vendedor_dono). A RLS de casos continua decidindo o que aparece. */
@@ -38,6 +38,8 @@ export type CasoListado = {
   vendedor_dono: string;
   donoNome: string;
   caso_teste: boolean;
+  contrato_origem: string | null;
+  subtipo_recadastro: SubtipoRecadastro | null;
   /** Só preenchido para status Resolvido — data em que entrou em Resolvido (ver carregarResolvidoEm). */
   resolvidoEm: string | null;
 };
@@ -62,7 +64,7 @@ async function idsCasosPorContratoAdicional(supabase: SupabaseClient, termo: str
 }
 
 /**
- * ids de casos cujo contrato (principal ou adicional) bate com o termo
+ * ids de casos cujo contrato (principal, adicional ou de origem) bate com o termo
  * (já só dígitos). Reaproveitado pelo filtro dedicado "Contrato" e pela
  * busca geral.
  */
@@ -78,11 +80,20 @@ async function idsCasosPorContrato(supabase: SupabaseClient, termoDigitos: strin
 
   for (const id of await idsCasosPorContratoAdicional(supabase, termoDigitos)) ids.add(id);
 
+  // Contrato de origem (só casos de cancelamento) — coluna do próprio caso,
+  // mesma RLS.
+  const { data: porOrigem, error: porOrigemError } = await supabase
+    .from("casos")
+    .select("id")
+    .ilike("contrato_origem", `%${termoDigitos}%`);
+  if (porOrigemError) throw porOrigemError;
+  for (const c of porOrigem ?? []) ids.add(c.id);
+
   return [...ids];
 }
 
 /**
- * ids de casos que batem com a busca geral (cliente, contrato, protocolo ou
+ * ids de casos que batem com a busca geral (cliente, contrato, recibo recadastrado, protocolo ou
  * CPF). Implementado como várias queries de coluna única (nunca `.or()` com
  * o termo bruto interpolado) — cada `.ilike()`/`.eq()` do supabase-js escapa
  * o valor sozinho; a fragilidade só existia na sintaxe combinada de `.or()`,
@@ -104,6 +115,15 @@ async function idsCasosPorBusca(supabase: SupabaseClient, termoBruto: string): P
   for (const c of porNome ?? []) ids.add(c.id);
 
   for (const id of await idsCasosPorContrato(supabase, termo)) ids.add(id);
+
+  // Recibos recadastrados (casos de Recadastro) — mesma RLS do caso pai,
+  // então só volta caso_id que este usuário já enxerga.
+  const { data: porRecibo, error: porReciboError } = await supabase
+    .from("casos_recibos_recadastrados")
+    .select("caso_id")
+    .ilike("recibo_numero", `%${termo}%`);
+  if (porReciboError) throw porReciboError;
+  for (const r of porRecibo ?? []) ids.add(r.caso_id);
 
   if (/^\d+$/.test(termo)) {
     const { data: porProtocolo, error: porProtocoloError } = await supabase
@@ -141,7 +161,7 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   let query = supabase
     .from("casos")
     .select(
-      "id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero, caso_teste"
+      "id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero, contrato_origem, subtipo_recadastro, caso_teste"
     )
     .order("criado_em", { ascending: false });
 

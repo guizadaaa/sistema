@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { cpfValido, somenteDigitos } from "./cpf";
-import type { FilialCvc, MotivoCaso, PerfilUsuario, TipoCaso } from "@/lib/supabase/types";
+import type { FilialCvc, MotivoCaso, PerfilUsuario, SubtipoRecadastro, TipoCaso } from "@/lib/supabase/types";
 
 export const TIPOS_CASO: readonly TipoCaso[] = [
   "alteracao_data",
@@ -23,14 +23,38 @@ export function tiposCasoPermitidos(perfil: PerfilUsuario): readonly TipoCaso[] 
 
 export const MOTIVOS_CASO: readonly MotivoCaso[] = ["pedido_cliente", "erro_vendedor", "fornecedor"];
 
-// Mesma regra do contrato principal (casos_contrato_numero_formato) — usada
-// também para os contratos adicionais (casos_contratos_adicionais_formato).
-const contratoNumeroSchema = z
-  .string()
-  .transform(somenteDigitos)
-  .refine((v) => v.length === 14, "Contrato deve ter exatamente 14 números");
+export const SUBTIPOS_RECADASTRO: readonly SubtipoRecadastro[] = [
+  "troca_passageiro",
+  "inclusao_passageiro",
+  "troca_fornecedor",
+  "inclusao_servicos",
+];
+
+// Regra única de número de 14 dígitos (casos_contrato_numero_formato) —
+// usada no contrato principal, nos contratos adicionais
+// (casos_contratos_adicionais_formato) e nos recibos recadastrados
+// (casos_recibos_recadastrados_formato). Só o rótulo da mensagem muda.
+function numero14DigitosSchema(rotulo: string) {
+  return z
+    .string()
+    .transform(somenteDigitos)
+    .refine((v) => v.length === 14, `${rotulo} deve ter exatamente 14 números`);
+}
+
+const contratoNumeroSchema = numero14DigitosSchema("Contrato");
 
 export const contratoAdicionalSchema = contratoNumeroSchema;
+export const reciboRecadastradoSchema = numero14DigitosSchema("Recibo");
+
+// Opcional, só nos tipos de cancelamento (casos_contrato_origem_por_tipo).
+// Campo vazio no form chega como "" — vira undefined (não informado).
+const contratoOrigemSchema = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+  numero14DigitosSchema("Contrato de origem").optional()
+);
+
+/** Tipos de caso de cancelamento — os únicos que aceitam "Contrato de origem". */
+export const TIPOS_CASO_CANCELAMENTO: readonly TipoCaso[] = ["cancelamento", "inadimplencia"];
 
 const camposComuns = {
   vendedorDono: z.string().uuid("Selecione o dono do caso"),
@@ -46,7 +70,7 @@ const camposComuns = {
 
 // As quatro variantes espelham exatamente a constraint casos_campos_por_tipo
 // (supabase/migrations/20260716000001_schema.sql): motivo+descricao exigidos
-// em alteração de data/cancelamento, só descricao em recadastro, e
+// em alteração de data/cancelamento, só descricao (+ subtipo, ver abaixo) em recadastro, e
 // parcelas_em_aberto+data_cancelamento (sem motivo/descricao) em
 // inadimplência. Mesma regra nos dois lados — client (UX) e o insert no
 // server action (defesa em profundidade) — para nunca divergir da constraint.
@@ -59,9 +83,16 @@ const alteracaoDataOuCancelamento = z.object({
   descricao: z.string().trim().min(1, "Descrição obrigatória"),
 });
 
+// subtipoRecadastro: obrigatório aqui, na criação — mesma regra da trigger
+// casos_exige_subtipo_recadastro (20261006000008). Não está em
+// casos_campos_por_tipo de propósito: lá invalidaria os Recadastro antigos
+// (sem subtipo), que continuam válidos e editáveis.
 const recadastroSemReserva = z.object({
   ...camposComuns,
   tipoCaso: z.literal("recadastro_sem_reserva"),
+  subtipoRecadastro: z.enum(SUBTIPOS_RECADASTRO as [SubtipoRecadastro, ...SubtipoRecadastro[]], {
+    message: "Selecione o subtipo do Recadastro",
+  }),
   descricao: z.string().trim().min(1, "Descrição obrigatória"),
 });
 
@@ -70,11 +101,12 @@ const inadimplencia = z.object({
   tipoCaso: z.literal("inadimplencia"),
   parcelasEmAberto: z.coerce.number().int("Deve ser um número inteiro").positive("Deve ser maior que zero"),
   dataCancelamento: z.string().refine((v) => !Number.isNaN(Date.parse(v)), "Data inválida"),
+  contratoOrigem: contratoOrigemSchema,
 });
 
 export const casoSchema = z.discriminatedUnion("tipoCaso", [
   alteracaoDataOuCancelamento.extend({ tipoCaso: z.literal("alteracao_data") }),
-  alteracaoDataOuCancelamento.extend({ tipoCaso: z.literal("cancelamento") }),
+  alteracaoDataOuCancelamento.extend({ tipoCaso: z.literal("cancelamento"), contratoOrigem: contratoOrigemSchema }),
   recadastroSemReserva,
   inadimplencia,
 ]);

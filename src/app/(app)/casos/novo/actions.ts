@@ -6,6 +6,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { enviarImagensDescricao, validarEEnviarAnexos } from "@/lib/casos/anexos";
 import { validarEInserirContratosAdicionais } from "@/lib/casos/contratos-adicionais";
+import { validarEInserirRecibosRecadastrados } from "@/lib/casos/recibos-recadastrados";
 import { casoSchema, tiposCasoPermitidos } from "@/lib/validation/caso";
 
 export type CasoFormValores = {
@@ -19,13 +20,15 @@ export type CasoFormValores = {
   descricao?: string;
   parcelasEmAberto?: string;
   dataCancelamento?: string;
+  contratoOrigem?: string;
+  subtipoRecadastro?: string;
 };
 
 export type CriarCasoState = {
   error?: string;
   fieldErrors?: Partial<Record<keyof CasoFormValores, string>>;
   valores?: CasoFormValores;
-  sucesso?: { id: string; protocolo: number; avisosAnexos?: string[]; avisosContratos?: string[] };
+  sucesso?: { id: string; protocolo: number; avisosAnexos?: string[]; avisosContratos?: string[]; avisosRecibos?: string[] };
 };
 
 /** Para reidratar o formulário após um erro — nunca undefined, mesmo vazio. */
@@ -58,6 +61,9 @@ function analisarErroCaso(error: PostgrestError): ErroAnalisado {
       const mensagem = "O número de contrato não começa com um código de filial válido (1710, 1714 ou 1730).";
       return { error: mensagem, fieldErrors: { contratoNumero: mensagem } };
     }
+    if (error.message.includes("subtipo do Recadastro")) {
+      return { error: error.message, fieldErrors: { subtipoRecadastro: error.message } };
+    }
     // Outras exceções (ex.: transferência de casos) já vêm escritas para
     // humanos em português, seguras para mostrar direto.
     return { error: error.message };
@@ -85,6 +91,17 @@ function analisarErroCaso(error: PostgrestError): ErroAnalisado {
       const mensagem = "Contrato deve ter exatamente 14 números.";
       return { error: mensagem, fieldErrors: { contratoNumero: mensagem } };
     }
+    if (error.message.includes("casos_contrato_origem_formato")) {
+      const mensagem = "Contrato de origem deve ter exatamente 14 números.";
+      return { error: mensagem, fieldErrors: { contratoOrigem: mensagem } };
+    }
+    if (error.message.includes("casos_contrato_origem_por_tipo")) {
+      const mensagem = "Contrato de origem só pode ser informado em casos de cancelamento.";
+      return { error: mensagem, fieldErrors: { contratoOrigem: mensagem } };
+    }
+    if (error.message.includes("casos_subtipo_recadastro_por_tipo")) {
+      return { error: "Subtipo só pode ser informado em casos de Recadastro." };
+    }
     if (error.message.includes("casos_campos_por_tipo")) {
       return { error: "Os dados informados não correspondem ao tipo de caso selecionado." };
     }
@@ -107,6 +124,8 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     descricao: comoTexto(formData.get("descricao")),
     parcelasEmAberto: comoTexto(formData.get("parcelasEmAberto")),
     dataCancelamento: comoTexto(formData.get("dataCancelamento")),
+    contratoOrigem: comoTexto(formData.get("contratoOrigem")),
+    subtipoRecadastro: comoTexto(formData.get("subtipoRecadastro")),
   };
 
   // Campos obrigatórios vão para o zod como string (mesmo vazia — a própria
@@ -123,6 +142,8 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     descricao: formData.get("descricao") || undefined,
     parcelasEmAberto: formData.get("parcelasEmAberto") || undefined,
     dataCancelamento: formData.get("dataCancelamento") || undefined,
+    contratoOrigem: formData.get("contratoOrigem") || undefined,
+    subtipoRecadastro: formData.get("subtipoRecadastro") || undefined,
   };
 
   const parsed = casoSchema.safeParse(raw);
@@ -168,6 +189,8 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
       descricao: "descricao" in dados ? dados.descricao : null,
       parcelas_em_aberto: "parcelasEmAberto" in dados ? dados.parcelasEmAberto : null,
       data_cancelamento: "dataCancelamento" in dados ? dados.dataCancelamento : null,
+      contrato_origem: "contratoOrigem" in dados ? (dados.contratoOrigem ?? null) : null,
+      subtipo_recadastro: "subtipoRecadastro" in dados ? dados.subtipoRecadastro : null,
     })
     .select("id, protocolo")
     .single();
@@ -183,6 +206,10 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     ...(await validarEEnviarAnexos(supabase, data.id, formData)),
   ];
   const avisosContratos = await validarEInserirContratosAdicionais(supabase, data.id, formData);
+  const avisosRecibos =
+    dados.tipoCaso === "recadastro_sem_reserva"
+      ? await validarEInserirRecibosRecadastrados(supabase, data.id, formData)
+      : [];
 
   return {
     sucesso: {
@@ -190,6 +217,7 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
       protocolo: data.protocolo,
       avisosAnexos: avisosAnexos.length > 0 ? avisosAnexos : undefined,
       avisosContratos: avisosContratos.length > 0 ? avisosContratos : undefined,
+      avisosRecibos: avisosRecibos.length > 0 ? avisosRecibos : undefined,
     },
   };
 }

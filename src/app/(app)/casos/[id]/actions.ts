@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { validarEEnviarAnexos } from "@/lib/casos/anexos";
 import { validarEInserirContratosAdicionais } from "@/lib/casos/contratos-adicionais";
+import { validarEInserirRecibosRecadastrados } from "@/lib/casos/recibos-recadastrados";
 import { createClient } from "@/lib/supabase/server";
 import { bancoPorCodigo, CODIGO_BANCO_OUTRO } from "@/lib/validation/bancos";
 import { anexoObrigatorioFaltando, desfechoSchema } from "@/lib/validation/desfecho";
@@ -50,6 +51,21 @@ export async function adicionarContratosAoCaso(
   const supabase = await createClient();
 
   const avisos = await validarEInserirContratosAdicionais(supabase, casoId, formData);
+  revalidatePath(`/casos/${casoId}`);
+
+  return { avisos: avisos.length > 0 ? avisos : undefined };
+}
+
+/** RLS de casos_recibos_recadastrados (auth_pode_ver_caso) decide quem pode; o trigger, que o caso seja Recadastro. */
+export async function adicionarRecibosAoCaso(
+  casoId: string,
+  _prevState: AdicionarContratoState,
+  formData: FormData
+): Promise<AdicionarContratoState> {
+  await requireCurrentUser();
+  const supabase = await createClient();
+
+  const avisos = await validarEInserirRecibosRecadastrados(supabase, casoId, formData);
   revalidatePath(`/casos/${casoId}`);
 
   return { avisos: avisos.length > 0 ? avisos : undefined };
