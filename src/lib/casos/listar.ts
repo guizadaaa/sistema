@@ -4,7 +4,7 @@ import { carregarNomesUsuariosCasos } from "@/lib/casos/nomes";
 import { carregarResolvidoEm } from "@/lib/casos/resolucao";
 import { createClient } from "@/lib/supabase/server";
 import { somenteDigitos } from "@/lib/validation/cpf";
-import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
+import type { FilialCvc, StatusCaso, SubtipoRecadastro, TipoCaso } from "@/lib/supabase/types";
 
 export type FiltrosCasos = {
   status?: StatusCaso;
@@ -39,6 +39,7 @@ export type CasoListado = {
   donoNome: string;
   caso_teste: boolean;
   contrato_origem: string | null;
+  subtipo_recadastro: SubtipoRecadastro | null;
   /** Só preenchido para status Resolvido — data em que entrou em Resolvido (ver carregarResolvidoEm). */
   resolvidoEm: string | null;
 };
@@ -160,7 +161,7 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   let query = supabase
     .from("casos")
     .select(
-      "id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero, contrato_origem, caso_teste"
+      "id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero, contrato_origem, subtipo_recadastro, caso_teste"
     )
     .order("criado_em", { ascending: false });
 

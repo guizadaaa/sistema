@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { cpfValido, somenteDigitos } from "./cpf";
-import type { FilialCvc, MotivoCaso, PerfilUsuario, TipoCaso } from "@/lib/supabase/types";
+import type { FilialCvc, MotivoCaso, PerfilUsuario, SubtipoRecadastro, TipoCaso } from "@/lib/supabase/types";
 
 export const TIPOS_CASO: readonly TipoCaso[] = [
   "alteracao_data",
@@ -22,6 +22,13 @@ export function tiposCasoPermitidos(perfil: PerfilUsuario): readonly TipoCaso[] 
 }
 
 export const MOTIVOS_CASO: readonly MotivoCaso[] = ["pedido_cliente", "erro_vendedor", "fornecedor"];
+
+export const SUBTIPOS_RECADASTRO: readonly SubtipoRecadastro[] = [
+  "troca_passageiro",
+  "inclusao_passageiro",
+  "troca_fornecedor",
+  "inclusao_servicos",
+];
 
 // Regra única de número de 14 dígitos (casos_contrato_numero_formato) —
 // usada no contrato principal, nos contratos adicionais
@@ -63,7 +70,7 @@ const camposComuns = {
 
 // As quatro variantes espelham exatamente a constraint casos_campos_por_tipo
 // (supabase/migrations/20260716000001_schema.sql): motivo+descricao exigidos
-// em alteração de data/cancelamento, só descricao em recadastro, e
+// em alteração de data/cancelamento, só descricao (+ subtipo, ver abaixo) em recadastro, e
 // parcelas_em_aberto+data_cancelamento (sem motivo/descricao) em
 // inadimplência. Mesma regra nos dois lados — client (UX) e o insert no
 // server action (defesa em profundidade) — para nunca divergir da constraint.
@@ -76,9 +83,16 @@ const alteracaoDataOuCancelamento = z.object({
   descricao: z.string().trim().min(1, "Descrição obrigatória"),
 });
 
+// subtipoRecadastro: obrigatório aqui, na criação — mesma regra da trigger
+// casos_exige_subtipo_recadastro (20261006000008). Não está em
+// casos_campos_por_tipo de propósito: lá invalidaria os Recadastro antigos
+// (sem subtipo), que continuam válidos e editáveis.
 const recadastroSemReserva = z.object({
   ...camposComuns,
   tipoCaso: z.literal("recadastro_sem_reserva"),
+  subtipoRecadastro: z.enum(SUBTIPOS_RECADASTRO as [SubtipoRecadastro, ...SubtipoRecadastro[]], {
+    message: "Selecione o subtipo do Recadastro",
+  }),
   descricao: z.string().trim().min(1, "Descrição obrigatória"),
 });
 

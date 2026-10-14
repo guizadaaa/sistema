@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ANEXO_TIPO_LABELS, MOTIVO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
+import { ANEXO_TIPO_LABELS, MOTIVO_LABELS, SUBTIPO_RECADASTRO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import type { DonoElegivel } from "@/lib/casos/dono-elegivel";
 import { cpfValido, formatarCpf, somenteDigitos } from "@/lib/validation/cpf";
 import {
@@ -18,6 +18,7 @@ import {
   ANEXO_TIPOS_DOCUMENTO,
   FILIAIS,
   MOTIVOS_CASO,
+  SUBTIPOS_RECADASTRO,
   TIPOS_CASO_CANCELAMENTO,
   tiposCasoPermitidos,
 } from "@/lib/validation/caso";
@@ -507,6 +508,40 @@ function CasoFormCampos({
             </SelectContent>
           </Select>
           <FieldError mensagem={errosLocais.motivo ?? state.fieldErrors?.motivo} />
+        </div>
+      )}
+
+      {exigeSoDescricao && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="subtipoRecadastro">Subtipo do Recadastro</Label>
+          <Select
+            name="subtipoRecadastro"
+            required
+            defaultValue={state.valores?.subtipoRecadastro || undefined}
+            onValueChange={() => setErroLocal("subtipoRecadastro", undefined)}
+          >
+            <SelectTrigger
+              id="subtipoRecadastro"
+              onBlur={(e) =>
+                setErroLocal(
+                  "subtipoRecadastro",
+                  (e.target as HTMLButtonElement).getAttribute("data-placeholder") !== null
+                    ? "Selecione o subtipo do Recadastro"
+                    : undefined
+                )
+              }
+            >
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {SUBTIPOS_RECADASTRO.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {SUBTIPO_RECADASTRO_LABELS[s]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldError mensagem={errosLocais.subtipoRecadastro ?? state.fieldErrors?.subtipoRecadastro} />
         </div>
       )}
 

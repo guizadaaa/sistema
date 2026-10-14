@@ -9,6 +9,7 @@ export type TipoCaso =
   | "cancelamento"
   | "recadastro_sem_reserva"
   | "inadimplencia";
+export type SubtipoRecadastro = "troca_passageiro" | "inclusao_passageiro" | "troca_fornecedor" | "inclusao_servicos";
 export type MotivoCaso = "pedido_cliente" | "erro_vendedor" | "fornecedor";
 export type StatusCaso =
   | "inicial"
@@ -88,6 +89,8 @@ export interface Database {
           caso_teste: boolean;
           /** Só cancelamento/inadimplência (20261006000007). */
           contrato_origem: string | null;
+          /** Só Recadastro; obrigatório na criação, NULL nos casos antigos (20261006000008). */
+          subtipo_recadastro: SubtipoRecadastro | null;
         };
         Insert: {
           tipo_caso: TipoCaso;
@@ -102,6 +105,7 @@ export interface Database {
           parcelas_em_aberto?: number | null;
           data_cancelamento?: string | null;
           contrato_origem?: string | null;
+          subtipo_recadastro?: SubtipoRecadastro | null;
         };
         Update: Partial<{
           prazo_vigencia: string;

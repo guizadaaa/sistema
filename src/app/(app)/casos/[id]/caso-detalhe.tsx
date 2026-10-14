@@ -6,6 +6,7 @@ import {
   MOTIVO_LABELS,
   QUEM_PAGA_LABELS,
   STATUS_LABELS,
+  SUBTIPO_RECADASTRO_LABELS,
   TIPO_CASO_LABELS,
 } from "@/lib/labels";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
@@ -76,6 +77,13 @@ export function CasoDetalhe({
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               <dt className="text-muted-foreground">Tipo</dt>
               <dd>{TIPO_CASO_LABELS[caso.tipo_caso]}</dd>
+
+              {caso.subtipo_recadastro && (
+                <>
+                  <dt className="text-muted-foreground">Subtipo</dt>
+                  <dd>{SUBTIPO_RECADASTRO_LABELS[caso.subtipo_recadastro]}</dd>
+                </>
+              )}
 
               <dt className="text-muted-foreground">Filial</dt>
               <dd>{FILIAL_LABELS[caso.filial]}</dd>

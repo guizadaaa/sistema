@@ -39,3 +39,31 @@ describe("casoSchema — contrato de origem", () => {
     expect("contratoOrigem" in resultado).toBe(false);
   });
 });
+
+describe("casoSchema — subtipo do Recadastro", () => {
+  const base = { ...COMUNS, tipoCaso: "recadastro_sem_reserva", descricao: "x" };
+
+  it("é obrigatório na criação de um Recadastro", () => {
+    const resultado = casoSchema.safeParse(base);
+    expect(resultado.success).toBe(false);
+    expect(resultado.error?.issues[0]?.message).toBe("Selecione o subtipo do Recadastro");
+  });
+
+  it("aceita os 4 subtipos e recusa valor fora da lista", () => {
+    for (const subtipo of ["troca_passageiro", "inclusao_passageiro", "troca_fornecedor", "inclusao_servicos"]) {
+      expect(casoSchema.safeParse({ ...base, subtipoRecadastro: subtipo }).success).toBe(true);
+    }
+    expect(casoSchema.safeParse({ ...base, subtipoRecadastro: "outro" }).success).toBe(false);
+  });
+
+  it("outros tipos descartam o subtipo (o banco também recusa)", () => {
+    const resultado = casoSchema.parse({
+      ...COMUNS,
+      tipoCaso: "alteracao_data",
+      motivo: "pedido_cliente",
+      descricao: "x",
+      subtipoRecadastro: "troca_passageiro",
+    });
+    expect("subtipoRecadastro" in resultado).toBe(false);
+  });
+});

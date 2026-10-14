@@ -21,6 +21,7 @@ export type CasoFormValores = {
   parcelasEmAberto?: string;
   dataCancelamento?: string;
   contratoOrigem?: string;
+  subtipoRecadastro?: string;
 };
 
 export type CriarCasoState = {
@@ -60,6 +61,9 @@ function analisarErroCaso(error: PostgrestError): ErroAnalisado {
       const mensagem = "O número de contrato não começa com um código de filial válido (1710, 1714 ou 1730).";
       return { error: mensagem, fieldErrors: { contratoNumero: mensagem } };
     }
+    if (error.message.includes("subtipo do Recadastro")) {
+      return { error: error.message, fieldErrors: { subtipoRecadastro: error.message } };
+    }
     // Outras exceções (ex.: transferência de casos) já vêm escritas para
     // humanos em português, seguras para mostrar direto.
     return { error: error.message };
@@ -95,6 +99,9 @@ function analisarErroCaso(error: PostgrestError): ErroAnalisado {
       const mensagem = "Contrato de origem só pode ser informado em casos de cancelamento.";
       return { error: mensagem, fieldErrors: { contratoOrigem: mensagem } };
     }
+    if (error.message.includes("casos_subtipo_recadastro_por_tipo")) {
+      return { error: "Subtipo só pode ser informado em casos de Recadastro." };
+    }
     if (error.message.includes("casos_campos_por_tipo")) {
       return { error: "Os dados informados não correspondem ao tipo de caso selecionado." };
     }
@@ -118,6 +125,7 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     parcelasEmAberto: comoTexto(formData.get("parcelasEmAberto")),
     dataCancelamento: comoTexto(formData.get("dataCancelamento")),
     contratoOrigem: comoTexto(formData.get("contratoOrigem")),
+    subtipoRecadastro: comoTexto(formData.get("subtipoRecadastro")),
   };
 
   // Campos obrigatórios vão para o zod como string (mesmo vazia — a própria
@@ -135,6 +143,7 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     parcelasEmAberto: formData.get("parcelasEmAberto") || undefined,
     dataCancelamento: formData.get("dataCancelamento") || undefined,
     contratoOrigem: formData.get("contratoOrigem") || undefined,
+    subtipoRecadastro: formData.get("subtipoRecadastro") || undefined,
   };
 
   const parsed = casoSchema.safeParse(raw);
@@ -181,6 +190,7 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
       parcelas_em_aberto: "parcelasEmAberto" in dados ? dados.parcelasEmAberto : null,
       data_cancelamento: "dataCancelamento" in dados ? dados.dataCancelamento : null,
       contrato_origem: "contratoOrigem" in dados ? (dados.contratoOrigem ?? null) : null,
+      subtipo_recadastro: "subtipoRecadastro" in dados ? dados.subtipoRecadastro : null,
     })
     .select("id, protocolo")
     .single();

@@ -33,8 +33,9 @@ on conflict (id) do nothing;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 set role authenticated;
 
-insert into public.casos (id, tipo_caso, descricao, vendedor_dono, criado_por, prazo_vigencia, contrato_numero, cliente_nome, cliente_cpf)
-values ('24000000-0000-0000-0000-00000000000a', 'recadastro_sem_reserva', 'recadastro com recibos',
+-- subtipo_recadastro obrigatório na criação desde 20261006000008.
+insert into public.casos (id, tipo_caso, subtipo_recadastro, descricao, vendedor_dono, criado_por, prazo_vigencia, contrato_numero, cliente_nome, cliente_cpf)
+values ('24000000-0000-0000-0000-00000000000a', 'recadastro_sem_reserva', 'troca_passageiro', 'recadastro com recibos',
   '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', '2026-12-31', '17100000000241', 'Cliente R', '11144477735');
 
 insert into public.casos (id, tipo_caso, motivo, descricao, vendedor_dono, criado_por, prazo_vigencia, contrato_numero, cliente_nome, cliente_cpf)

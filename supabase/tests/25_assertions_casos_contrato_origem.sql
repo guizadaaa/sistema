@@ -70,8 +70,10 @@ values ('alteracao_data', 'pedido_cliente', 'x', '00000000-0000-0000-0000-000000
 select public._test_assert('constraint: contrato de origem em Alteração de data é recusado', :'ERROR' = 'true');
 
 \set ON_ERROR_STOP 0
-insert into public.casos (tipo_caso, descricao, vendedor_dono, criado_por, prazo_vigencia, contrato_numero, cliente_nome, cliente_cpf, contrato_origem)
-values ('recadastro_sem_reserva', 'x', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', '2026-12-31', '17100000000257', 'X', '11144477735', '17100000000258');
+-- Com subtipo (obrigatório desde 20261006000008), para o único motivo de
+-- recusa ser o contrato de origem.
+insert into public.casos (tipo_caso, subtipo_recadastro, descricao, vendedor_dono, criado_por, prazo_vigencia, contrato_numero, cliente_nome, cliente_cpf, contrato_origem)
+values ('recadastro_sem_reserva', 'inclusao_servicos', 'x', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', '2026-12-31', '17100000000257', 'X', '11144477735', '17100000000258');
 \set ON_ERROR_STOP 1
 select public._test_assert('constraint: contrato de origem em Recadastro é recusado', :'ERROR' = 'true');
 
