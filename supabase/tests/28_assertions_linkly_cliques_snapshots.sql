@@ -238,6 +238,10 @@ select public._test_assert('authenticated NAO executa a função interna', not h
 
 -- Idempotência.
 \ir ../migrations/20261006000010_linkly_cliques_snapshots.sql
+-- Reaplicar uma migration antiga recria as funções na versão DELA; reaplica
+-- também as posteriores que redefinem os mesmos objetos, para os arquivos
+-- de teste seguintes rodarem contra o schema atual.
+\ir ../migrations/20261006000011_linkly_base_mes_manual.sql
 select public._test_assert(
   'migration reaplicada: snapshots preservados e trigger única',
   (select total = 300 from public.linkly_cliques_snapshots where link_id = '28000000-0000-0000-0000-0000000000a1' and data = '2026-10-20')
