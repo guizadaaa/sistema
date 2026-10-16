@@ -232,6 +232,48 @@ select public._test_assert(
 reset role;
 reset request.jwt.claim.sub;
 
+-- ----------------------------------------------------------------------------
+-- Virada de mês com sincronização de hora em hora (link de vitrine V2,
+-- nov -> dez/2026). O snapshot de um dia guarda o ÚLTIMO total do dia; a
+-- base de dezembro é o snapshot de 30/11 (sync das 23h). Os cliques entre
+-- 23h e 00h de 30/11 contam em dezembro: erro de até ~1 h na virada. Se a
+-- base fosse o primeiro snapshot de 01/12, ele guardaria o total do FIM do
+-- dia 1 (sync das 23h de 01/12) e o dia 1 inteiro sumiria de dezembro.
+-- ----------------------------------------------------------------------------
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
+set role authenticated;
+insert into public.linkly_links (id, workspace_secret, linkly_link_id, short_url, tipo, filial) values
+  ('28000000-0000-0000-0000-0000000000a5', 'linkly_api_key_vitrine', 'snap-v2', 'https://linkly.link/snapv2', 'vitrine', '1714');
+reset role;
+reset request.jwt.claim.sub;
+
+set role postgres;
+insert into public.linkly_cliques_totais (link_id, total_cliques, atualizado_em)
+values ('28000000-0000-0000-0000-0000000000a5', 100, timestamp '2026-11-30 20:00' at time zone 'America/Sao_Paulo');
+update public.linkly_cliques_totais set total_cliques = 130, atualizado_em = timestamp '2026-11-30 23:00' at time zone 'America/Sao_Paulo'
+where link_id = '28000000-0000-0000-0000-0000000000a5';
+update public.linkly_cliques_totais set total_cliques = 135, atualizado_em = timestamp '2026-12-01 00:00' at time zone 'America/Sao_Paulo'
+where link_id = '28000000-0000-0000-0000-0000000000a5';
+update public.linkly_cliques_totais set total_cliques = 200, atualizado_em = timestamp '2026-12-01 23:00' at time zone 'America/Sao_Paulo'
+where link_id = '28000000-0000-0000-0000-0000000000a5';
+
+select public._test_assert(
+  'virada: snapshot de 30/11 guarda o total da última sync do dia (23h = 130); o de 01/12, o da última de 01/12 (200)',
+  (select total = 130 from public.linkly_cliques_snapshots where link_id = '28000000-0000-0000-0000-0000000000a5' and data = '2026-11-30')
+  and (select total = 200 from public.linkly_cliques_snapshots where link_id = '28000000-0000-0000-0000-0000000000a5' and data = '2026-12-01')
+);
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006';
+set role authenticated;
+select public._test_assert(
+  'virada: dezembro conta a partir da última sync de 30/11 (200 - 130 = 70, inclui o dia 1 inteiro), não parcial',
+  (select cliques = 70 and not base_parcial from public.linkly_cliques_vitrine_mes('2026-12-01')
+   where link_id = '28000000-0000-0000-0000-0000000000a5')
+);
+reset role;
+reset request.jwt.claim.sub;
+
 -- anon não executa as funções.
 select public._test_assert('anon NAO executa linkly_cliques_mes', not has_function_privilege('anon', 'public.linkly_cliques_mes(date)', 'execute'));
 select public._test_assert('authenticated NAO executa a função interna', not has_function_privilege('authenticated', 'public._linkly_links_no_mes(date)', 'execute'));
