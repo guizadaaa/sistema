@@ -2,11 +2,12 @@ import Link from "next/link";
 
 import type { PerfilUsuario } from "@/lib/supabase/types";
 
-/** Mesmo padrão de vendas-tabs.tsx: Mapeamento é exclusivo adm_master. */
-export function CliquesTabs({ ativo, perfil }: { ativo: "cliques" | "mapeamento"; perfil: PerfilUsuario }) {
+/** Mesmo padrão de vendas-tabs.tsx: Mapeamento e Base do mês são exclusivos adm_master. */
+export function CliquesTabs({ ativo, perfil }: { ativo: "cliques" | "mapeamento" | "base"; perfil: PerfilUsuario }) {
   const tabs = [
     { href: "/cliques", label: "Cliques", chave: "cliques" as const, visivel: true },
     { href: "/cliques/mapeamento", label: "Mapeamento", chave: "mapeamento" as const, visivel: perfil === "adm_master" },
+    { href: "/cliques/base", label: "Base do mês", chave: "base" as const, visivel: perfil === "adm_master" },
   ].filter((tab) => tab.visivel);
 
   if (tabs.length <= 1) return null;

@@ -140,6 +140,10 @@ reset request.jwt.claim.sub;
 
 -- Idempotência.
 \ir ../migrations/20261006000007_casos_contrato_origem.sql
+-- Reaplicar 0007 recria enforce_casos_update_permissions na versão dela;
+-- 0008 a estende (subtipo_recadastro) — reaplica para os testes seguintes
+-- rodarem contra o schema atual.
+\ir ../migrations/20261006000008_subtipo_recadastro.sql
 select public._test_assert(
   'migration reaplicada: constraints não duplicadas e dados preservados',
   (select count(*) = 1 from pg_constraint where conname = 'casos_contrato_origem_formato')

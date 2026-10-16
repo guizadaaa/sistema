@@ -106,3 +106,37 @@ where jobid = (select jobid from cron.job where jobname = 'sincronizar-linkly')
 order by start_time desc
 limit 5;                                           -- próximas execuções: status = succeeded
 ```
+
+## Cliques por mês: virada e base do mês
+
+**Como a base de cada mês é escolhida** (`_linkly_links_no_mes`): a base do
+mês M é o **último snapshot com data anterior ao dia 1 de M**. O snapshot de
+um dia guarda o **último** total sincronizado naquele dia (a trigger faz
+upsert a cada sync), ou seja, o total da sync das ~23h do último dia do mês
+anterior. Os cliques entre essa sync e a meia-noite caem no mês novo:
+**erro máximo de ~1 h na virada** (mais o tempo da própria sincronização;
+se a sync das 23h falhar, o erro cresce até a última sync bem-sucedida do
+dia). Usar o primeiro snapshot do dia 1 seria pior: ele guarda o total do
+**fim** do dia 1, e o dia 1 inteiro sumiria do mês. Teste: cenário "virada"
+em `supabase/tests/28_assertions_linkly_cliques_snapshots.sql`.
+
+**Mês sem snapshot anterior** (outubro/2026, primeiro mês do registro): a
+tela mostra "contagem a partir de DD/MM (início do registro)" até o
+adm_master definir a base em **Cliques → Base do mês** (`/cliques/base`):
+
+1. **Buscar no Linkly** — uma chamada a `/clicks/counters/link_id` por
+   workspace (`start` = dia 1, `end` = hoje, `timezone=America/Sao_Paulo`),
+   além de `/workspaces` e `/list_links` para casar os links. O formato
+   esperado (`{ total, values: [{ value, count }] }`) vem da documentação e
+   **não foi confirmado contra uma resposta real**; se não bater, nada é
+   usado e a tela mostra o trecho bruto da resposta (sem a API key) — envie
+   esse trecho para ajustar `src/lib/linkly/contagem-linkly.ts`.
+2. **Manual** — digitar, por link, os "cliques desde 01/MM" do relatório
+   do Linkly.
+
+A prévia mostra total atual, cliques do mês e base resultante (total atual
+− cliques); só grava depois de "Confirmar e gravar". A contagem do Linkly
+pode estar até 3 h defasada (cache), o que deixa o mês com alguns cliques a
+menos, nunca a mais. A base só pode ser definida para o **mês atual** (a
+fórmula usa o total atual) e nunca substitui um snapshot real; reaplicar
+substitui a base anterior.

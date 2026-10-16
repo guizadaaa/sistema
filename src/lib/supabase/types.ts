@@ -459,6 +459,27 @@ export interface Database {
         }>;
         Relationships: [];
       };
+      linkly_cliques_snapshots: {
+        Row: {
+          link_id: string;
+          data: string;
+          total: number;
+          criado_em: string;
+          /** 'sync' (sincronização) ou 'base_manual' (linkly_definir_base_mes). */
+          origem: "sync" | "base_manual";
+        };
+        // Sem leitura/escrita por authenticated — só service_role e funções.
+        Insert: {
+          link_id: string;
+          data: string;
+          total: number;
+          origem?: "sync" | "base_manual";
+        };
+        Update: Partial<{
+          total: number;
+        }>;
+        Relationships: [];
+      };
       linkly_cliques_totais: {
         Row: {
           link_id: string;
@@ -654,6 +675,14 @@ export interface Database {
       linkly_meses_com_registro: {
         Args: Record<string, never>;
         Returns: { mes: string }[];
+      };
+      linkly_definir_base_mes: {
+        Args: { p_link_id: string; p_mes: string; p_cliques_no_mes: number };
+        Returns: number;
+      };
+      obter_linkly_api_key: {
+        Args: { p_nome_secret: string };
+        Returns: string | null;
       };
       linkly_ultima_sincronizacao: {
         Args: Record<string, never>;

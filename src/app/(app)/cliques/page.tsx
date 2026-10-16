@@ -106,10 +106,15 @@ export default async function CliquesPage({
       {usuario.perfil === "adm_master" && (
         <Card className="border-dashed">
           <CardContent className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Cadastro de links e atribuição de vendedores.</span>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/cliques/mapeamento">Ver mapeamento</Link>
-            </Button>
+            <span className="text-muted-foreground">Cadastro de links, atribuição de vendedores e base do mês.</span>
+            <div className="flex gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/cliques/mapeamento">Ver mapeamento</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/cliques/base">Definir base do mês</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
