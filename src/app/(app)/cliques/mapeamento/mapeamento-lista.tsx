@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatarDataBr } from "@/lib/formatacao";
 import { FILIAL_LABELS } from "@/lib/labels";
 import type { HistoricoVinculo, LinkComVendedorAtual } from "@/lib/linkly/mapeamento";
+import type { FilialCvc } from "@/lib/supabase/types";
 import { FILIAIS } from "@/lib/validation/caso";
 
 import { atribuirVendedor, cadastrarLink, type AtribuirVendedorState, type CadastrarLinkState } from "./actions";
@@ -85,7 +86,16 @@ function LinhaLink({ link }: { link: LinkComVendedorAtual }) {
   );
 }
 
-export function MapeamentoLista({ links, historico }: { links: LinkComVendedorAtual[]; historico: HistoricoVinculo[] }) {
+export function MapeamentoLista({
+  links,
+  historico,
+  loja,
+}: {
+  links: LinkComVendedorAtual[];
+  historico: HistoricoVinculo[];
+  /** Filtro ?loja= da URL (ausente = todas as lojas). */
+  loja?: FilialCvc;
+}) {
   const [state, formAction, isPending] = useActionState(cadastrarLink, initialCadastrarState);
   const [tipo, setTipo] = useState("vendedor");
 
@@ -93,13 +103,39 @@ export function MapeamentoLista({ links, historico }: { links: LinkComVendedorAt
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-semibold">Mapeamento de links (Linkly)</h1>
 
+      <form method="get" className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium" htmlFor="filtro-loja">
+            Loja
+          </label>
+          <Select name="loja" defaultValue={loja ?? "todas"}>
+            <SelectTrigger id="filtro-loja" className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas as lojas</SelectItem>
+              {FILIAIS.map((f) => (
+                <SelectItem key={f} value={f}>
+                  {FILIAL_LABELS[f]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button type="submit" variant="outline">
+          Filtrar
+        </Button>
+      </form>
+
       <Card>
         <CardHeader>
           <CardTitle>Links cadastrados</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {links.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Nenhum link cadastrado ainda.</p>
+            <p className="text-muted-foreground text-sm">
+              {loja ? `Nenhum link cadastrado para ${FILIAL_LABELS[loja]}.` : "Nenhum link cadastrado ainda."}
+            </p>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -194,7 +230,9 @@ export function MapeamentoLista({ links, historico }: { links: LinkComVendedorAt
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {historico.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Nenhum vínculo criado ainda.</p>
+            <p className="text-muted-foreground text-sm">
+              {loja ? `Nenhum vínculo para links de ${FILIAL_LABELS[loja]}.` : "Nenhum vínculo criado ainda."}
+            </p>
           ) : (
             <table className="w-full text-sm">
               <thead>

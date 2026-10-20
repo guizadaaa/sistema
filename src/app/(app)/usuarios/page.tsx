@@ -38,7 +38,9 @@ export default async function UsuariosPage({
       ? (sp.perfil as PerfilUsuario)
       : undefined;
 
-  const usuarios = await listarUsuarios({ filial, perfil });
+  const mostrarInativos = sp.mostrarInativos === "1";
+
+  const usuarios = await listarUsuarios({ filial, perfil, mostrarInativos });
 
   return (
     <div className="flex flex-col gap-4">
@@ -47,7 +49,7 @@ export default async function UsuariosPage({
       <UsuariosLista
         usuarios={usuarios}
         podeEditar={usuario.perfil === "adm_master"}
-        filtros={{ filial, perfil }}
+        filtros={{ filial, perfil, mostrarInativos }}
       />
     </div>
   );

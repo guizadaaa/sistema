@@ -36,10 +36,12 @@ vi.mock("@/lib/supabase/server", () => ({
 const { listarUsuarios } = await import("./listar");
 
 const USUARIOS_FIXTURE: Row[] = [
-  { id: "u1", nome_completo: "Ana Paula", perfil: "vendedor", filial: "1710" },
-  { id: "u2", nome_completo: "Carlos Souza", perfil: "gerente", filial: "1714" },
-  { id: "u3", nome_completo: "Débora Reis", perfil: "vendedor", filial: "1714" },
-  { id: "u4", nome_completo: "Eduardo Lima", perfil: "adm_master", filial: null },
+  { id: "u1", nome_completo: "Ana Paula", perfil: "vendedor", filial: "1710", ativo: true },
+  { id: "u2", nome_completo: "Carlos Souza", perfil: "gerente", filial: "1714", ativo: true },
+  { id: "u3", nome_completo: "Débora Reis", perfil: "vendedor", filial: "1714", ativo: true },
+  { id: "u4", nome_completo: "Eduardo Lima", perfil: "adm_master", filial: null, ativo: true },
+  { id: "u5", nome_completo: "Fábio Inativo", perfil: "vendedor", filial: "1714", ativo: false },
+  { id: "u6", nome_completo: "Gina Inativa", perfil: "gerente", filial: "1710", ativo: false },
 ];
 
 beforeEach(() => {
@@ -47,7 +49,7 @@ beforeEach(() => {
 });
 
 describe("listarUsuarios — filtros de filial e perfil", () => {
-  it("sem filtro retorna todos", async () => {
+  it("sem filtro retorna todos os ATIVOS", async () => {
     const resultado = await listarUsuarios();
     expect(resultado.map((u) => u.id)).toEqual(["u1", "u2", "u3", "u4"]);
   });
@@ -65,5 +67,23 @@ describe("listarUsuarios — filtros de filial e perfil", () => {
   it("filial + perfil combinados são interseção (AND)", async () => {
     const resultado = await listarUsuarios({ filial: "1714", perfil: "vendedor" });
     expect(resultado.map((u) => u.id)).toEqual(["u3"]);
+  });
+});
+
+describe("listarUsuarios — mostrar inativos", () => {
+  it("padrão: só ativos", async () => {
+    const resultado = await listarUsuarios({});
+    expect(resultado.every((u) => u.ativo)).toBe(true);
+  });
+
+  it("mostrarInativos: SOMENTE inativos, sem os ativos", async () => {
+    const resultado = await listarUsuarios({ mostrarInativos: true });
+    expect(resultado.map((u) => u.id)).toEqual(["u5", "u6"]);
+  });
+
+  it("combina com filial e perfil (AND)", async () => {
+    expect((await listarUsuarios({ mostrarInativos: true, filial: "1714" })).map((u) => u.id)).toEqual(["u5"]);
+    expect((await listarUsuarios({ mostrarInativos: true, perfil: "gerente" })).map((u) => u.id)).toEqual(["u6"]);
+    expect(await listarUsuarios({ mostrarInativos: true, filial: "1714", perfil: "gerente" })).toEqual([]);
   });
 });
