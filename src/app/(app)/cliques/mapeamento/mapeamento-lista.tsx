@@ -14,6 +14,7 @@ import type { HistoricoVinculo, LinkComVendedorAtual } from "@/lib/linkly/mapeam
 import type { FilialCvc } from "@/lib/supabase/types";
 import { FILIAIS } from "@/lib/validation/caso";
 
+import { SeletorLoja } from "../seletor-loja";
 import { atribuirVendedor, cadastrarLink, type AtribuirVendedorState, type CadastrarLinkState } from "./actions";
 
 const initialCadastrarState: CadastrarLinkState = {};
@@ -103,29 +104,7 @@ export function MapeamentoLista({
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-semibold">Mapeamento de links (Linkly)</h1>
 
-      <form method="get" className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium" htmlFor="filtro-loja">
-            Loja
-          </label>
-          <Select name="loja" defaultValue={loja ?? "todas"}>
-            <SelectTrigger id="filtro-loja" className="w-56">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todas">Todas as lojas</SelectItem>
-              {FILIAIS.map((f) => (
-                <SelectItem key={f} value={f}>
-                  {FILIAL_LABELS[f]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button type="submit" variant="outline">
-          Filtrar
-        </Button>
-      </form>
+      <SeletorLoja loja={loja} />
 
       <Card>
         <CardHeader>

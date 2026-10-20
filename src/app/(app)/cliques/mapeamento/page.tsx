@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
+import { resolverLoja } from "@/lib/linkly/loja";
 import { listarHistoricoVinculos, listarLinks } from "@/lib/linkly/mapeamento";
-
-import { isFilialCvc } from "../../casos/casos-lista";
 
 import { CliquesTabs } from "../cliques-tabs";
 import { MapeamentoLista } from "./mapeamento-lista";
@@ -25,13 +24,13 @@ export default async function MapeamentoLinklyPage({
   // ?loja=1710 — inválido ou ausente = todas as lojas. Fica na URL, então a
   // revalidação depois de "Trocar/Atribuir vendedor" mantém o filtro.
   const sp = await searchParams;
-  const loja = typeof sp.loja === "string" && isFilialCvc(sp.loja) ? sp.loja : undefined;
+  const loja = resolverLoja(sp.loja);
 
   const [links, historico] = await Promise.all([listarLinks({ filial: loja }), listarHistoricoVinculos({ filial: loja })]);
 
   return (
     <div className="flex flex-col gap-4">
-      <CliquesTabs ativo="mapeamento" perfil={usuario.perfil} />
+      <CliquesTabs ativo="mapeamento" perfil={usuario.perfil} loja={loja} />
       <MapeamentoLista links={links} historico={historico} loja={loja} />
     </div>
   );
