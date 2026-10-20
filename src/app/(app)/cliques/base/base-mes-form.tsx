@@ -88,6 +88,8 @@ export function BaseMesForm({ mes, links }: { mes: string; links: LinkParaBase[]
 
   const resultadoPorLink = new Map((resultados ?? []).map((r) => [r.linkId, r]));
   const nomeLink = new Map(links.map((l) => [l.linkId, l.shortUrl]));
+  // A consulta cobre todos os links; com ?loja= só os da loja exibida importam.
+  const naoEncontrados = consulta?.naoEncontrados.filter((id) => nomeLink.has(id)) ?? [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -140,9 +142,9 @@ export function BaseMesForm({ mes, links }: { mes: string; links: LinkParaBase[]
                     )}
                   </div>
                 ))}
-              {consulta.naoEncontrados.length > 0 && (
+              {naoEncontrados.length > 0 && (
                 <p className="text-destructive text-xs">
-                  Não encontrados na lista de links do Linkly: {consulta.naoEncontrados.map((id) => nomeLink.get(id)).join(", ")}
+                  Não encontrados na lista de links do Linkly: {naoEncontrados.map((id) => nomeLink.get(id)).join(", ")}
                   — preencha esses manualmente.
                 </p>
               )}

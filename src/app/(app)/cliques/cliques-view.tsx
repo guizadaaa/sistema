@@ -14,6 +14,7 @@ import { formatarDataBr } from "@/lib/formatacao";
 import { FILIAL_LABELS } from "@/lib/labels";
 import type { CliquesMes, ResumoVendedorMes, VitrineMes } from "@/lib/linkly/listar";
 import { dataHoraSaoPaulo, hojeSaoPaulo, horaSaoPaulo, parametroMes, rotuloMes, rotuloMesCapitalizado } from "@/lib/linkly/mes";
+import type { FilialCvc } from "@/lib/supabase/types";
 
 import { atualizarCliques, type AtualizarCliquesState } from "./actions";
 
@@ -202,10 +203,13 @@ export function ResumoPorVendedorMes({
   resumo,
   mes,
   mostrarFilial,
+  loja,
 }: {
   resumo: ResumoVendedorMes[];
   mes: string;
   mostrarFilial: boolean;
+  /** Filtro ?loja= ativo — levado para o "Ver por link". */
+  loja?: FilialCvc;
 }) {
   const totalGeral = resumo.reduce((soma, r) => soma + r.totalCliques, 0);
 
@@ -219,7 +223,9 @@ export function ResumoPorVendedorMes({
       </CardHeader>
       <CardContent className="overflow-x-auto">
         {resumo.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Nenhum clique registrado neste mês.</p>
+          <p className="text-muted-foreground text-sm">
+            {loja ? `Nenhum clique registrado neste mês em ${FILIAL_LABELS[loja]}.` : "Nenhum clique registrado neste mês."}
+          </p>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -233,6 +239,7 @@ export function ResumoPorVendedorMes({
             <tbody>
               {resumo.map((r) => {
                 const query = new URLSearchParams({ vendedorId: r.vendedorId, vendedorNome: r.vendedorNome, mes: parametroMes(mes) });
+                if (loja) query.set("loja", loja);
                 return (
                   <tr key={r.vendedorId} className="border-b last:border-0 hover:bg-accent/50">
                     <td className="py-2 pr-4">{r.vendedorNome}</td>

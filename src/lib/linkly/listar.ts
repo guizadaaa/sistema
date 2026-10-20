@@ -3,6 +3,8 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { FilialCvc } from "@/lib/supabase/types";
 
+import { filtrarPorLoja } from "./loja";
+
 export type ResumoVendedorCliques = {
   vendedorId: string;
   vendedorNome: string;
@@ -30,14 +32,21 @@ export type CliquesMes = {
   contagemDesde: string | null;
 };
 
-/** mes = "YYYY-MM-01". vendedorId opcional (drill-down de gerente/admin). */
-export async function listarCliquesDoMes(mes: string, filtros: { vendedorId?: string } = {}): Promise<CliquesMes[]> {
+export type FiltrosCliquesMes = {
+  /** Drill-down de gerente/admin. */
+  vendedorId?: string;
+  /** Filtro ?loja= da tela (adm/adm_master); ausente = todas as lojas. */
+  filial?: FilialCvc;
+};
+
+/** mes = "YYYY-MM-01". */
+export async function listarCliquesDoMes(mes: string, filtros: FiltrosCliquesMes = {}): Promise<CliquesMes[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase.rpc("linkly_cliques_mes", { p_mes: mes });
   if (error) throw error;
 
-  return (data ?? [])
+  return filtrarPorLoja(data ?? [], filtros.filial)
     .filter((r) => !filtros.vendedorId || r.usuario_id === filtros.vendedorId)
     .map((r) => ({
       mapeamentoId: r.mapeamento_id,
@@ -81,8 +90,8 @@ export function agruparPorVendedor(linhas: CliquesMes[], nomesPorId: Map<string,
   return [...acumulado.values()].sort((a, b) => a.vendedorNome.localeCompare(b.vendedorNome, "pt-BR"));
 }
 
-export async function listarResumoPorVendedorDoMes(mes: string): Promise<ResumoVendedorMes[]> {
-  const linhas = await listarCliquesDoMes(mes);
+export async function listarResumoPorVendedorDoMes(mes: string, filtros: { filial?: FilialCvc } = {}): Promise<ResumoVendedorMes[]> {
+  const linhas = await listarCliquesDoMes(mes, filtros);
   const idsVendedores = [...new Set(linhas.map((l) => l.usuarioId))];
 
   const supabase = await createClient();
@@ -104,12 +113,12 @@ export type VitrineMes = {
   contagemDesde: string | null;
 };
 
-export async function listarVitrineDoMes(mes: string): Promise<VitrineMes[]> {
+export async function listarVitrineDoMes(mes: string, filtros: { filial?: FilialCvc } = {}): Promise<VitrineMes[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("linkly_cliques_vitrine_mes", { p_mes: mes });
   if (error) throw error;
 
-  return (data ?? []).map((r) => ({
+  return filtrarPorLoja(data ?? [], filtros.filial).map((r) => ({
     linkId: r.link_id,
     filial: r.filial,
     shortUrl: r.short_url,

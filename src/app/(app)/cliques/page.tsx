@@ -10,6 +10,7 @@ import {
   listarResumoPorVendedorDoMes,
   listarVitrineDoMes,
 } from "@/lib/linkly/listar";
+import { resolverLoja } from "@/lib/linkly/loja";
 import { mesAtualSaoPaulo, opcoesDeMes, parametroMes, resolverMes, sincronizacaoAtrasada } from "@/lib/linkly/mes";
 
 import { CliquesTabs } from "./cliques-tabs";
@@ -22,6 +23,7 @@ import {
   TabelaCliquesMes,
   VitrineMesCard,
 } from "./cliques-view";
+import { SeletorLoja } from "./seletor-loja";
 
 export default async function CliquesPage({
   searchParams,
@@ -39,11 +41,18 @@ export default async function CliquesPage({
   const mes = resolverMes(sp.mes, mesesComRegistro, mesAtual);
   const opcoes = opcoesDeMes(mesesComRegistro, mesAtual);
 
+  // ?loja= só para adm/adm_master. Gerente e vendedor já são restritos à
+  // própria loja pelas funções do banco: seletor oculto e parâmetro ignorado.
+  const loja = ehAdmin ? resolverLoja(sp.loja) : undefined;
+
   const cabecalho = (titulo: string, extra?: React.ReactNode) => (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex flex-col gap-2">
         <h1 className="text-xl font-semibold">{titulo}</h1>
-        <SeletorMes mes={mes} opcoes={opcoes} />
+        <div className="flex flex-wrap items-center gap-4">
+          <SeletorMes mes={mes} opcoes={opcoes} />
+          {ehAdmin && <SeletorLoja loja={loja} />}
+        </div>
       </div>
       <div className="flex flex-col items-end gap-1">
         <StatusSincronizacao
@@ -71,17 +80,17 @@ export default async function CliquesPage({
   // Gerente/adm/adm_master com um vendedor selecionado: detalhe por link.
   const vendedorId = typeof sp.vendedorId === "string" ? sp.vendedorId : undefined;
   if (vendedorId) {
-    const linhas = await listarCliquesDoMes(mes, { vendedorId });
+    const linhas = await listarCliquesDoMes(mes, { vendedorId, filial: loja });
     const nomeVendedor = typeof sp.vendedorNome === "string" ? sp.vendedorNome : "Vendedor";
 
     return (
       <div className="flex flex-col gap-4">
         <AutoAtualizar />
-        <CliquesTabs ativo="cliques" perfil={usuario.perfil} />
+        <CliquesTabs ativo="cliques" perfil={usuario.perfil} loja={loja} />
         {cabecalho(
           `Cliques de ${nomeVendedor}`,
           <Button asChild variant="ghost" size="sm">
-            <Link href={`/cliques?mes=${parametroMes(mes)}`}>← Voltar ao resumo</Link>
+            <Link href={`/cliques?${new URLSearchParams({ mes: parametroMes(mes), ...(loja && { loja }) })}`}>← Voltar ao resumo</Link>
           </Button>
         )}
         <TabelaCliquesMes linhas={linhas} mes={mes} />
@@ -91,15 +100,18 @@ export default async function CliquesPage({
 
   // Resumo do mês por vendedor + vitrine (vitrine: a função restringe a
   // admin e ao gerente da própria loja).
-  const [resumo, vitrine] = await Promise.all([listarResumoPorVendedorDoMes(mes), listarVitrineDoMes(mes)]);
+  const [resumo, vitrine] = await Promise.all([
+    listarResumoPorVendedorDoMes(mes, { filial: loja }),
+    listarVitrineDoMes(mes, { filial: loja }),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
       <AutoAtualizar />
-      <CliquesTabs ativo="cliques" perfil={usuario.perfil} />
+      <CliquesTabs ativo="cliques" perfil={usuario.perfil} loja={loja} />
       {cabecalho("Cliques por vendedor", ehAdmin ? <AtualizarAgoraBotao /> : undefined)}
 
-      <ResumoPorVendedorMes resumo={resumo} mes={mes} mostrarFilial={ehAdmin} />
+      <ResumoPorVendedorMes resumo={resumo} mes={mes} mostrarFilial={ehAdmin} loja={loja} />
 
       <VitrineMesCard vitrine={vitrine} mes={mes} />
 

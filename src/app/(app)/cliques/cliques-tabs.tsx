@@ -1,9 +1,19 @@
 import Link from "next/link";
 
-import type { PerfilUsuario } from "@/lib/supabase/types";
+import type { FilialCvc, PerfilUsuario } from "@/lib/supabase/types";
 
 /** Mesmo padrão de vendas-tabs.tsx: Mapeamento e Base do mês são exclusivos adm_master. */
-export function CliquesTabs({ ativo, perfil }: { ativo: "cliques" | "mapeamento" | "base"; perfil: PerfilUsuario }) {
+export function CliquesTabs({
+  ativo,
+  perfil,
+  loja,
+}: {
+  ativo: "cliques" | "mapeamento" | "base";
+  perfil: PerfilUsuario;
+  /** Filtro ?loja= ativo — mantido ao trocar de aba. */
+  loja?: FilialCvc;
+}) {
+  const sufixo = loja ? `?loja=${loja}` : "";
   const tabs = [
     { href: "/cliques", label: "Cliques", chave: "cliques" as const, visivel: true },
     { href: "/cliques/mapeamento", label: "Mapeamento", chave: "mapeamento" as const, visivel: perfil === "adm_master" },
@@ -17,7 +27,7 @@ export function CliquesTabs({ ativo, perfil }: { ativo: "cliques" | "mapeamento"
       {tabs.map((tab) => (
         <Link
           key={tab.chave}
-          href={tab.href}
+          href={`${tab.href}${sufixo}`}
           className={
             tab.chave === ativo
               ? "border-primary text-foreground -mb-px border-b-2 pb-2 font-medium"
