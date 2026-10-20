@@ -5,6 +5,7 @@ import { useActionState, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -326,6 +327,7 @@ export function UsuariosLista({
   filtros: {
     filial?: FilialCvc;
     perfil?: PerfilUsuario;
+    mostrarInativos?: boolean;
   };
 }) {
   const [state, formAction, isPending] = useActionState(convidarUsuario, initialConvidarState);
@@ -448,6 +450,13 @@ export function UsuariosLista({
               </Select>
             </div>
 
+            <div className="flex items-center gap-2">
+              <Checkbox id="mostrarInativos" name="mostrarInativos" value="1" defaultChecked={filtros.mostrarInativos} />
+              <Label htmlFor="mostrarInativos" className="text-sm font-normal">
+                Mostrar usuários inativos
+              </Label>
+            </div>
+
             <Button type="submit" variant="outline">
               Filtrar
             </Button>
@@ -455,7 +464,9 @@ export function UsuariosLista({
 
           <div className="overflow-x-auto">
             {usuarios.length === 0 ? (
-              <p className="text-muted-foreground text-sm">Nenhum usuário encontrado.</p>
+              <p className="text-muted-foreground text-sm">
+                {filtros.mostrarInativos ? "Nenhum usuário inativo encontrado." : "Nenhum usuário ativo encontrado."}
+              </p>
             ) : (
               <table className="w-full text-sm">
                 <thead>

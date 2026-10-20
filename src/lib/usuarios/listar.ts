@@ -8,6 +8,8 @@ export type UsuarioListado = Database["public"]["Tables"]["usuarios"]["Row"];
 export type FiltrosUsuarios = {
   filial?: FilialCvc;
   perfil?: PerfilUsuario;
+  /** false/ausente: só ativos (padrão). true: SOMENTE inativos — nunca os dois juntos. */
+  mostrarInativos?: boolean;
 };
 
 /**
@@ -20,6 +22,7 @@ export async function listarUsuarios(filtros: FiltrosUsuarios = {}): Promise<Usu
   let query = supabase.from("usuarios").select("*").order("nome_completo");
   if (filtros.filial) query = query.eq("filial", filtros.filial);
   if (filtros.perfil) query = query.eq("perfil", filtros.perfil);
+  query = query.eq("ativo", !filtros.mostrarInativos);
   const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
