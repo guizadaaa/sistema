@@ -201,7 +201,9 @@ export function CasosLista({
       <Card>
         <CardContent className="overflow-x-auto">
           {casos.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Nenhum caso encontrado.</p>
+            <p className="text-muted-foreground text-sm">
+              {filtros.mostrarTeste ? "Nenhum caso de teste encontrado." : "Nenhum caso encontrado."}
+            </p>
           ) : (
             <table className="w-full text-sm">
               <thead>

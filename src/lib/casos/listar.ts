@@ -18,10 +18,11 @@ export type FiltrosCasos = {
   dataInicio?: string;
   dataFim?: string;
   /**
-   * Revela casos marcados como teste — só tem efeito de verdade pra
-   * adm_master (RLS nega a linha pra qualquer outro perfil de qualquer
-   * jeito). Fica em quem chama (a página) garantir que só passa `true`
-   * quando o usuário é adm_master; aqui é só o filtro de exibição.
+   * Alterna entre casos reais (padrão, caso_teste = false) e SOMENTE casos
+   * de teste (caso_teste = true) — nunca os dois juntos. Só tem efeito de
+   * verdade pra adm_master (RLS nega a linha de teste pra qualquer outro
+   * perfil de qualquer jeito). Fica em quem chama (a página) garantir que
+   * só passa `true` quando o usuário é adm_master.
    */
   mostrarTeste?: boolean;
 };
@@ -165,7 +166,7 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
     )
     .order("criado_em", { ascending: false });
 
-  if (!filtros.mostrarTeste) query = query.eq("caso_teste", false);
+  query = query.eq("caso_teste", Boolean(filtros.mostrarTeste));
 
   if (filtros.status) query = query.eq("status_atual", filtros.status);
   if (filtros.tipo) query = query.eq("tipo_caso", filtros.tipo);

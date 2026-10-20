@@ -167,9 +167,14 @@ describe("listarCasos — casos de teste", () => {
     expect(resultado.map((c) => c.id)).toEqual(["c1", "c2"]);
   });
 
-  it("com mostrarTeste, casos de teste aparecem junto com os demais", async () => {
+  it("com mostrarTeste, aparecem SOMENTE os casos de teste (sem os reais)", async () => {
     const resultado = await listarCasos({ mostrarTeste: true });
-    expect(resultado.map((c) => c.id).sort()).toEqual(["c1", "c2", "c3"]);
+    expect(resultado.map((c) => c.id)).toEqual(["c3"]);
+  });
+
+  it("mostrarTeste combina com os demais filtros", async () => {
+    expect((await listarCasos({ mostrarTeste: true, busca: "Caso de Teste" })).map((c) => c.id)).toEqual(["c3"]);
+    expect(await listarCasos({ mostrarTeste: true, busca: "Maria" })).toEqual([]);
   });
 });
 
