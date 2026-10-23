@@ -2,13 +2,16 @@ import Link from "next/link";
 
 import type { FilialCvc, PerfilUsuario } from "@/lib/supabase/types";
 
-/** Mesmo padrão de vendas-tabs.tsx: Mapeamento e Base do mês são exclusivos adm_master. */
+/**
+ * Mesmo padrão de vendas-tabs.tsx: Mapeamento e Base do mês são exclusivos
+ * adm_master; Vendedores Systur (Aura Conferência) é de adm e adm_master.
+ */
 export function CliquesTabs({
   ativo,
   perfil,
   loja,
 }: {
-  ativo: "cliques" | "mapeamento" | "base";
+  ativo: "cliques" | "mapeamento" | "systur" | "base";
   perfil: PerfilUsuario;
   /** Filtro ?loja= ativo — mantido ao trocar de aba. */
   loja?: FilialCvc;
@@ -17,6 +20,12 @@ export function CliquesTabs({
   const tabs = [
     { href: "/cliques", label: "Cliques", chave: "cliques" as const, visivel: true },
     { href: "/cliques/mapeamento", label: "Mapeamento", chave: "mapeamento" as const, visivel: perfil === "adm_master" },
+    {
+      href: "/cliques/vendedores-systur",
+      label: "Vendedores Systur",
+      chave: "systur" as const,
+      visivel: perfil === "adm" || perfil === "adm_master",
+    },
     { href: "/cliques/base", label: "Base do mês", chave: "base" as const, visivel: perfil === "adm_master" },
   ].filter((tab) => tab.visivel);
 
