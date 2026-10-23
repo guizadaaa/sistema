@@ -39,7 +39,7 @@ export default async function DelegacoesPage() {
   return (
     <div className="flex flex-col gap-4">
       {/* Só adm_master enxerga as duas telas — gerente só tem esta, sem aba pra alternar. */}
-      {usuario.perfil === "adm_master" && <UsuariosTabs ativo="delegacoes" />}
+      {(usuario.perfil === "adm_master" || usuario.perfil === "gerente") && <UsuariosTabs ativo="delegacoes" />}
       <DelegacoesLista
         delegacoes={delegacoes}
         gerentes={gerentes}
