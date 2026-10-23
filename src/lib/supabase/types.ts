@@ -4,6 +4,7 @@
 
 export type PerfilUsuario = "vendedor" | "gerente" | "adm" | "adm_master";
 export type FilialCvc = "1710" | "1714" | "1730";
+export type TelefoneCliente = { numero: string; tipo?: string; contato?: string };
 export type TipoCaso =
   | "alteracao_data"
   | "cancelamento"
@@ -558,6 +559,143 @@ export interface Database {
         }>;
         Relationships: [];
       };
+      // ----------------------------------------------------------------------
+      // Aura Conferência (20261023000001/2). Escrita nas tabelas de dados só
+      // pela API (service_role, via conferencia_*).
+      // ----------------------------------------------------------------------
+      systur_vendedor_mapeamento: {
+        Row: {
+          id: string;
+          nome_systur: string;
+          loja: FilialCvc;
+          usuario_id: string | null;
+          login_systur: string | null;
+          ativo: boolean;
+          criado_em: string;
+          atualizado_em: string;
+        };
+        Insert: never;
+        // Admin só altera vínculo, login e ativo (grant por coluna).
+        Update: { usuario_id?: string | null; login_systur?: string | null; ativo?: boolean };
+        Relationships: [];
+      };
+      clientes: {
+        Row: {
+          id: string;
+          pessoa_id_systur: string | null;
+          nome: string;
+          nome_normalizado: string | null;
+          cpf: string | null;
+          telefones: TelefoneCliente[];
+          loja_principal: FilialCvc | null;
+          vendedor_usuario_id: string | null;
+          primeira_compra: string | null;
+          ultima_compra: string | null;
+          total_comprado: number;
+          revisar: boolean;
+          criado_em: string;
+          atualizado_em: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      cliente_excursoes: {
+        Row: {
+          reserva: string;
+          roteiro: string | null;
+          excursao: string | null;
+          categoria_codigo: number | null;
+          loja: FilialCvc;
+          recibos: string[];
+          vendedor_nome_systur: string | null;
+          vendedor_usuario_id: string | null;
+          cliente_id: string | null;
+          contratantes: { pessoa_id?: string; nome?: string }[];
+          destino: string | null;
+          descricao: string | null;
+          data_viagem: string | null;
+          data_retorno: string | null;
+          data_confirmacao: string | null;
+          voucher_status: string | null;
+          reserva_site: boolean | null;
+          status_voos: string | null;
+          alteracoes: unknown;
+          avisos: unknown;
+          pendencias: unknown;
+          servicos: unknown;
+          apolices: unknown;
+          retrato_voos: unknown;
+          avisar_cliente: boolean;
+          aviso: unknown;
+          cliente_avisado_em: string | null;
+          cliente_avisado_por: string | null;
+          conferido_em: string | null;
+          atualizado_por: string | null;
+          login_systur: string | null;
+          criado_em: string;
+          atualizado_em: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      cliente_voo_eventos: {
+        Row: {
+          id: string;
+          reserva: string;
+          quando: string;
+          alteracoes: unknown;
+          significativa: boolean;
+          retrato_antes: unknown;
+          retrato_depois: unknown;
+          registrado_por: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      recibos: {
+        Row: {
+          recibo: string;
+          numero: string | null;
+          loja: FilialCvc;
+          data_venda: string | null;
+          valor: number | null;
+          cliente_nome: string | null;
+          cliente_id: string | null;
+          vendedor_usuario_id: string | null;
+          pdf_path: string | null;
+          pdf_enviado_em: string | null;
+          pdf_enviado_por: string | null;
+          atualizado_por: string | null;
+          criado_em: string;
+          atualizado_em: string;
+        };
+        Insert: never;
+        // Só a rota do PDF (service_role).
+        Update: { pdf_path?: string | null; pdf_enviado_em?: string | null; pdf_enviado_por?: string | null };
+        Relationships: [];
+      };
+      mensagem_modelos: {
+        Row: { id: string; chave: string; titulo: string; texto: string; ativo: boolean; criado_em: string; atualizado_em: string };
+        Insert: { chave: string; titulo: string; texto?: string; ativo?: boolean };
+        Update: { titulo?: string; texto?: string; ativo?: boolean };
+        Relationships: [];
+      };
+      conferencia_config: {
+        Row: { id: boolean; versao_atual: string | null; logins_gravacao: string[]; atualizado_em: string };
+        Insert: never;
+        Update: { versao_atual?: string | null; logins_gravacao?: string[] };
+        Relationships: [];
+      };
+      conferencia_reportes: {
+        Row: { id: string; usuario_id: string; criado_em: string; texto: string; diagnostico: unknown };
+        // Só a rota /api/conferencia/reporte (service_role).
+        Insert: { usuario_id: string; texto: string; diagnostico?: unknown };
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       status_historico_com_duracao: {
@@ -646,6 +784,33 @@ export interface Database {
       };
     };
     Functions: {
+      // Aura Conferência — gravação só service_role (rotas /api/conferencia).
+      conferencia_sync: {
+        Args: { p_usuario: string; p_payload: unknown };
+        Returns: {
+          recebidas: number;
+          novas: number;
+          atualizadas: number;
+          eventos_voo: number;
+          vendedores_sem_vinculo: string[];
+        };
+      };
+      conferencia_recibos: {
+        Args: { p_usuario: string; p_payload: unknown };
+        Returns: { recebidos: number; novos: number; atualizados: number };
+      };
+      conferencia_marcar_cliente_avisado: {
+        Args: { p_usuario: string; p_reserva: string };
+        Returns: boolean;
+      };
+      usuario_pode_ver_conferencia: {
+        Args: { p_usuario: string; p_loja: FilialCvc; p_vendedor: string | null };
+        Returns: boolean;
+      };
+      systur_sugestoes_vinculo: {
+        Args: Record<string, never>;
+        Returns: { mapeamento_id: string; usuario_id: string; origem: "usuario" | "linkly" }[];
+      };
       linkly_cliques_mes: {
         Args: { p_mes: string };
         Returns: {
