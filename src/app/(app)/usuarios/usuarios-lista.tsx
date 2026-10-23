@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -188,7 +189,11 @@ function UsuarioRow({ usuario, podeEditar }: { usuario: UsuarioListado; podeEdit
   if (!editando) {
     return (
       <tr className="border-b last:border-0">
-        <td className="py-2 pr-4">{usuario.nome_completo}</td>
+        <td className="py-2 pr-4">
+          <Link href={`/usuarios/${usuario.id}`} className="font-medium hover:underline">
+            {usuario.nome_completo}
+          </Link>
+        </td>
         <td className="py-2 pr-4">{usuario.email}</td>
         <td className="py-2 pr-4">{PERFIL_LABELS[usuario.perfil]}</td>
         <td className="py-2 pr-4">{usuario.filial ? FILIAL_LABELS[usuario.filial] : "—"}</td>

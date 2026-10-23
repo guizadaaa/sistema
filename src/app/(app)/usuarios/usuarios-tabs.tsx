@@ -1,10 +1,9 @@
 import Link from "next/link";
 
 /**
- * Só renderizada para quem enxerga as duas telas (adm_master, hoje o único
- * perfil com acesso tanto a Usuários quanto a Delegações) — adm e gerente
- * só veem uma das duas, então não faz sentido mostrar uma aba pra algo que
- * eles não podem abrir. Ver o comentário de controle de acesso em cada page.tsx.
+ * Só renderizada para quem enxerga as duas telas (adm_master e gerente) —
+ * adm só vê Usuários, então não faz sentido mostrar uma aba pra algo que
+ * ele não pode abrir. Ver o comentário de controle de acesso em cada page.tsx.
  */
 export function UsuariosTabs({ ativo }: { ativo: "usuarios" | "delegacoes" }) {
   const tabs = [
