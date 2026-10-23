@@ -689,6 +689,21 @@ export interface Database {
         Update: { versao_atual?: string | null; logins_gravacao?: string[] };
         Relationships: [];
       };
+      usuario_transferencias: {
+        Row: {
+          id: string;
+          usuario_id: string;
+          loja_de: FilialCvc;
+          loja_para: FilialCvc;
+          feito_por: string;
+          feito_em: string;
+          observacao: string | null;
+        };
+        // Escrita só por transferir_usuario_loja().
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       conferencia_reportes: {
         Row: { id: string; usuario_id: string; criado_em: string; texto: string; diagnostico: unknown };
         // Só a rota /api/conferencia/reporte (service_role).
@@ -784,6 +799,25 @@ export interface Database {
       };
     };
     Functions: {
+      transferir_usuario_loja: {
+        Args: { p_usuario_id: string; p_loja_para: FilialCvc; p_observacao?: string | null };
+        Returns: string;
+      };
+      usuario_transferencias_historico: {
+        Args: { p_usuario: string };
+        Returns: {
+          id: string;
+          loja_de: FilialCvc;
+          loja_para: FilialCvc;
+          feito_em: string;
+          feito_por_nome: string;
+          observacao: string | null;
+        }[];
+      };
+      pode_ver_venda: {
+        Args: { p_loja: FilialCvc; p_vendedor: string | null };
+        Returns: boolean;
+      };
       // Aura Conferência — gravação só service_role (rotas /api/conferencia).
       conferencia_sync: {
         Args: { p_usuario: string; p_payload: unknown };
