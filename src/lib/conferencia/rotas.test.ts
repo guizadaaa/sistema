@@ -19,7 +19,15 @@ const estado = vi.hoisted(() => ({
   inserts: [] as { tabela: string; valores: unknown }[],
   signIn: vi.fn(),
   refresh: vi.fn(),
+  challenge: vi.fn(),
+  verify: vi.fn(),
+  fatores: new Map<string, { id: string; factor_type: string; status: string }[]>(),
 }));
+
+/** access_token falso no formato JWT (só o payload importa: sub e aal). */
+function jwt(sub: string, aal: "aal1" | "aal2") {
+  return `h.${Buffer.from(JSON.stringify({ sub, aal })).toString("base64url")}.s`;
+}
 
 function builder(tabela: string) {
   const filtros: Record<string, unknown> = {};
@@ -68,8 +76,13 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     auth: {
       getUser: async (token: string) => {
-        const id = token.startsWith("valido-") ? token.slice("valido-".length) : null;
-        return id ? { data: { user: { id } }, error: null } : { data: { user: null }, error: { message: "invalid JWT" } };
+        let id: string | null = token.startsWith("valido-") ? token.slice("valido-".length) : null;
+        if (!id && token.split(".").length === 3) {
+          id = (JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString()) as { sub: string }).sub;
+        }
+        return id
+          ? { data: { user: { id, factors: estado.fatores.get(id) ?? [] } }, error: null }
+          : { data: { user: null }, error: { message: "invalid JWT" } };
       },
     },
     from: (tabela: string) => builder(tabela),
@@ -86,12 +99,20 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 vi.mock("@supabase/supabase-js", () => ({
-  createClient: () => ({ auth: { signInWithPassword: estado.signIn, refreshSession: estado.refresh } }),
+  createClient: () => ({
+    auth: {
+      signInWithPassword: estado.signIn,
+      refreshSession: estado.refresh,
+      mfa: { challenge: estado.challenge, verify: estado.verify },
+    },
+  }),
 }));
 
 const ADMIN = "00000000-0000-0000-0000-000000000004";
 const VENDEDOR_1714 = "00000000-0000-0000-0000-000000000005";
 const INATIVO = "00000000-0000-0000-0000-000000000009";
+const VENDEDOR_1710 = "00000000-0000-0000-0000-000000000001";
+const ADMIN_2FA = "00000000-0000-0000-0000-000000000006";
 
 function req(url: string, init: RequestInit & { token?: string } = {}) {
   const headers = new Headers(init.headers);
@@ -114,6 +135,8 @@ beforeEach(() => {
   estado.usuarios = new Map([
     [ADMIN, { id: ADMIN, nome_completo: "Guilherme", perfil: "adm_master", filial: null, ativo: true }],
     [VENDEDOR_1714, { id: VENDEDOR_1714, nome_completo: "Vendedora Batel", perfil: "vendedor", filial: "1714", ativo: true }],
+    [ADMIN_2FA, { id: ADMIN_2FA, nome_completo: "Adm com 2FA", perfil: "adm", filial: null, ativo: true }],
+    [VENDEDOR_1710, { id: VENDEDOR_1710, nome_completo: "Vendedora Palladium", perfil: "vendedor", filial: "1710", ativo: true }],
     [INATIVO, { id: INATIVO, nome_completo: "Ex", perfil: "vendedor", filial: "1710", ativo: false }],
   ]);
   estado.recibos = new Map([
@@ -123,6 +146,9 @@ beforeEach(() => {
   estado.rpc.mockReset();
   estado.signIn.mockReset();
   estado.refresh.mockReset();
+  estado.challenge.mockReset();
+  estado.verify.mockReset();
+  estado.fatores = new Map([[ADMIN_2FA, [{ id: "fator-totp", factor_type: "totp", status: "verified" }]]]);
   estado.uploads = [];
   estado.updates = [];
   estado.inserts = [];
@@ -217,20 +243,19 @@ describe("POST /sync", () => {
     expect(estado.rpc).toHaveBeenCalledWith("conferencia_sync", { p_usuario: ADMIN, p_payload: corpoSync });
   });
 
-  it("login do Systur fora de logins_gravacao -> 403", async () => {
+  it("vendedor fora de logins_gravacao sincroniza a própria loja (login_systur só é registrado)", async () => {
+    estado.rpc.mockResolvedValue({ data: { recebidas: 1, novas: 1, atualizadas: 0, eventos_voo: 0, vendedores_sem_vinculo: [] }, error: null });
     const { POST } = await import("@/app/api/conferencia/sync/route");
-    const resposta = await POST(
-      req("sync", { method: "POST", token: `valido-${ADMIN}`, body: JSON.stringify({ ...corpoSync, login_systur: "XXXX0001" }) })
-    );
-    expect(resposta.status).toBe(403);
-    expect(estado.rpc).not.toHaveBeenCalled();
+    const corpo = { ...corpoSync, login_systur: "CWBG0300" };
+    const resposta = await POST(req("sync", { method: "POST", token: `valido-${VENDEDOR_1710}`, body: JSON.stringify(corpo) }));
+    expect(resposta.status).toBe(200);
+    expect(estado.rpc).toHaveBeenCalledWith("conferencia_sync", { p_usuario: VENDEDOR_1710, p_payload: corpo });
   });
 
-  it("loja fora das lojas do usuário -> 403", async () => {
-    estado.config = { ...estado.config, logins_gravacao: [...estado.config.logins_gravacao, "CWBG0300"] };
+  it("loja de outra filial -> 403", async () => {
     const { POST } = await import("@/app/api/conferencia/sync/route");
     const resposta = await POST(
-      req("sync", { method: "POST", token: `valido-${VENDEDOR_1714}`, body: JSON.stringify({ ...corpoSync, login_systur: "CWBG0300" }) })
+      req("sync", { method: "POST", token: `valido-${VENDEDOR_1714}`, body: JSON.stringify({ ...corpoSync, login_systur: "SPBG0007" }) })
     );
     expect(resposta.status).toBe(403);
     expect(estado.rpc).not.toHaveBeenCalled();
@@ -290,7 +315,7 @@ describe("PUT /recibos/{recibo}/pdf", () => {
 
     expect((await enviar(pdf, "image/png")).status).toBe(415);
     expect((await enviar(new TextEncoder().encode("não é pdf"))).status).toBe(400);
-    expect((await enviar(new Uint8Array(5 * 1024 * 1024 + 1))).status).toBe(413);
+    expect((await enviar(new Uint8Array(4 * 1024 * 1024 + 1))).status).toBe(413);
     expect((await enviar(pdf, "application/pdf", "999")).status).toBe(404);
 
     estado.rpc.mockResolvedValue({ data: false, error: null });
@@ -325,5 +350,75 @@ describe("POST /reporte", () => {
     ]);
     const vazio = await POST(req("reporte", { method: "POST", token: `valido-${VENDEDOR_1714}`, body: JSON.stringify({ texto: " " }) }));
     expect(vazio.status).toBe(400);
+  });
+});
+
+describe("2FA (TOTP)", () => {
+  const sessaoAal1 = {
+    access_token: jwt(ADMIN_2FA, "aal1"),
+    refresh_token: "rt-aal1",
+    expires_at: 1_800_000_000,
+    user: { id: ADMIN_2FA, factors: [{ id: "fator-totp", factor_type: "totp", status: "verified" }] },
+  };
+
+  it("login de quem tem TOTP ativo devolve mfa_required, sem sessão final", async () => {
+    estado.signIn.mockResolvedValue({ data: { session: sessaoAal1 }, error: null });
+    const { POST } = await import("@/app/api/conferencia/login/route");
+    const resposta = await POST(req("login", { method: "POST", body: JSON.stringify({ email: "g@cvc.com.br", senha: "123456" }) }));
+    expect(resposta.status).toBe(200);
+    const corpo = await resposta.json();
+    expect(corpo).toEqual({ mfa_required: true, factor_id: "fator-totp", mfa_token: "rt-aal1" });
+    expect(corpo).not.toHaveProperty("access_token");
+  });
+
+  it("login/mfa: challenge + verify devolvem a sessão aal2", async () => {
+    estado.refresh.mockResolvedValue({ data: { session: sessaoAal1 }, error: null });
+    estado.challenge.mockResolvedValue({ data: { id: "desafio-1" }, error: null });
+    estado.verify.mockResolvedValue({
+      data: { access_token: jwt(ADMIN_2FA, "aal2"), refresh_token: "rt-aal2", expires_in: 3600, user: sessaoAal1.user },
+      error: null,
+    });
+    const { POST } = await import("@/app/api/conferencia/login/mfa/route");
+    const resposta = await POST(
+      req("login/mfa", { method: "POST", body: JSON.stringify({ mfa_token: "rt-aal1", factor_id: "fator-totp", code: "123456" }) })
+    );
+    expect(resposta.status).toBe(200);
+    const corpo = await resposta.json();
+    expect(corpo).toMatchObject({ access_token: jwt(ADMIN_2FA, "aal2"), refresh_token: "rt-aal2", usuario: { id: ADMIN_2FA, papel: "adm" } });
+    expect(estado.refresh).toHaveBeenCalledWith({ refresh_token: "rt-aal1" });
+    expect(estado.challenge).toHaveBeenCalledWith({ factorId: "fator-totp" });
+    expect(estado.verify).toHaveBeenCalledWith({ factorId: "fator-totp", challengeId: "desafio-1", code: "123456" });
+  });
+
+  it("login/mfa: código errado -> 401; mfa_token expirado -> 401; corpo incompleto -> 400", async () => {
+    const { POST } = await import("@/app/api/conferencia/login/mfa/route");
+    const enviar = (corpo: object) => POST(req("login/mfa", { method: "POST", body: JSON.stringify(corpo) }));
+
+    estado.refresh.mockResolvedValue({ data: { session: sessaoAal1 }, error: null });
+    estado.challenge.mockResolvedValue({ data: { id: "desafio-1" }, error: null });
+    estado.verify.mockResolvedValue({ data: null, error: { message: "Invalid TOTP code entered" } });
+    expect((await enviar({ mfa_token: "rt-aal1", factor_id: "fator-totp", code: "000000" })).status).toBe(401);
+
+    estado.refresh.mockResolvedValue({ data: { session: null }, error: { message: "Invalid Refresh Token" } });
+    expect((await enviar({ mfa_token: "velho", factor_id: "fator-totp", code: "123456" })).status).toBe(401);
+
+    expect((await enviar({ mfa_token: "rt-aal1", factor_id: "fator-totp" })).status).toBe(400);
+  });
+
+  it("refresh mantém o aal: aal2 renova; aal1 de quem tem 2FA não vira sessão", async () => {
+    const { POST } = await import("@/app/api/conferencia/refresh/route");
+    estado.refresh.mockResolvedValue({ data: { session: { ...sessaoAal1, access_token: jwt(ADMIN_2FA, "aal2") } }, error: null });
+    const ok = await POST(req("refresh", { method: "POST", body: JSON.stringify({ refresh_token: "rt-aal2" }) }));
+    expect(ok.status).toBe(200);
+    expect((await ok.json()).access_token).toBe(jwt(ADMIN_2FA, "aal2"));
+
+    estado.refresh.mockResolvedValue({ data: { session: sessaoAal1 }, error: null });
+    expect((await POST(req("refresh", { method: "POST", body: JSON.stringify({ refresh_token: "rt-aal1" }) }))).status).toBe(401);
+  });
+
+  it("rotas protegidas: token aal1 de quem tem 2FA -> 401; aal2 -> ok", async () => {
+    const { GET } = await import("@/app/api/conferencia/config/route");
+    expect((await GET(req("config", { token: jwt(ADMIN_2FA, "aal1") }))).status).toBe(401);
+    expect((await GET(req("config", { token: jwt(ADMIN_2FA, "aal2") }))).status).toBe(200);
   });
 });

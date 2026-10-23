@@ -3,7 +3,7 @@ import { caminhoPdfRecibo, PDF_RECIBO_MAX_BYTES, pareceSerPdf } from "@/lib/conf
 import { erro, json } from "@/lib/conferencia/respostas";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-/** PUT body application/pdf (máx. 5 MB) -> bucket "recibos" + recibos.pdf_path. */
+/** PUT body application/pdf (máx. 4 MB) -> bucket "recibos" + recibos.pdf_path. */
 export async function PUT(request: Request, { params }: { params: Promise<{ recibo: string }> }) {
   const usuario = await autenticar(request);
   if (usuario instanceof Response) return usuario;
@@ -15,10 +15,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ reci
     return erro(415, "Envie o PDF com Content-Type: application/pdf.");
   }
   if (Number(request.headers.get("content-length") ?? 0) > PDF_RECIBO_MAX_BYTES) {
-    return erro(413, "PDF maior que 5 MB.");
+    return erro(413, "PDF maior que 4 MB.");
   }
   const bytes = new Uint8Array(await request.arrayBuffer());
-  if (bytes.byteLength > PDF_RECIBO_MAX_BYTES) return erro(413, "PDF maior que 5 MB.");
+  if (bytes.byteLength > PDF_RECIBO_MAX_BYTES) return erro(413, "PDF maior que 4 MB.");
   if (!pareceSerPdf(bytes)) return erro(400, "O arquivo enviado não é um PDF.");
 
   const admin = createAdminClient();

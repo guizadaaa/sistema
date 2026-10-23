@@ -632,6 +632,7 @@ export interface Database {
           cliente_avisado_por: string | null;
           conferido_em: string | null;
           atualizado_por: string | null;
+          login_systur: string | null;
           criado_em: string;
           atualizado_em: string;
         };

@@ -100,8 +100,9 @@ select public._test_assert('sync 1: cliente por pessoa_id, com telefone e vended
      and telefones -> 0 ->> 'numero' = '41 9651-7241'
      and vendedor_usuario_id = '00000000-0000-0000-0000-000000000001'
      and primeira_compra = '2026-02-14' and loja_principal = '1710'));
-select public._test_assert('sync 1: atualizado_por carimbado',
-  (select atualizado_por = '00000000-0000-0000-0000-000000000004' from public.cliente_excursoes where reserva = '303999143'));
+select public._test_assert('sync 1: atualizado_por e login_systur registrados',
+  (select atualizado_por = '00000000-0000-0000-0000-000000000004' and login_systur = 'SPBG0007'
+   from public.cliente_excursoes where reserva = '303999143'));
 
 select count(*) as clientes_antes from public.clientes \gset
 select count(*) as mapeamentos_antes from public.systur_vendedor_mapeamento \gset

@@ -124,6 +124,7 @@ create table if not exists public.cliente_excursoes (
   cliente_avisado_por uuid references public.usuarios (id),
   conferido_em timestamptz,
   atualizado_por uuid references public.usuarios (id),
+  login_systur text,
   criado_em timestamptz not null default now(),
   atualizado_em timestamptz not null default now()
 );
@@ -133,6 +134,8 @@ comment on table public.cliente_excursoes is
 comment on column public.cliente_excursoes.categoria_codigo is
   '1º dígito da excursão: 5 aéreo nac., 2 terrestre nac., 4 pacote exclusivo, 9 internacional, 8 cruzeiro, 7 rodoviário, 3 rodoaéreo.';
 comment on column public.cliente_excursoes.cliente_id is 'Contratante principal (primeiro de contratantes).';
+comment on column public.cliente_excursoes.login_systur is
+  'Login do Systur informado no último sync desta reserva (só registro — não autoriza nada).';
 
 create index if not exists cliente_excursoes_cliente_idx on public.cliente_excursoes (cliente_id);
 create index if not exists cliente_excursoes_vendedor_idx on public.cliente_excursoes (vendedor_usuario_id);
@@ -707,7 +710,7 @@ begin
       reserva, roteiro, excursao, categoria_codigo, loja, recibos, vendedor_nome_systur, vendedor_usuario_id,
       cliente_id, contratantes, destino, descricao, data_viagem, data_retorno, data_confirmacao, voucher_status,
       reserva_site, status_voos, alteracoes, avisos, pendencias, servicos, apolices, retrato_voos, avisar_cliente,
-      aviso, conferido_em, atualizado_por
+      aviso, conferido_em, atualizado_por, login_systur
     ) values (
       v_reserva,
       e ->> 'roteiro',
@@ -736,7 +739,8 @@ begin
       v_avisar,
       public._jcampo(e, 'aviso'),
       (e ->> 'conferido_em')::timestamptz,
-      p_usuario
+      p_usuario,
+      nullif(trim(p_payload ->> 'login_systur'), '')
     )
     on conflict (reserva) do update set
       roteiro = case when e ? 'roteiro' then excluded.roteiro else t.roteiro end,
@@ -765,7 +769,8 @@ begin
       avisar_cliente = excluded.avisar_cliente,
       aviso = case when e ? 'aviso' then excluded.aviso else t.aviso end,
       conferido_em = case when e ? 'conferido_em' then excluded.conferido_em else t.conferido_em end,
-      atualizado_por = excluded.atualizado_por;
+      atualizado_por = excluded.atualizado_por,
+      login_systur = coalesce(excluded.login_systur, t.login_systur);
 
     if v_tem then
       v_atualizadas := v_atualizadas + 1;

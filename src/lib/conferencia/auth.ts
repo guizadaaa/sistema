@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { FilialCvc, PerfilUsuario } from "@/lib/supabase/types";
 import { FILIAIS } from "@/lib/validation/caso";
 
+import { faltaSegundoFator } from "./mfa";
 import { erro } from "./respostas";
 
 // Rotas /api/conferencia/*: chamadas pelo service worker da extensão "Aura
@@ -47,7 +48,8 @@ export async function carregarUsuarioConferencia(id: string): Promise<UsuarioCon
 
 /**
  * Valida o Bearer token com supabase.auth.getUser(token). Devolve o usuário
- * ou a Response de erro (401 token ausente/inválido, 403 usuário inativo).
+ * ou a Response de erro (401 token ausente/inválido ou sem o 2FA concluído
+ * para quem tem TOTP ativo, 403 usuário inativo).
  */
 export async function autenticar(request: Request): Promise<UsuarioConferencia | Response> {
   const token = tokenDoHeader(request);
@@ -56,6 +58,7 @@ export async function autenticar(request: Request): Promise<UsuarioConferencia |
   const admin = createAdminClient();
   const { data, error } = await admin.auth.getUser(token);
   if (error || !data.user) return erro(401, "Token inválido ou expirado.");
+  if (faltaSegundoFator(data.user, token)) return erro(401, "Conclua a verificação em duas etapas.");
 
   const usuario = await carregarUsuarioConferencia(data.user.id);
   if (!usuario) return erro(403, "Usuário sem acesso à Aura (inativo ou sem perfil).");
