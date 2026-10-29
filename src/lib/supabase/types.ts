@@ -711,6 +711,51 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      vitrine_categorias: {
+        Row: { id: string; filial: FilialCvc; nome: string; ordem: number; ativo: boolean; criado_em: string };
+        Insert: { filial: FilialCvc; nome: string; ordem?: number; ativo?: boolean };
+        Update: { nome?: string; ativo?: boolean; ordem?: number };
+        Relationships: [];
+      };
+      vitrine_arquivos: {
+        Row: {
+          id: string;
+          filial: FilialCvc;
+          categoria_id: string;
+          titulo: string;
+          pdf_path: string;
+          paginas: number;
+          capa_pagina: number | null;
+          enviado_por: string | null;
+          enviado_em: string;
+        };
+        // Escrita por vitrine_salvar_envio().
+        Insert: never;
+        Update: { titulo?: string; categoria_id?: string };
+        Relationships: [];
+      };
+      vitrine_ofertas: {
+        Row: {
+          id: string;
+          filial: FilialCvc;
+          categoria_id: string;
+          arquivo_id: string;
+          pagina: number | null;
+          titulo: string;
+          imagem_path: string;
+          link: string | null;
+          validade: string | null;
+          ordem: number;
+          ativo: boolean;
+          criado_por: string | null;
+          criado_em: string;
+          atualizado_em: string;
+        };
+        // Criação por vitrine_salvar_envio(); exclusão por vitrine_excluir_oferta().
+        Insert: never;
+        Update: { titulo?: string; link?: string | null; validade?: string | null; ativo?: boolean; categoria_id?: string };
+        Relationships: [];
+      };
     };
     Views: {
       status_historico_com_duracao: {
@@ -799,6 +844,27 @@ export interface Database {
       };
     };
     Functions: {
+      vitrine_salvar_envio: {
+        Args: {
+          p_arquivo_id: string;
+          p_filial: FilialCvc;
+          p_categoria_id: string;
+          p_titulo: string;
+          p_paginas: number;
+          p_capa_pagina: number | null;
+          p_ofertas: { pagina: number | null; titulo: string; link: string | null; validade: string | null }[];
+          p_copiar_para?: FilialCvc[];
+        };
+        Returns: string;
+      };
+      vitrine_excluir_oferta: {
+        Args: { p_oferta_id: string };
+        Returns: { remover: string[]; prefixo: string | null };
+      };
+      vitrine_mover: {
+        Args: { p_tabela: "categoria" | "oferta"; p_id: string; p_direcao: -1 | 1 };
+        Returns: undefined;
+      };
       transferir_usuario_loja: {
         Args: { p_usuario_id: string; p_loja_para: FilialCvc; p_observacao?: string | null };
         Returns: string;

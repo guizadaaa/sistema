@@ -2,6 +2,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { listarCategoriasMateriaisApoio, listarMateriaisApoio } from "@/lib/materiais-apoio/listar";
 
 import { MateriaisApoioLista } from "./materiais-lista";
+import { MateriaisTabs } from "./materiais-tabs";
 
 export default async function MateriaisApoioPage() {
   const usuario = await requireCurrentUser();
@@ -10,5 +11,10 @@ export default async function MateriaisApoioPage() {
 
   const [materiais, categorias] = await Promise.all([listarMateriaisApoio(), listarCategoriasMateriaisApoio()]);
 
-  return <MateriaisApoioLista materiais={materiais} categorias={categorias} ehAdmin={ehAdmin} ehAdmMaster={ehAdmMaster} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <MateriaisTabs ativo="documentos" />
+      <MateriaisApoioLista materiais={materiais} categorias={categorias} ehAdmin={ehAdmin} ehAdmMaster={ehAdmMaster} />
+    </div>
+  );
 }
