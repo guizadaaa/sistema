@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { ArrowLeft, ArrowRight, Copy, Download, ExternalLink, FileDown, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Copy, ExternalLink, Pencil, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,23 +17,10 @@ import {
   editarOfertaVitrine,
   excluirOfertaVitrine,
   moverVitrine,
-  urlArquivoVitrine,
   type VitrineFormState,
 } from "./actions";
 
 const initialState: VitrineFormState = {};
-
-/** Nome de arquivo legível para "Baixar imagem"/"Baixar PDF". */
-export function nomeArquivo(titulo: string, extensao: "png" | "pdf"): string {
-  const base = titulo
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .toLowerCase()
-    .slice(0, 80);
-  return `${base || "vitrine"}.${extensao}`;
-}
 
 /** Link fora de cvc.com.br: pede confirmação (devolve false se o usuário cancelar). */
 export function confirmarLinksExternos(links: string[]): boolean {
@@ -43,43 +30,6 @@ export function confirmarLinksExternos(links: string[]): boolean {
   if (externos.length === 0) return true;
   return window.confirm(
     `Link fora de cvc.com.br: ${[...new Set(externos)].join(", ")}.\n\nConfira se é mesmo o link da oferta. Salvar assim mesmo?`
-  );
-}
-
-export function BotaoArquivo({
-  caminho,
-  nome,
-  rotulo,
-  icone: Icone,
-}: {
-  caminho: string;
-  nome?: string;
-  rotulo: string;
-  icone: typeof Download;
-}) {
-  const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState<string | undefined>();
-
-  const abrir = async () => {
-    setCarregando(true);
-    setErro(undefined);
-    const resultado = await urlArquivoVitrine(caminho, nome);
-    setCarregando(false);
-    if (!resultado.url) {
-      setErro(resultado.error ?? "Erro ao gerar o link.");
-      return;
-    }
-    if (nome) window.location.assign(resultado.url);
-    else window.open(resultado.url, "_blank", "noopener,noreferrer");
-  };
-
-  return (
-    <>
-      <Button type="button" variant="outline" size="sm" onClick={abrir} disabled={carregando} title={erro}>
-        <Icone className="size-4" /> {carregando ? "Gerando..." : rotulo}
-      </Button>
-      {erro && <span className="text-destructive text-xs">{erro}</span>}
-    </>
   );
 }
 
@@ -147,13 +97,11 @@ function EditarOfertaDialog({
 
 export function OfertaCard({
   oferta,
-  pdfPath,
   podeEditar,
   primeira,
   ultima,
 }: {
   oferta: OfertaVitrine;
-  pdfPath: string | undefined;
   podeEditar: boolean;
   primeira: boolean;
   ultima: boolean;
@@ -182,8 +130,12 @@ export function OfertaCard({
   return (
     <li className={`flex flex-col overflow-hidden rounded-lg border ${esmaecida ? "opacity-60" : ""}`}>
       {oferta.imagemUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- URL assinada do Storage, next/image não se aplica
-        <img src={oferta.imagemUrl} alt={oferta.titulo} className="aspect-[1190/425] w-full bg-black object-contain" />
+        // URL assinada sem "download": abre o PNG inline em nova aba; salvar é
+        // pelo botão direito (o nome do objeto é o título da oferta).
+        <a href={oferta.imagemUrl} target="_blank" rel="noopener noreferrer" title="Abrir imagem em nova aba">
+          {/* eslint-disable-next-line @next/next/no-img-element -- URL assinada do Storage, next/image não se aplica */}
+          <img src={oferta.imagemUrl} alt={oferta.titulo} className="aspect-[1190/425] w-full bg-black object-contain" />
+        </a>
       ) : (
         <div className="bg-muted aspect-[1190/425] w-full" />
       )}
@@ -199,9 +151,8 @@ export function OfertaCard({
           <span className="text-muted-foreground text-xs">Válida até {formatarDataBr(oferta.validade)}</span>
         )}
 
-        <div className="mt-auto flex flex-wrap gap-1">
-          {oferta.link && (
-            <>
+        {oferta.link && (
+          <div className="mt-auto flex flex-wrap gap-1">
               <Button type="button" variant="outline" size="sm" onClick={copiar}>
                 <Copy className="size-4" /> {copiado ? "Copiado!" : "Copiar link"}
               </Button>
@@ -210,11 +161,8 @@ export function OfertaCard({
                   <ExternalLink className="size-4" /> Abrir link
                 </a>
               </Button>
-            </>
-          )}
-          <BotaoArquivo caminho={oferta.imagem_path} nome={nomeArquivo(oferta.titulo, "png")} rotulo="Baixar imagem" icone={Download} />
-          {pdfPath && <BotaoArquivo caminho={pdfPath} nome={nomeArquivo(oferta.titulo, "pdf")} rotulo="Baixar PDF" icone={FileDown} />}
-        </div>
+          </div>
+        )}
 
         {podeEditar && (
           <div className="flex flex-wrap items-center gap-1 border-t pt-2">

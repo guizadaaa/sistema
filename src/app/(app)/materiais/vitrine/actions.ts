@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { FilialCvc } from "@/lib/supabase/types";
 import { FILIAIS } from "@/lib/validation/caso";
 import { validarLinkVitrine, validarValidadeVitrine } from "@/lib/validation/vitrine";
+import { migrarNomesVitrine, type ResumoMigracaoNomes } from "@/lib/vitrine/migrar-nomes";
+import { nomeArquivoValido } from "@/lib/vitrine/nomes";
 
 export type VitrineFormState = { error?: string; ok?: boolean };
 
@@ -118,44 +120,47 @@ export async function moverVitrine(tabela: "categoria" | "oferta", id: string, d
 
 export type EnvioPreparado = {
   arquivoId: string;
-  uploads: { caminho: string; token: string; tipo: "application/pdf" | "image/png"; pagina: number | null }[];
+  uploads: { nome: string; caminho: string; token: string; tipo: "application/pdf" | "image/png" }[];
 };
 
 /**
- * URLs assinadas de upload (PDF + um PNG por página), criadas com a sessão
- * do usuário — passam pela policy storage_vitrine_insert. O navegador sobe
- * os arquivos direto no Supabase Storage; nada passa por aqui.
+ * URLs assinadas de upload, criadas com a sessão do usuário — passam pela
+ * policy storage_vitrine_insert. O navegador sobe o PDF e os PNGs direto no
+ * Supabase Storage; nada passa por aqui. Os nomes (legíveis, "Salvar como"
+ * usa o nome do objeto) vêm da revisão: {filial}/{arquivo_id}/{nome}.
  */
-export async function prepararEnvioVitrine(filial: FilialCvc, paginas: number): Promise<EnvioPreparado | { error: string }> {
+export async function prepararEnvioVitrine(
+  filial: FilialCvc,
+  arquivos: { nome: string; tipo: "application/pdf" | "image/png" }[]
+): Promise<EnvioPreparado | { error: string }> {
   if (!ehFilial(filial)) return { error: "Filial inválida." };
-  if (!Number.isInteger(paginas) || paginas < 1 || paginas > MAX_PAGINAS) return { error: "PDF sem páginas válidas." };
+  if (arquivos.length < 2 || arquivos.length > MAX_PAGINAS + 1) return { error: "Envio sem arquivos válidos." };
+  const nomes = new Set<string>();
+  for (const { nome, tipo } of arquivos) {
+    if (!nomeArquivoValido(nome, tipo === "application/pdf" ? "pdf" : "png") || nomes.has(nome)) {
+      return { error: `Nome de arquivo inválido: ${nome}` };
+    }
+    nomes.add(nome);
+  }
   const bloqueio = await exigirEditor(filial);
   if (bloqueio) return { error: bloqueio };
 
   const arquivoId = randomUUID();
-  const alvos: Omit<EnvioPreparado["uploads"][number], "token">[] = [
-    { caminho: `${filial}/${arquivoId}.pdf`, tipo: "application/pdf", pagina: null },
-    ...Array.from({ length: paginas }, (_, i) => ({
-      caminho: `${filial}/${arquivoId}/p${i + 1}.png`,
-      tipo: "image/png" as const,
-      pagina: i + 1,
-    })),
-  ];
-
   const supabase = await createClient();
   const uploads: EnvioPreparado["uploads"] = [];
-  for (const alvo of alvos) {
-    const { data, error } = await supabase.storage.from("vitrine").createSignedUploadUrl(alvo.caminho);
+  for (const { nome, tipo } of arquivos) {
+    const caminho = `${filial}/${arquivoId}/${nome}`;
+    const { data, error } = await supabase.storage.from("vitrine").createSignedUploadUrl(caminho);
     if (error || !data) {
       console.error("Erro ao gerar URL de upload da vitrine:", error);
       return { error: "Não foi possível preparar o envio. Tente novamente." };
     }
-    uploads.push({ ...alvo, token: data.token });
+    uploads.push({ nome, caminho, token: data.token, tipo });
   }
   return { arquivoId, uploads };
 }
 
-export type OfertaRevisada = { pagina: number | null; titulo: string; link: string; validade: string };
+export type OfertaRevisada = { pagina: number | null; titulo: string; link: string; validade: string; imagem: string };
 
 export async function salvarEnvioVitrine(entrada: {
   arquivoId: string;
@@ -164,6 +169,7 @@ export async function salvarEnvioVitrine(entrada: {
   titulo: string;
   paginas: number;
   capaPagina: number | null;
+  pdfNome: string;
   ofertas: OfertaRevisada[];
   copiarPara: FilialCvc[];
   linksExternosConfirmados: boolean;
@@ -184,7 +190,7 @@ export async function salvarEnvioVitrine(entrada: {
     if ("error" in link) return { error: `${rotulo}: ${link.error}` };
     const validade = validarValidadeVitrine(oferta.validade);
     if (!validade.ok) return { error: `${rotulo}: ${validade.erro}` };
-    ofertas.push({ pagina: oferta.pagina, titulo: oferta.titulo.trim(), link: link.link, validade: validade.data });
+    ofertas.push({ pagina: oferta.pagina, titulo: oferta.titulo.trim(), link: link.link, validade: validade.data, imagem: oferta.imagem });
   }
 
   const supabase = await createClient();
@@ -195,6 +201,7 @@ export async function salvarEnvioVitrine(entrada: {
     p_titulo: entrada.titulo.trim(),
     p_paginas: entrada.paginas,
     p_capa_pagina: entrada.capaPagina,
+    p_pdf_nome: entrada.pdfNome,
     p_ofertas: ofertas,
     p_copiar_para: entrada.copiarPara,
   });
@@ -280,16 +287,21 @@ export async function excluirOfertaVitrine(id: string): Promise<{ error?: string
   return {};
 }
 
-/** URL assinada curta para baixar o PNG da oferta ou o PDF da vitrine (RLS do bucket). */
-export async function urlArquivoVitrine(caminho: string, nomeDownload?: string): Promise<{ url?: string; error?: string }> {
-  await requireCurrentUser();
-  const supabase = await createClient();
-  const { data, error } = await supabase.storage
-    .from("vitrine")
-    .createSignedUrl(caminho, 300, nomeDownload ? { download: nomeDownload } : undefined);
-  if (error || !data) {
-    console.error("Erro ao gerar link da vitrine:", error);
-    return { error: "Não foi possível gerar o link." };
+/**
+ * Arquivos enviados antes dos nomes legíveis ({filial}/{id}.pdf, p{n}.png):
+ * copia para o nome novo, atualiza pdf_path/imagem_path e só então apaga o
+ * antigo. Só adm_master; usa a service role porque mexe em pastas de todas
+ * as filiais (ver migrarNomesVitrine).
+ */
+export async function migrarNomesVitrineAction(): Promise<{ error?: string; resumo?: ResumoMigracaoNomes }> {
+  const usuario = await requireCurrentUser();
+  if (usuario.perfil !== "adm_master") return { error: "Apenas adm_master pode migrar os arquivos." };
+  try {
+    const resumo = await migrarNomesVitrine();
+    revalidatePath(CAMINHO);
+    return { resumo };
+  } catch (erro) {
+    console.error("Erro ao migrar nomes da vitrine:", erro);
+    return { error: "Não foi possível migrar os arquivos." };
   }
-  return { url: data.signedUrl };
 }

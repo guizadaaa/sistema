@@ -28,6 +28,7 @@ export default async function VitrinePage({
         <VitrineTela
           filial={filial}
           ehAdmin={ehAdmin}
+          ehAdmMaster={usuario.perfil === "adm_master"}
           podeEditar={podeEditar}
           dados={await carregarVitrine(filial)}
         />

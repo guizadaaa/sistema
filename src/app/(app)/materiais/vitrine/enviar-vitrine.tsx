@@ -15,7 +15,9 @@ import { VITRINE_PDF_TAMANHO_MAXIMO_BYTES } from "@/lib/validation/vitrine";
 import type { CategoriaVitrine } from "@/lib/vitrine/listar";
 import { processarPdfVitrine, type PaginaProcessada } from "@/lib/vitrine/processar-pdf";
 
-import { prepararEnvioVitrine, salvarEnvioVitrine, type EnvioPreparado } from "./actions";
+import { nomePdfVitrine, nomesImagensVitrine } from "@/lib/vitrine/nomes";
+
+import { prepararEnvioVitrine, salvarEnvioVitrine } from "./actions";
 import { confirmarLinksExternos } from "./oferta-card";
 
 type Linha = { pagina: number; titulo: string; link: string; validade: string; capa: boolean; miniatura: string };
@@ -24,13 +26,16 @@ type Etapa =
   | { tipo: "escolher" }
   | { tipo: "processando"; feitas: number; total: number }
   | { tipo: "enviando"; feitos: number; total: number }
-  | { tipo: "revisao"; preparado: EnvioPreparado };
+  | { tipo: "revisao" };
 
 /**
  * Envio da vitrine (PDF de até 25 MB). Tudo pesado acontece no navegador:
- * pdf.js gera o PNG e lê o texto de cada página; o PDF e os PNGs sobem
- * direto para o Supabase Storage por URL assinada de upload (o teto de
- * corpo da Vercel é 4,5 MB). O servidor só gera as URLs e grava a revisão.
+ * pdf.js gera o PNG e lê o texto de cada página; a revisão vem em seguida
+ * (miniaturas locais) e, ao publicar, o PDF e os PNGs sobem direto para o
+ * Supabase Storage por URL assinada de upload (o teto de corpo da Vercel é
+ * 4,5 MB), já com os nomes legíveis — título da oferta e "{categoria} -
+ * {titulo}" —, que são os nomes do "Salvar como". O servidor só gera as
+ * URLs e grava a revisão.
  */
 export function EnviarVitrine({
   filial,
@@ -59,6 +64,7 @@ export function EnviarVitrine({
 
   // Miniaturas (blob:) liberadas só ao sair — editar uma linha não as recria.
   const miniaturas = useRef<string[]>([]);
+  const pngs = useRef(new Map<number, Blob>());
   useEffect(() => () => miniaturas.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
   const enviar = async () => {
@@ -78,27 +84,6 @@ export function EnviarVitrine({
       return setErro("Não foi possível ler o PDF.");
     }
 
-    const preparado = await acoes.prepararEnvioVitrine(filial, paginas.length);
-    if ("error" in preparado) {
-      setEtapa({ tipo: "escolher" });
-      return setErro(preparado.error);
-    }
-
-    const storage = createClient().storage.from("vitrine");
-    const pngPorPagina = new Map(paginas.map((p) => [p.numero, p.png]));
-    let feitos = 0;
-    setEtapa({ tipo: "enviando", feitos, total: preparado.uploads.length });
-    for (const upload of preparado.uploads) {
-      const corpo = upload.pagina === null ? arquivo : pngPorPagina.get(upload.pagina);
-      const { error } = await storage.uploadToSignedUrl(upload.caminho, upload.token, corpo!, { contentType: upload.tipo });
-      if (error) {
-        console.error("Erro ao enviar arquivo da vitrine:", error);
-        setEtapa({ tipo: "escolher" });
-        return setErro("Falha no envio para o armazenamento. Tente de novo.");
-      }
-      setEtapa({ tipo: "enviando", feitos: ++feitos, total: preparado.uploads.length });
-    }
-
     const tituloVitrine = titulo.trim() || paginas[0]?.tituloSugerido || arquivo.name.replace(/\.pdf$/i, "");
     setTitulo(tituloVitrine);
     setUnica({ titulo: tituloVitrine, link: "", validade: "" });
@@ -111,32 +96,72 @@ export function EnviarVitrine({
       miniatura: URL.createObjectURL(p.png),
     }));
     miniaturas.current = novas.map((l) => l.miniatura);
+    pngs.current = new Map(paginas.map((p) => [p.numero, p.png]));
     setLinhas(novas);
-    setEtapa({ tipo: "revisao", preparado });
+    setEtapa({ tipo: "revisao" });
   };
 
   const salvar = async () => {
-    if (etapa.tipo !== "revisao") return;
+    if (etapa.tipo !== "revisao" || !arquivo) return;
     setErro(undefined);
-    const ofertas = pdfInteiro
-      ? [{ pagina: null, ...unica }]
+    const capa = pdfInteiro ? undefined : linhas.find((l) => l.capa);
+    const paginasOferta = pdfInteiro
+      ? [{ pagina: 1, ...unica }]
       : linhas.filter((l) => !l.capa).map(({ pagina, titulo, link, validade }) => ({ pagina, titulo, link, validade }));
-    if (!confirmarLinksExternos(ofertas.map((o) => o.link))) return;
+    if (!confirmarLinksExternos(paginasOferta.map((o) => o.link))) return;
+
+    // Nomes legíveis dos arquivos (são os nomes do "Salvar como").
+    const pdfNome = nomePdfVitrine(categorias.find((c) => c.id === categoriaId)?.nome ?? "", titulo);
+    const nomesPng = nomesImagensVitrine([
+      ...(capa ? [{ pagina: capa.pagina, titulo: "", capa: true }] : []),
+      ...paginasOferta.map(({ pagina, titulo }) => ({ pagina, titulo })),
+    ]);
+    const arquivos = [
+      { nome: pdfNome, tipo: "application/pdf" as const, corpo: arquivo as Blob },
+      ...[...nomesPng].map(([pagina, nome]) => ({ nome, tipo: "image/png" as const, corpo: pngs.current.get(pagina)! })),
+    ];
 
     setSalvando(true);
+    const preparado = await acoes.prepararEnvioVitrine(filial, arquivos.map(({ nome, tipo }) => ({ nome, tipo })));
+    if ("error" in preparado) {
+      setSalvando(false);
+      return setErro(preparado.error);
+    }
+
+    const storage = createClient().storage.from("vitrine");
+    const corpoPorNome = new Map(arquivos.map((a) => [a.nome, a.corpo]));
+    let feitos = 0;
+    setEtapa({ tipo: "enviando", feitos, total: preparado.uploads.length });
+    for (const upload of preparado.uploads) {
+      const { error } = await storage.uploadToSignedUrl(upload.caminho, upload.token, corpoPorNome.get(upload.nome)!, {
+        contentType: upload.tipo,
+      });
+      if (error) {
+        console.error("Erro ao enviar arquivo da vitrine:", error);
+        setSalvando(false);
+        setEtapa({ tipo: "revisao" });
+        return setErro("Falha no envio para o armazenamento. Tente de novo.");
+      }
+      setEtapa({ tipo: "enviando", feitos: ++feitos, total: preparado.uploads.length });
+    }
+
     const resultado = await acoes.salvarEnvioVitrine({
-      arquivoId: etapa.preparado.arquivoId,
+      arquivoId: preparado.arquivoId,
       filial,
       categoriaId,
       titulo,
       paginas: linhas.length,
-      capaPagina: pdfInteiro ? null : (linhas.find((l) => l.capa)?.pagina ?? null),
-      ofertas,
+      capaPagina: capa?.pagina ?? null,
+      pdfNome,
+      ofertas: paginasOferta.map((o) => ({ ...o, pagina: pdfInteiro ? null : o.pagina, imagem: nomesPng.get(o.pagina)! })),
       copiarPara,
       linksExternosConfirmados: true,
     });
     setSalvando(false);
-    if (resultado.error) return setErro(resultado.error);
+    if (resultado.error) {
+      setEtapa({ tipo: "revisao" });
+      return setErro(resultado.error);
+    }
     aoConcluir();
   };
 
@@ -148,7 +173,7 @@ export function EnviarVitrine({
     return (
       <div className="flex flex-col gap-2 py-4" role="status">
         <p className="text-sm">
-          {etapa.tipo === "processando" ? "Gerando as imagens das páginas" : "Enviando para o armazenamento"}… {feito}/{total || "?"}
+          {etapa.tipo === "processando" ? "Lendo o PDF e gerando as imagens das páginas" : "Enviando para o armazenamento"}… {feito}/{total || "?"}
         </p>
         <div className="bg-muted h-2 overflow-hidden rounded">
           <div className="bg-primary h-full transition-all" style={{ width: `${total ? (feito / total) * 100 : 5}%` }} />
@@ -190,7 +215,7 @@ export function EnviarVitrine({
         </div>
         {erro && <p className="text-destructive text-sm">{erro}</p>}
         <Button type="button" onClick={enviar} disabled={!arquivo || categorias.length === 0} className="w-fit">
-          Enviar e revisar
+          Ler PDF e revisar
         </Button>
       </div>
     );

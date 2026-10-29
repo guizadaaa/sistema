@@ -1,6 +1,6 @@
 import { VITRINE_PNG_LARGURA } from "@/lib/validation/vitrine";
 
-import { sugerirTituloOferta } from "./titulo";
+import { sugerirTituloOferta, type TrechoTexto } from "./titulo";
 
 // Só no navegador: pdf.js renderiza cada página num <canvas> e lê o texto.
 // O PDF (9–14 MB) nunca passa pelo servidor do Next.
@@ -50,12 +50,15 @@ export async function processarPdfVitrine(
       await pagina.render({ canvas, viewport }).promise;
       const png = await canvasParaPng(canvas);
 
+      // Tamanho da fonte = escala vertical da matriz do trecho (para achar as
+      // "linhas com fonte grande" quando a página não tem "Valor").
       const conteudo = await pagina.getTextContent();
-      const texto = conteudo.items
-        .map((item) => ("str" in item ? item.str + (item.hasEOL ? "\n" : " ") : ""))
-        .join("");
+      const trechos: TrechoTexto[] = conteudo.items.flatMap((item) =>
+        "str" in item ? [{ texto: item.str, tamanho: Math.hypot(item.transform[2], item.transform[3]), fimDeLinha: item.hasEOL }] : []
+      );
+      const texto = trechos.map((t) => t.texto + (t.fimDeLinha ? "\n" : " ")).join("");
 
-      paginas.push({ numero, png, texto, tituloSugerido: sugerirTituloOferta(texto) });
+      paginas.push({ numero, png, texto, tituloSugerido: sugerirTituloOferta(trechos) });
       pagina.cleanup();
       aoProgredir?.(numero, documento.numPages);
     }

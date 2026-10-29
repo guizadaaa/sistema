@@ -74,12 +74,12 @@ select public._test_assert('categorias da 1710 com ordem automática',
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
 set role authenticated;
 select public.vitrine_salvar_envio(
-  '32000000-0000-0000-0000-0000000000a1', '1710', '32000000-0000-0000-0000-0000000000c1', 'MSC Cruzeiros', 5, 1,
+  '32000000-0000-0000-0000-0000000000a1', '1710', '32000000-0000-0000-0000-0000000000c1', 'MSC Cruzeiros', 5, 1, 'v.pdf',
   $j$[
-    {"pagina": 2, "titulo": "MSC VIRTUOSA BÚZIOS, SALVADOR E MACEIÓ", "link": "https://cruzeiros.atlas.cvc.com.br/quote/1"},
-    {"pagina": 3, "titulo": "MSC SEAVIEW ILHABELA", "link": "https://www.cvc.com.br/carrinho-dinamico/2", "validade": "2026-01-01"},
-    {"pagina": 4, "titulo": "MSC PREZIOSA ARGENTINA"},
-    {"pagina": 5, "titulo": "MSC ARMONIA BÚZIOS"}
+    {"pagina": 2, "imagem": "p2.png", "titulo": "MSC VIRTUOSA BÚZIOS, SALVADOR E MACEIÓ", "link": "https://cruzeiros.atlas.cvc.com.br/quote/1"},
+    {"pagina": 3, "imagem": "p3.png", "titulo": "MSC SEAVIEW ILHABELA", "link": "https://www.cvc.com.br/carrinho-dinamico/2", "validade": "2026-01-01"},
+    {"pagina": 4, "imagem": "p4.png", "titulo": "MSC PREZIOSA ARGENTINA"},
+    {"pagina": 5, "imagem": "p5.png", "titulo": "MSC ARMONIA BÚZIOS"}
   ]$j$::jsonb
 ) is not null as salvou;
 reset role;
@@ -90,7 +90,7 @@ select public._test_assert('envio: 4 ofertas (capa fora), PNG por página',
          '1710/32000000-0000-0000-0000-0000000000a1/p2.png', '1710/32000000-0000-0000-0000-0000000000a1/p3.png',
          '1710/32000000-0000-0000-0000-0000000000a1/p4.png', '1710/32000000-0000-0000-0000-0000000000a1/p5.png']
        from public.vitrine_ofertas where arquivo_id = '32000000-0000-0000-0000-0000000000a1')
-  and (select pdf_path = '1710/32000000-0000-0000-0000-0000000000a1.pdf' and capa_pagina = 1
+  and (select pdf_path = '1710/32000000-0000-0000-0000-0000000000a1/v.pdf' and capa_pagina = 1
          and enviado_por = '00000000-0000-0000-0000-000000000003'
        from public.vitrine_arquivos where id = '32000000-0000-0000-0000-0000000000a1'));
 
@@ -98,8 +98,8 @@ do $$
 begin
   perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', true);
   set local role authenticated;
-  perform public.vitrine_salvar_envio(gen_random_uuid(), '1710', '32000000-0000-0000-0000-0000000000c1', 'x', 1, null,
-    '[{"pagina": 1, "titulo": "x"}]'::jsonb, '{1714}');
+  perform public.vitrine_salvar_envio(gen_random_uuid(), '1710', '32000000-0000-0000-0000-0000000000c1', 'x', 1, null, 'x.pdf',
+    '[{"pagina": 1, "imagem": "p1.png", "titulo": "x"}]'::jsonb, '{1714}');
   raise exception 'FALHOU: gerente publicou em outra filial';
 exception when insufficient_privilege then
   raise notice 'ok: só adm publica em outras filiais';
@@ -110,13 +110,13 @@ $$;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006';
 set role authenticated;
 select public.vitrine_salvar_envio(
-  '32000000-0000-0000-0000-0000000000a2', '1710', '32000000-0000-0000-0000-0000000000c2', 'Nordeste', 3, null,
-  '[{"pagina": null, "titulo": "Nordeste completo", "link": "https://www.cvc.com.br/nordeste"}]'::jsonb, '{1714,1730,1710}'
+  '32000000-0000-0000-0000-0000000000a2', '1710', '32000000-0000-0000-0000-0000000000c2', 'Nordeste', 3, null, 'v.pdf',
+  '[{"pagina": null, "imagem": "p1.png", "titulo": "Nordeste completo", "link": "https://www.cvc.com.br/nordeste"}]'::jsonb, '{1714,1730,1710}'
 ) is not null as salvou_adm;
 reset role;
 
 select public._test_assert('publicar também em: cópia por filial, mesmo PDF, categoria criada pelo nome',
-  (select count(*) = 3 from public.vitrine_arquivos where pdf_path = '1710/32000000-0000-0000-0000-0000000000a2.pdf')
+  (select count(*) = 3 from public.vitrine_arquivos where pdf_path = '1710/32000000-0000-0000-0000-0000000000a2/v.pdf')
   and (select array_agg(filial order by filial) = '{1710,1714,1730}' from public.vitrine_ofertas
        where imagem_path = '1710/32000000-0000-0000-0000-0000000000a2/p1.png' and pagina is null)
   and exists (select 1 from public.vitrine_categorias where filial = '1714' and nome = 'Nacional'));
@@ -220,9 +220,9 @@ $$;
 -- ----------------------------------------------------------------------------
 
 insert into storage.objects (bucket_id, name) values
-  ('vitrine', '1710/32000000-0000-0000-0000-0000000000a1.pdf'),
+  ('vitrine', '1710/32000000-0000-0000-0000-0000000000a1/v.pdf'),
   ('vitrine', '1710/32000000-0000-0000-0000-0000000000a1/p2.png'),
-  ('vitrine', '1710/32000000-0000-0000-0000-0000000000a2.pdf'),
+  ('vitrine', '1710/32000000-0000-0000-0000-0000000000a2/v.pdf'),
   ('vitrine', '1710/32000000-0000-0000-0000-0000000000a2/p1.png');
 
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
@@ -253,7 +253,7 @@ $$;
 set request.jwt.claim.sub = '32000000-0000-0000-0000-000000000001';
 set role authenticated;
 select public._test_assert('storage: vendedor 1714 lê o PDF/PNG da cópia (pasta da 1710), não os só da 1710',
-  (select array_agg(name order by name) = array['1710/32000000-0000-0000-0000-0000000000a2.pdf', '1710/32000000-0000-0000-0000-0000000000a2/p1.png']
+  (select array_agg(name order by name) = array['1710/32000000-0000-0000-0000-0000000000a2/p1.png', '1710/32000000-0000-0000-0000-0000000000a2/v.pdf']
    from storage.objects where bucket_id = 'vitrine'));
 reset role;
 
@@ -294,7 +294,7 @@ select public.vitrine_excluir_oferta((select id from public.vitrine_ofertas wher
 reset role;
 select public._test_assert('última oferta: sai o PDF e a pasta (capa incluída)',
   :'rult'::jsonb -> 'prefixo' = '"1710/32000000-0000-0000-0000-0000000000a1"'::jsonb
-  and :'rult'::jsonb -> 'remover' ? '1710/32000000-0000-0000-0000-0000000000a1.pdf'
+  and :'rult'::jsonb -> 'remover' ? '1710/32000000-0000-0000-0000-0000000000a1/v.pdf'
   and not exists (select 1 from public.vitrine_arquivos where id = '32000000-0000-0000-0000-0000000000a1'));
 
 -- ----------------------------------------------------------------------------
