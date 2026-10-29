@@ -731,7 +731,8 @@ export interface Database {
         };
         // Escrita por vitrine_salvar_envio().
         Insert: never;
-        Update: { titulo?: string; categoria_id?: string };
+        // pdf_path: só a migração de nomes (service role).
+        Update: { titulo?: string; categoria_id?: string; pdf_path?: string };
         Relationships: [];
       };
       vitrine_ofertas: {
@@ -753,7 +754,15 @@ export interface Database {
         };
         // Criação por vitrine_salvar_envio(); exclusão por vitrine_excluir_oferta().
         Insert: never;
-        Update: { titulo?: string; link?: string | null; validade?: string | null; ativo?: boolean; categoria_id?: string };
+        // imagem_path: só a migração de nomes (service role).
+        Update: {
+          titulo?: string;
+          link?: string | null;
+          validade?: string | null;
+          ativo?: boolean;
+          categoria_id?: string;
+          imagem_path?: string;
+        };
         Relationships: [];
       };
     };
@@ -852,7 +861,9 @@ export interface Database {
           p_titulo: string;
           p_paginas: number;
           p_capa_pagina: number | null;
-          p_ofertas: { pagina: number | null; titulo: string; link: string | null; validade: string | null }[];
+          /** "{categoria} - {titulo}.pdf" — nome do arquivo na pasta {filial}/{arquivo_id}/. */
+          p_pdf_nome: string;
+          p_ofertas: { pagina: number | null; titulo: string; link: string | null; validade: string | null; imagem: string }[];
           p_copiar_para?: FilialCvc[];
         };
         Returns: string;

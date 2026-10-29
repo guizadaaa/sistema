@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Eye, Plus, Search, Upload } from "lucide-react";
 
@@ -20,11 +20,12 @@ import {
   atualizarCategoriaVitrine,
   criarCategoriaVitrine,
   excluirCategoriaVitrine,
+  migrarNomesVitrineAction,
   moverVitrine,
   type VitrineFormState,
 } from "./actions";
 import { EnviarVitrine } from "./enviar-vitrine";
-import { BotaoArquivo, OfertaCard } from "./oferta-card";
+import { OfertaCard } from "./oferta-card";
 
 const initialState: VitrineFormState = {};
 
@@ -126,14 +127,52 @@ function CabecalhoCategoria({
   );
 }
 
+/** Vitrines enviadas antes dos nomes legíveis: o adm_master migra (copia, atualiza, apaga o antigo). */
+function AvisoMigrarNomes() {
+  const [mensagem, setMensagem] = useState<string | undefined>();
+  const [pendente, startTransition] = useTransition();
+
+  return (
+    <Card className="border-dashed">
+      <CardContent className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span className="text-muted-foreground">
+          Há vitrines enviadas antes dos nomes legíveis (o arquivo salvo sai como “p2.png”). Migrar renomeia os
+          arquivos de todas as filiais — copia, atualiza e só depois apaga o antigo.
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={pendente}
+          onClick={() =>
+            startTransition(async () => {
+              const resultado = await migrarNomesVitrineAction();
+              if (resultado.error) return setMensagem(resultado.error);
+              const r = resultado.resumo!;
+              setMensagem(
+                `${r.vitrines} vitrine(s) e ${r.arquivos} arquivo(s) migrados.${r.erros.length ? ` Erros: ${r.erros.join("; ")}` : ""}`
+              );
+            })
+          }
+        >
+          {pendente ? "Migrando..." : "Migrar nomes dos arquivos"}
+        </Button>
+        {mensagem && <p className="w-full text-xs">{mensagem}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function VitrineTela({
   filial,
   ehAdmin,
+  ehAdmMaster = false,
   podeEditar,
   dados,
 }: {
   filial: FilialCvc;
   ehAdmin: boolean;
+  ehAdmMaster?: boolean;
   podeEditar: boolean;
   dados: DadosVitrine;
 }) {
@@ -143,7 +182,6 @@ export function VitrineTela({
   const [novaCategoria, setNovaCategoria] = useState(false);
   const [enviando, setEnviando] = useState(false);
 
-  const pdfPorArquivo = useMemo(() => new Map(dados.arquivos.map((a) => [a.id, a.pdf_path])), [dados.arquivos]);
   const termo = semAcento(busca.trim());
   const ofertasFiltradas = termo ? dados.ofertas.filter((o) => semAcento(o.titulo).includes(termo)) : dados.ofertas;
 
@@ -191,6 +229,8 @@ export function VitrineTela({
         </div>
       </div>
 
+      {ehAdmMaster && dados.arquivos.some((a) => a.legado) && <AvisoMigrarNomes />}
+
       {podeEditar && enviando && (
         <Card>
           <CardHeader>
@@ -236,7 +276,14 @@ export function VitrineTela({
                     {arquivos.map((a) => (
                       <span key={a.id} className="flex items-center gap-1">
                         {a.titulo} ({a.paginas} pág.)
-                        <BotaoArquivo caminho={a.pdf_path} rotulo="Ver vitrine completa" icone={Eye} />
+                        {a.pdfUrl && (
+                          // URL assinada sem "download": abre no visualizador de PDF do navegador.
+                          <Button asChild variant="outline" size="sm">
+                            <a href={a.pdfUrl} target="_blank" rel="noopener noreferrer">
+                              <Eye className="size-4" /> Ver vitrine completa
+                            </a>
+                          </Button>
+                        )}
                       </span>
                     ))}
                   </div>
@@ -249,7 +296,6 @@ export function VitrineTela({
                       <OfertaCard
                         key={oferta.id}
                         oferta={oferta}
-                        pdfPath={pdfPorArquivo.get(oferta.arquivo_id)}
                         podeEditar={podeEditar}
                         primeira={j === 0}
                         ultima={j === ofertas.length - 1}
