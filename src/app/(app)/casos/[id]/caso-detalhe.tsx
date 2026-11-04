@@ -148,6 +148,8 @@ export function CasoDetalhe({
                           <img
                             src={imagem.url}
                             alt={imagem.nome}
+                            loading="lazy"
+                            decoding="async"
                             className="max-h-48 w-auto max-w-full rounded-md border object-contain"
                           />
                         </a>

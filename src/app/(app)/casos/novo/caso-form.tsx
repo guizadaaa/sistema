@@ -13,8 +13,6 @@ import { ANEXO_TIPO_LABELS, MOTIVO_LABELS, SUBTIPO_RECADASTRO_LABELS, TIPO_CASO_
 import type { DonoElegivel } from "@/lib/casos/dono-elegivel";
 import { cpfValido, formatarCpf, somenteDigitos } from "@/lib/validation/cpf";
 import {
-  ANEXO_MIME_TYPES,
-  ANEXO_TAMANHO_MAXIMO_BYTES,
   ANEXO_TIPOS_DOCUMENTO,
   FILIAIS,
   MOTIVOS_CASO,
@@ -24,6 +22,7 @@ import {
 } from "@/lib/validation/caso";
 import type { PerfilUsuario, TipoCaso } from "@/lib/supabase/types";
 
+import { CampoArquivoAnexo } from "../campo-arquivo-anexo";
 import { criarCaso, type CasoFormValores, type CriarCasoState } from "./actions";
 import { DescricaoComImagens } from "./descricao-com-imagens";
 
@@ -43,16 +42,6 @@ function SectionTitle({ icon: Icon, children }: { icon: typeof User; children: R
       {children}
     </p>
   );
-}
-
-function validarArquivoAnexo(arquivo: File): string | undefined {
-  if (!(ANEXO_MIME_TYPES as readonly string[]).includes(arquivo.type)) {
-    return "Formato não permitido (só PDF, JPG ou PNG)";
-  }
-  if (arquivo.size > ANEXO_TAMANHO_MAXIMO_BYTES) {
-    return "Arquivo maior que 10 MB";
-  }
-  return undefined;
 }
 
 export function CasoForm({
@@ -636,19 +625,7 @@ function CasoFormCampos({
         {anexoRows.map((rowId) => (
           <div key={rowId} className="grid grid-cols-[1fr_1fr_auto] items-start gap-2">
             <div className="flex flex-col gap-1">
-              <Input
-                type="file"
-                name="anexoArquivo"
-                accept={ANEXO_MIME_TYPES.join(",")}
-                aria-invalid={Boolean(anexoErros[rowId])}
-                onChange={(e) => {
-                  const arquivo = e.target.files?.[0];
-                  setAnexoErros((prev) => ({
-                    ...prev,
-                    [rowId]: arquivo ? validarArquivoAnexo(arquivo) : undefined,
-                  }));
-                }}
-              />
+              <CampoArquivoAnexo onErro={(erro) => setAnexoErros((prev) => ({ ...prev, [rowId]: erro }))} />
               {anexoErros[rowId] && <p className="text-destructive text-sm">{anexoErros[rowId]}</p>}
             </div>
             <Select name="anexoTipo" defaultValue="outro">

@@ -1,4 +1,4 @@
-const EXTENSAO_POR_MIME: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg" };
+const EXTENSAO_POR_MIME: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
 
 /** Nome estável para imagem vinda da área de transferência (que chega como "image.png" genérico). */
 export function nomeImagemColada(mime: string, agora: Date = new Date()): string {

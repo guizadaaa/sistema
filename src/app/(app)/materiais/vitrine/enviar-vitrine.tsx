@@ -64,7 +64,9 @@ export function EnviarVitrine({
 
   // Miniaturas (blob:) liberadas só ao sair — editar uma linha não as recria.
   const miniaturas = useRef<string[]>([]);
-  const imagens = useRef(new Map<number, Pick<PaginaProcessada, "imagem" | "miniatura">>());
+  const imagens = useRef(
+    new Map<number, Pick<PaginaProcessada, "imagem" | "miniatura" | "miniaturaLargura" | "miniaturaAltura">>()
+  );
   useEffect(() => () => miniaturas.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
   const enviar = async () => {
@@ -96,7 +98,12 @@ export function EnviarVitrine({
       miniatura: URL.createObjectURL(p.miniatura),
     }));
     miniaturas.current = novas.map((l) => l.miniatura);
-    imagens.current = new Map(paginas.map((p) => [p.numero, { imagem: p.imagem, miniatura: p.miniatura }]));
+    imagens.current = new Map(
+      paginas.map((p) => [
+        p.numero,
+        { imagem: p.imagem, miniatura: p.miniatura, miniaturaLargura: p.miniaturaLargura, miniaturaAltura: p.miniaturaAltura },
+      ])
+    );
     setLinhas(novas);
     setEtapa({ tipo: "revisao" });
   };
@@ -173,7 +180,14 @@ export function EnviarVitrine({
       paginas: linhas.length,
       capaPagina: capa?.pagina ?? null,
       pdfNome,
-      ofertas: paginasOferta.map((o) => ({ ...o, pagina: pdfInteiro ? null : o.pagina, imagem: nomesImagem.get(o.pagina)!, miniatura: nomesMini.get(o.pagina)! })),
+      ofertas: paginasOferta.map((o) => ({
+        ...o,
+        pagina: pdfInteiro ? null : o.pagina,
+        imagem: nomesImagem.get(o.pagina)!,
+        miniatura: nomesMini.get(o.pagina)!,
+        largura: imagens.current.get(o.pagina)!.miniaturaLargura,
+        altura: imagens.current.get(o.pagina)!.miniaturaAltura,
+      })),
       copiarPara,
       linksExternosConfirmados: true,
     });

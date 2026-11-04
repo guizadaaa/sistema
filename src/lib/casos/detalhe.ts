@@ -3,6 +3,7 @@ import "server-only";
 import { carregarNomesUsuariosCasos } from "@/lib/casos/nomes";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
+import { CacheUrlsAssinadas } from "@/lib/vitrine/cache-urls";
 
 type CasoRow = Database["public"]["Tables"]["casos"]["Row"];
 type AnexoRow = Database["public"]["Tables"]["anexos"]["Row"];
@@ -114,8 +115,12 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
   };
 }
 
-// Mesmo prazo curto de gerarUrlAssinadaAnexo, com folga para a página ficar aberta.
-const VALIDADE_URL_IMAGEM_SEGUNDOS = 600;
+// URLs estáveis das imagens da descrição: sem isso, cada carregamento gerava
+// um token novo e o navegador baixava as imagens de novo. Documento de
+// cliente: validade menor que a da Vitrine — 24 h, reaproveitada enquanto
+// faltar mais de 2 h. Só para caminhos que o select com RLS devolveu (o
+// "Baixar" dos documentos continua com URL de 60 s sob demanda).
+const cacheUrlsImagensDescricao = new CacheUrlsAssinadas({ validadeS: 24 * 60 * 60, folgaMinimaS: 2 * 60 * 60 });
 
 async function gerarUrlsImagensDescricao(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -124,16 +129,19 @@ async function gerarUrlsImagensDescricao(
   if (imagens.length === 0) return [];
 
   const caminhos = imagens.map((i) => i.storage_path as string);
-  const { data, error } = await supabase.storage
-    .from("anexos")
-    .createSignedUrls(caminhos, VALIDADE_URL_IMAGEM_SEGUNDOS);
-  if (error) {
+  let urlPorCaminho: Map<string, string>;
+  try {
+    urlPorCaminho = await cacheUrlsImagensDescricao.obter(caminhos, async (faltando, validadeS) => {
+      const { data, error } = await supabase.storage.from("anexos").createSignedUrls(faltando, validadeS);
+      if (error) throw error;
+      return new Map((data ?? []).flatMap((d) => (d.path && d.signedUrl ? [[d.path, d.signedUrl] as const] : [])));
+    });
+  } catch (error) {
     // Imagem é complemento visual — falha aqui não derruba a tela do caso.
     console.error("Erro ao gerar signed URLs das imagens da descrição:", error);
     return [];
   }
 
-  const urlPorCaminho = new Map((data ?? []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
   return imagens.flatMap((i) => {
     const url = urlPorCaminho.get(i.storage_path as string);
     return url ? [{ id: i.id, nome: i.nome_arquivo ?? "imagem", url }] : [];

@@ -6,6 +6,7 @@ import { ClipboardPaste, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { imagensDaAreaDeTransferencia } from "@/lib/colar-imagem";
+import { comprimirImagem } from "@/lib/comprimir-imagem";
 import {
   ANEXO_TAMANHO_MAXIMO_BYTES,
   DESCRICAO_IMAGEM_MIME_TYPES,
@@ -15,7 +16,7 @@ import {
 type ImagemColada = { id: string; arquivo: File; url: string };
 
 /**
- * Textarea da Descrição que aceita Ctrl+V de imagem (JPG/PNG, até 10 MB,
+ * Textarea da Descrição que aceita Ctrl+V de imagem (JPG/PNG/WebP, até 10 MB,
  * no máximo DESCRICAO_IMAGENS_MAXIMO). A imagem não entra no texto: vira
  * prévia abaixo, removível, e é enviada como "descricaoImagem" num
  * <input type="file"> oculto sincronizado via DataTransfer — mesmo
@@ -40,10 +41,12 @@ export function DescricaoComImagens(props: ComponentProps<typeof Textarea>) {
     inputRef.current.files = transferencia.files;
   }, [imagens]);
 
-  const aoColar = (evento: React.ClipboardEvent<HTMLTextAreaElement>) => {
+  const aoColar = async (evento: React.ClipboardEvent<HTMLTextAreaElement>) => {
     props.onPaste?.(evento);
-    const coladas = imagensDaAreaDeTransferencia(evento.clipboardData, DESCRICAO_IMAGEM_MIME_TYPES);
-    if (coladas.length === 0) return;
+    const brutas = imagensDaAreaDeTransferencia(evento.clipboardData, DESCRICAO_IMAGEM_MIME_TYPES);
+    if (brutas.length === 0) return;
+    // Comprime no navegador (WebP, lado maior até 2000 px) só se ficar menor.
+    const coladas = await Promise.all(brutas.map((f) => comprimirImagem(f)));
 
     const dentroDoLimite = coladas.filter((f) => f.size <= ANEXO_TAMANHO_MAXIMO_BYTES);
     const vagas = Math.max(0, DESCRICAO_IMAGENS_MAXIMO - imagens.length);
@@ -74,7 +77,7 @@ export function DescricaoComImagens(props: ComponentProps<typeof Textarea>) {
       <Textarea {...props} onPaste={aoColar} />
       <input ref={inputRef} type="file" name="descricaoImagem" multiple hidden tabIndex={-1} aria-hidden />
       <p className="text-muted-foreground flex items-center gap-1 text-xs">
-        <ClipboardPaste className="size-3.5" /> Cole imagens (Ctrl+V) na descrição — JPG ou PNG, até 10 MB cada.
+        <ClipboardPaste className="size-3.5" /> Cole imagens (Ctrl+V) na descrição — JPG, PNG ou WebP, até 10 MB cada.
       </p>
       {aviso && <p className="text-destructive text-xs">{aviso}</p>}
       {imagens.length > 0 && (
@@ -85,6 +88,8 @@ export function DescricaoComImagens(props: ComponentProps<typeof Textarea>) {
               <img
                 src={imagem.url}
                 alt={imagem.arquivo.name}
+                loading="lazy"
+                decoding="async"
                 className="h-24 w-auto max-w-40 rounded-md border object-contain"
               />
               <Button

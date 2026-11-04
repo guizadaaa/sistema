@@ -174,6 +174,9 @@ export type OfertaRevisada = {
   imagem: string;
   /** Miniatura do card ("-mini.webp"/"-mini.jpg"). */
   miniatura?: string;
+  /** Tamanho da miniatura (px), para o card reservar o espaço certo. */
+  largura?: number;
+  altura?: number;
 };
 
 export async function salvarEnvioVitrine(entrada: {
@@ -211,6 +214,9 @@ export async function salvarEnvioVitrine(entrada: {
       validade: validade.data,
       imagem: oferta.imagem,
       miniatura: oferta.miniatura,
+      ...(Number.isInteger(oferta.largura) && Number.isInteger(oferta.altura) && oferta.largura! > 0 && oferta.altura! > 0
+        ? { largura: oferta.largura, altura: oferta.altura }
+        : {}),
     });
   }
 
