@@ -139,9 +139,13 @@ export function OfertaCard({
             // antigas sem miniatura usam a grande.
             src={oferta.miniaturaUrl ?? oferta.imagemUrl}
             alt={oferta.titulo}
+            // Proporção natural da arte (sem faixas pretas). width/height
+            // gravados no envio reservam o espaço antes de carregar.
+            width={oferta.imagem_largura ?? undefined}
+            height={oferta.imagem_altura ?? undefined}
             loading="lazy"
             decoding="async"
-            className="aspect-[1190/425] w-full bg-black object-contain"
+            className="block h-auto w-full"
           />
         </a>
       ) : (

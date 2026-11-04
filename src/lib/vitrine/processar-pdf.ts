@@ -19,6 +19,9 @@ export type PaginaProcessada = {
   imagem: Blob;
   /** WebP 800 px (JPEG no fallback), ≤ ~150 KB: a que o card mostra. */
   miniatura: Blob;
+  /** Tamanho da miniatura em px — vai para width/height do <img> do card. */
+  miniaturaLargura: number;
+  miniaturaAltura: number;
   texto: string;
   tituloSugerido: string;
 };
@@ -50,7 +53,7 @@ async function comprimir(canvas: HTMLCanvasElement, qualidadeWebp: number, quali
 }
 
 /** Miniatura do card: 800 px, baixando a qualidade até caber na meta (~150 KB). */
-async function gerarMiniatura(origem: HTMLCanvasElement): Promise<Blob> {
+async function gerarMiniatura(origem: HTMLCanvasElement): Promise<{ blob: Blob; largura: number; altura: number }> {
   const canvas = document.createElement("canvas");
   canvas.width = VITRINE_MINIATURA_LARGURA;
   canvas.height = Math.round((origem.height * VITRINE_MINIATURA_LARGURA) / origem.width);
@@ -62,7 +65,7 @@ async function gerarMiniatura(origem: HTMLCanvasElement): Promise<Blob> {
   for (let q = 0.7; miniatura.size > VITRINE_MINIATURA_META_BYTES && q >= 0.5; q -= 0.1) {
     miniatura = await comprimir(canvas, q, q);
   }
-  return miniatura;
+  return { blob: miniatura, largura: canvas.width, altura: canvas.height };
 }
 
 /** Gera a imagem (1600 px), a miniatura (800 px) e o texto de cada página. */
@@ -86,7 +89,7 @@ export async function processarPdfVitrine(
       canvas.height = Math.round(viewport.height);
       await pagina.render({ canvas, viewport }).promise;
       const imagem = await comprimir(canvas, VITRINE_IMAGEM_QUALIDADE, VITRINE_IMAGEM_QUALIDADE);
-      const miniatura = await gerarMiniatura(canvas);
+      const { blob: miniatura, largura: miniaturaLargura, altura: miniaturaAltura } = await gerarMiniatura(canvas);
 
       // Tamanho da fonte = escala vertical da matriz do trecho (para achar as
       // "linhas com fonte grande" quando a página não tem "Valor").
@@ -96,7 +99,7 @@ export async function processarPdfVitrine(
       );
       const texto = trechos.map((t) => t.texto + (t.fimDeLinha ? "\n" : " ")).join("");
 
-      paginas.push({ numero, imagem, miniatura, texto, tituloSugerido: sugerirTituloOferta(trechos) });
+      paginas.push({ numero, imagem, miniatura, miniaturaLargura, miniaturaAltura, texto, tituloSugerido: sugerirTituloOferta(trechos) });
       pagina.cleanup();
       aoProgredir?.(numero, documento.numPages);
     }

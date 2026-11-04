@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import type { createClient } from "@/lib/supabase/server";
 import {
+  ANEXO_CACHE_CONTROL_S,
   ANEXO_MIME_TYPES,
   ANEXO_TAMANHO_MAXIMO_BYTES,
   ANEXO_TIPOS_DOCUMENTO,
@@ -31,14 +32,17 @@ export async function validarEEnviarAnexos(
   casoId: string,
   formData: FormData
 ): Promise<string[]> {
-  const arquivos = formData.getAll("anexoArquivo").filter((v): v is File => v instanceof File && v.size > 0);
+  // Pareia arquivo e tipo pela posição ANTES de descartar as linhas vazias —
+  // uma linha sem arquivo no meio não pode deslocar o tipo das seguintes.
   const tipos = formData.getAll("anexoTipo").map(String);
+  const pares = formData
+    .getAll("anexoArquivo")
+    .map((v, i) => ({ arquivo: v, tipoBruto: tipos[i] }))
+    .filter((p): p is { arquivo: File; tipoBruto: string } => p.arquivo instanceof File && p.arquivo.size > 0);
 
   const avisos: string[] = [];
 
-  for (let i = 0; i < arquivos.length; i++) {
-    const arquivo = arquivos[i];
-    const tipoBruto = tipos[i];
+  for (const { arquivo, tipoBruto } of pares) {
 
     if (!tipoBruto || !isTipoDocumentoAnexo(tipoBruto)) {
       avisos.push(`${arquivo.name}: tipo de documento inválido, não enviado.`);
@@ -46,7 +50,7 @@ export async function validarEEnviarAnexos(
     }
 
     if (!(ANEXO_MIME_TYPES as readonly string[]).includes(arquivo.type)) {
-      avisos.push(`${arquivo.name}: formato não permitido (só PDF, JPG ou PNG).`);
+      avisos.push(`${arquivo.name}: formato não permitido (só PDF, JPG, PNG ou WebP).`);
       continue;
     }
 
@@ -57,8 +61,10 @@ export async function validarEEnviarAnexos(
 
     const storagePath = `${casoId}/${randomUUID()}-${arquivo.name}`;
 
+    // Path único por envio (randomUUID): pode ficar em cache por 1 ano.
     const { error: uploadError } = await supabase.storage.from("anexos").upload(storagePath, arquivo, {
       contentType: arquivo.type,
+      cacheControl: ANEXO_CACHE_CONTROL_S,
     });
 
     if (uploadError) {
@@ -104,7 +110,7 @@ export async function enviarImagensDescricao(
 
   for (const imagem of imagens.slice(0, DESCRICAO_IMAGENS_MAXIMO)) {
     if (!(DESCRICAO_IMAGEM_MIME_TYPES as readonly string[]).includes(imagem.type)) {
-      avisos.push(`${imagem.name}: só imagens JPG ou PNG na descrição, não enviada.`);
+      avisos.push(`${imagem.name}: só imagens JPG, PNG ou WebP na descrição, não enviada.`);
       continue;
     }
     if (imagem.size > ANEXO_TAMANHO_MAXIMO_BYTES) {
@@ -115,7 +121,7 @@ export async function enviarImagensDescricao(
     const storagePath = `${casoId}/${randomUUID()}-${imagem.name}`;
     const { error: uploadError } = await supabase.storage
       .from("anexos")
-      .upload(storagePath, imagem, { contentType: imagem.type });
+      .upload(storagePath, imagem, { contentType: imagem.type, cacheControl: ANEXO_CACHE_CONTROL_S });
     if (uploadError) {
       console.error("Erro ao enviar imagem da descrição:", uploadError);
       avisos.push(`${imagem.name}: falha no envio da imagem da descrição.`);

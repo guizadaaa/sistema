@@ -746,6 +746,9 @@ export interface Database {
           imagem_path: string;
           /** Miniatura do card; null nas ofertas antigas (usa imagem_path). */
           miniatura_path: string | null;
+          /** Tamanho da miniatura (px), gravado no envio; null nas antigas. */
+          imagem_largura: number | null;
+          imagem_altura: number | null;
           link: string | null;
           validade: string | null;
           ordem: number;
@@ -872,6 +875,8 @@ export interface Database {
             validade: string | null;
             imagem: string;
             miniatura?: string;
+            largura?: number;
+            altura?: number;
           }[];
           p_copiar_para?: FilialCvc[];
         };

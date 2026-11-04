@@ -1,38 +1,32 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useActionState, useEffect, useState } from "react";
+import { ClipboardPaste, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ANEXO_TIPO_LABELS } from "@/lib/labels";
-import { ANEXO_MIME_TYPES, ANEXO_TAMANHO_MAXIMO_BYTES, ANEXO_TIPOS_DOCUMENTO } from "@/lib/validation/caso";
+import { imagensDaAreaDeTransferencia } from "@/lib/colar-imagem";
+import { comprimirImagem } from "@/lib/comprimir-imagem";
+import { ANEXO_IMAGEM_MIME_TYPES, ANEXO_TAMANHO_MAXIMO_BYTES, ANEXO_TIPOS_DOCUMENTO } from "@/lib/validation/caso";
 import type { Database } from "@/lib/supabase/types";
 
+import { CampoArquivoAnexo, definirArquivoNoInput, PreviaAnexo } from "../campo-arquivo-anexo";
 import { enviarAnexoAoCaso, gerarUrlAssinadaAnexo, type EnviarAnexoState } from "./actions";
 
 type AnexoRow = Database["public"]["Tables"]["anexos"]["Row"];
 
-function validarArquivoAnexo(arquivo: File): string | undefined {
-  if (!(ANEXO_MIME_TYPES as readonly string[]).includes(arquivo.type)) {
-    return "Formato não permitido (só PDF, JPG ou PNG)";
-  }
-  if (arquivo.size > ANEXO_TAMANHO_MAXIMO_BYTES) {
-    return "Arquivo maior que 10 MB";
-  }
-  return undefined;
-}
+type AcoesAnexos = { enviar: typeof enviarAnexoAoCaso; gerarUrl: typeof gerarUrlAssinadaAnexo };
 
-function BotaoDownload({ anexo }: { anexo: AnexoRow }) {
+function BotaoDownload({ anexo, gerarUrl }: { anexo: AnexoRow; gerarUrl: AcoesAnexos["gerarUrl"] }) {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | undefined>();
 
   const baixar = async () => {
     setCarregando(true);
     setErro(undefined);
-    const resultado = await gerarUrlAssinadaAnexo(anexo.id, anexo.storage_path);
+    const resultado = await gerarUrl(anexo.id, anexo.storage_path);
     setCarregando(false);
     if (resultado.error || !resultado.url) {
       setErro(resultado.error ?? "Erro ao gerar link");
@@ -53,20 +47,65 @@ function BotaoDownload({ anexo }: { anexo: AnexoRow }) {
 
 const initialState: EnviarAnexoState = {};
 
-export function AnexosSecao({ casoId, anexos }: { casoId: string; anexos: AnexoRow[] }) {
-  const enviarAnexoAction = enviarAnexoAoCaso.bind(null, casoId);
-  const [state, formAction, isPending] = useActionState(enviarAnexoAction, initialState);
-  const [rows, setRows] = useState<string[]>([]);
-  const [erros, setErros] = useState<Record<string, string | undefined>>({});
+/** Linha de anexo: escolhida pelo "Escolher arquivo" ou colada (Ctrl+V), já com o arquivo. */
+type LinhaAnexo = { id: string; colada?: File };
 
-  const adicionarRow = () => setRows((prev) => [...prev, `${prev.length}-${Date.now()}`]);
+/** Foco num campo de texto: colar ali segue o comportamento normal do navegador. */
+function ehCampoDeTexto(alvo: EventTarget | null): boolean {
+  if (!(alvo instanceof HTMLElement)) return false;
+  if (alvo.isContentEditable || alvo instanceof HTMLTextAreaElement) return true;
+  return alvo instanceof HTMLInputElement && !["file", "checkbox", "radio", "button", "submit"].includes(alvo.type);
+}
+
+export function AnexosSecao({
+  casoId,
+  anexos,
+  acoes = { enviar: enviarAnexoAoCaso, gerarUrl: gerarUrlAssinadaAnexo },
+}: {
+  casoId: string;
+  anexos: AnexoRow[];
+  /** Só para o teste de navegador (sem Supabase); na tela, sempre as actions reais. */
+  acoes?: AcoesAnexos;
+}) {
+  const enviarAnexoAction = acoes.enviar.bind(null, casoId);
+  const [rows, setRows] = useState<LinhaAnexo[]>([]);
+  const [erros, setErros] = useState<Record<string, string | undefined>>({});
+  // Depois de cada envio (o form é resetado pelo React), as linhas somem —
+  // as coladas não podem ser reenviadas por engano.
+  const [state, formAction, isPending] = useActionState(async (prev: EnviarAnexoState, formData: FormData) => {
+    const resultado = await enviarAnexoAction(prev, formData);
+    setRows([]);
+    setErros({});
+    return resultado;
+  }, initialState);
+  const [avisoColar, setAvisoColar] = useState<string | undefined>();
+
+  const adicionarRow = () => setRows((prev) => [...prev, { id: crypto.randomUUID() }]);
   const removerRow = (rowId: string) => {
-    setRows((prev) => prev.filter((id) => id !== rowId));
+    setRows((prev) => prev.filter((row) => row.id !== rowId));
     setErros((prev) => {
       const { [rowId]: _removido, ...resto } = prev;
       return resto;
     });
   };
+
+  // Ctrl+V de imagem na página do protocolo (fora de campo de texto) ou na
+  // área "Cole imagens aqui": cada imagem vira uma linha, como o + Adicionar.
+  useEffect(() => {
+    const aoColar = async (evento: ClipboardEvent) => {
+      if (ehCampoDeTexto(evento.target)) return;
+      const coladas = imagensDaAreaDeTransferencia(evento.clipboardData, ANEXO_IMAGEM_MIME_TYPES);
+      if (coladas.length === 0) return;
+      evento.preventDefault();
+
+      const comprimidas = await Promise.all(coladas.map((f) => comprimirImagem(f)));
+      const aceitas = comprimidas.filter((f) => f.size <= ANEXO_TAMANHO_MAXIMO_BYTES);
+      setAvisoColar(aceitas.length < comprimidas.length ? "Imagem maior que 10 MB não foi adicionada." : undefined);
+      if (aceitas.length > 0) setRows((prev) => [...prev, ...aceitas.map((colada) => ({ id: crypto.randomUUID(), colada }))]);
+    };
+    document.addEventListener("paste", aoColar);
+    return () => document.removeEventListener("paste", aoColar);
+  }, []);
 
   const bloquearSeInvalido = (event: React.FormEvent<HTMLFormElement>) => {
     if (Object.values(erros).some(Boolean)) {
@@ -92,7 +131,7 @@ export function AnexosSecao({ casoId, anexos }: { casoId: string; anexos: AnexoR
                     {ANEXO_TIPO_LABELS[a.tipo_documento]} · {new Date(a.enviado_em).toLocaleDateString("pt-BR")}
                   </span>
                 </div>
-                <BotaoDownload anexo={a} />
+                <BotaoDownload anexo={a} gerarUrl={acoes.gerarUrl} />
               </li>
             ))}
           </ul>
@@ -106,20 +145,39 @@ export function AnexosSecao({ casoId, anexos }: { casoId: string; anexos: AnexoR
             </Button>
           </div>
 
-          {rows.map((rowId) => (
-            <div key={rowId} className="grid grid-cols-[1fr_1fr_auto] items-start gap-2">
+          <div
+            tabIndex={0}
+            className="text-muted-foreground focus-visible:ring-ring flex items-center gap-2 rounded-md border border-dashed p-3 text-sm outline-none focus-visible:ring-2"
+            aria-label="Área para colar imagens"
+          >
+            <ClipboardPaste className="size-4 shrink-0" />
+            <span>
+              Cole imagens aqui (Ctrl+V) — prints de tela, JPG, PNG ou WebP, até 10 MB cada. Também funciona em qualquer
+              ponto da página fora de um campo de texto.
+            </span>
+          </div>
+          {avisoColar && <p className="text-destructive text-xs">{avisoColar}</p>}
+
+          {rows.map((row) => (
+            <div key={row.id} className="grid grid-cols-[1fr_1fr_auto] items-start gap-2">
               <div className="flex flex-col gap-1">
-                <Input
-                  type="file"
-                  name="anexoArquivo"
-                  accept={ANEXO_MIME_TYPES.join(",")}
-                  aria-invalid={Boolean(erros[rowId])}
-                  onChange={(e) => {
-                    const arquivo = e.target.files?.[0];
-                    setErros((prev) => ({ ...prev, [rowId]: arquivo ? validarArquivoAnexo(arquivo) : undefined }));
-                  }}
-                />
-                {erros[rowId] && <p className="text-destructive text-sm">{erros[rowId]}</p>}
+                {row.colada ? (
+                  <>
+                    <input
+                      type="file"
+                      name="anexoArquivo"
+                      hidden
+                      tabIndex={-1}
+                      aria-hidden
+                      ref={(input) => definirArquivoNoInput(input, row.colada!)}
+                    />
+                    <span className="text-sm">{row.colada.name}</span>
+                    <PreviaAnexo arquivo={row.colada} />
+                  </>
+                ) : (
+                  <CampoArquivoAnexo onErro={(erro) => setErros((prev) => ({ ...prev, [row.id]: erro }))} />
+                )}
+                {erros[row.id] && <p className="text-destructive text-sm">{erros[row.id]}</p>}
               </div>
               <Select name="anexoTipo" defaultValue="outro">
                 <SelectTrigger>
@@ -133,7 +191,7 @@ export function AnexosSecao({ casoId, anexos }: { casoId: string; anexos: AnexoR
                   ))}
                 </SelectContent>
               </Select>
-              <Button type="button" variant="ghost" size="icon" aria-label="Remover anexo" onClick={() => removerRow(rowId)}>
+              <Button type="button" variant="ghost" size="icon" aria-label="Remover anexo" onClick={() => removerRow(row.id)}>
                 <Trash2 />
               </Button>
             </div>

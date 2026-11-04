@@ -69,12 +69,15 @@ function CabecalhoCategoria({
   primeira,
   ultima,
   vazia,
+  pdfs,
 }: {
   categoria: CategoriaVitrine;
   podeEditar: boolean;
   primeira: boolean;
   ultima: boolean;
   vazia: boolean;
+  /** URLs (inline) dos PDFs das vitrines desta categoria. */
+  pdfs: string[];
 }) {
   const [erro, setErro] = useState<string | undefined>();
   const [pendente, startTransition] = useTransition();
@@ -93,35 +96,45 @@ function CabecalhoCategoria({
         {categoria.nome}
         {!categoria.ativo && <Badge variant="outline">inativa</Badge>}
       </CardTitle>
-      {podeEditar && (
-        <div className="flex flex-wrap items-center gap-1">
-          <Button type="button" variant="ghost" size="sm" aria-label="Subir categoria" disabled={primeira || pendente}
-            onClick={() => executar(() => moverVitrine("categoria", categoria.id, -1))}>
-            <ArrowUp className="size-4" />
+      <div className="flex flex-wrap items-center gap-1">
+        {pdfs.map((url, i) => (
+          // URL assinada sem "download": abre no visualizador de PDF do navegador.
+          <Button key={url} asChild variant="outline" size="sm">
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <Eye className="size-4" /> Ver vitrine completa{pdfs.length > 1 ? ` ${i + 1}` : ""}
+            </a>
           </Button>
-          <Button type="button" variant="ghost" size="sm" aria-label="Descer categoria" disabled={ultima || pendente}
-            onClick={() => executar(() => moverVitrine("categoria", categoria.id, 1))}>
-            <ArrowDown className="size-4" />
-          </Button>
-          <Button type="button" variant="ghost" size="sm" disabled={pendente}
-            onClick={() => {
-              const nome = window.prompt("Novo nome da categoria", categoria.nome);
-              if (nome && nome.trim() !== categoria.nome) executar(() => atualizarCategoriaVitrine(categoria.id, { nome }));
-            }}>
-            Renomear
-          </Button>
-          <Button type="button" variant="ghost" size="sm" disabled={pendente}
-            onClick={() => executar(() => atualizarCategoriaVitrine(categoria.id, { ativo: !categoria.ativo }))}>
-            {categoria.ativo ? "Desativar" : "Ativar"}
-          </Button>
-          {vazia && (
-            <Button type="button" variant="ghost" size="sm" className="text-destructive" disabled={pendente}
-              onClick={() => window.confirm(`Excluir a categoria "${categoria.nome}"?`) && executar(() => excluirCategoriaVitrine(categoria.id))}>
-              Excluir
+        ))}
+        {podeEditar && (
+          <>
+            <Button type="button" variant="ghost" size="sm" aria-label="Subir categoria" disabled={primeira || pendente}
+              onClick={() => executar(() => moverVitrine("categoria", categoria.id, -1))}>
+              <ArrowUp className="size-4" />
             </Button>
-          )}
-        </div>
-      )}
+            <Button type="button" variant="ghost" size="sm" aria-label="Descer categoria" disabled={ultima || pendente}
+              onClick={() => executar(() => moverVitrine("categoria", categoria.id, 1))}>
+              <ArrowDown className="size-4" />
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={pendente}
+              onClick={() => {
+                const nome = window.prompt("Novo nome da categoria", categoria.nome);
+                if (nome && nome.trim() !== categoria.nome) executar(() => atualizarCategoriaVitrine(categoria.id, { nome }));
+              }}>
+              Renomear
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={pendente}
+              onClick={() => executar(() => atualizarCategoriaVitrine(categoria.id, { ativo: !categoria.ativo }))}>
+              {categoria.ativo ? "Desativar" : "Ativar"}
+            </Button>
+            {vazia && (
+              <Button type="button" variant="ghost" size="sm" className="text-destructive" disabled={pendente}
+                onClick={() => window.confirm(`Excluir a categoria "${categoria.nome}"?`) && executar(() => excluirCategoriaVitrine(categoria.id))}>
+                Excluir
+              </Button>
+            )}
+          </>
+        )}
+      </div>
       {erro && <p className="text-destructive w-full text-xs">{erro}</p>}
     </CardHeader>
   );
@@ -269,25 +282,9 @@ export function VitrineTela({
                 primeira={i === 0}
                 ultima={i === dados.categorias.length - 1}
                 vazia={arquivos.length === 0 && !dados.ofertas.some((o) => o.categoria_id === categoria.id)}
+                pdfs={arquivos.flatMap((a) => (a.pdfUrl ? [a.pdfUrl] : []))}
               />
               <CardContent className="flex flex-col gap-3">
-                {arquivos.length > 0 && (
-                  <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-                    {arquivos.map((a) => (
-                      <span key={a.id} className="flex items-center gap-1">
-                        {a.titulo} ({a.paginas} pág.)
-                        {a.pdfUrl && (
-                          // URL assinada sem "download": abre no visualizador de PDF do navegador.
-                          <Button asChild variant="outline" size="sm">
-                            <a href={a.pdfUrl} target="_blank" rel="noopener noreferrer">
-                              <Eye className="size-4" /> Ver vitrine completa
-                            </a>
-                          </Button>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                )}
                 {ofertas.length === 0 ? (
                   <p className="text-muted-foreground text-sm">Nenhuma oferta nesta categoria.</p>
                 ) : (
