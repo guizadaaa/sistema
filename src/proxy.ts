@@ -9,12 +9,15 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Roda em todas as rotas exceto assets estáticos e a própria API do
-     * Next.js, para não gastar ciclo revalidando sessão em requisições que
-     * não precisam disso. /api/conferencia/* (extensão Aura Conferência)
-     * autentica por Bearer token, sem cookie — o redirect para /login
-     * quebraria as chamadas do service worker.
+     * Roda só nas páginas e rotas que dependem da sessão por cookie. Fica de
+     * fora (cada execução chama supabase.auth.getUser(), que é rede + CPU):
+     *   - _next/* (chunks, CSS, imagens e dados do Next);
+     *   - arquivos estáticos (ícones, imagens, fontes, mapas, robots...);
+     *   - /api/conferencia/* — extensão Aura Conferência, autentica por
+     *     Bearer token, sem cookie (o redirect para /login quebraria o
+     *     service worker);
+     *   - /api/saude — health check do Render, sem sessão.
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/conferencia|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/|api/conferencia(?:/|$)|api/saude(?:/|$)|favicon\\.ico$|robots\\.txt$|sitemap\\.xml$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|woff2?|ttf)$).*)",
   ],
 };

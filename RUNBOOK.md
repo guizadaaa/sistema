@@ -316,5 +316,87 @@ Gera .vercel/ (config local) e .env.local (token OIDC) — ambos devem permanece
 
 
 
-Última atualização: agosto/2026. Manter este documento vivo — atualizar sempre que um novo processo operacional crítico for estabelecido.
+12\. Hospedagem: Render
+
+
+
+Desde novembro/2026 a Aura roda no Render (plano Free), porque a Vercel (Hobby) pausou a conta por uso de CPU. O Supabase não muda. A configuração da Vercel continua válida (seção 11): o mesmo build roda nas duas, então dá para voltar.
+
+
+
+Arquivos
+
+
+
+render.yaml (Blueprint): Web Service Node "aura", plano free, branch claude/new-session-x4vojn, autoDeploy ligado, build "npm ci && npm run build", start "npm run start", health check em /api/saude.
+
+/api/saude: só responde {"ok":true}; não toca no banco e não passa pelo proxy.
+
+
+
+Primeira configuração (uma vez)
+
+
+
+1. Render → New → Blueprint → conectar o GitHub e escolher guizadaaa/sistema (o render.yaml é lido sozinho).
+
+2. Preencher as variáveis pedidas (copiar os valores da Vercel → Settings → Environment Variables):
+
+NEXT\_PUBLIC\_SUPABASE\_URL
+
+NEXT\_PUBLIC\_SUPABASE\_ANON\_KEY
+
+SUPABASE\_SERVICE\_ROLE\_KEY
+
+(NODE\_VERSION=22 já vem do render.yaml; PORT é definida pelo próprio Render.)
+
+3. Aplicar e esperar o primeiro deploy ficar "Live". Anotar a URL (https://aura-XXXX.onrender.com).
+
+4. Supabase → Authentication → URL Configuration: trocar a Site URL pela URL do Render e incluir https://aura-XXXX.onrender.com/\*\* nas Redirect URLs (links de acesso, convite e "Esqueci minha senha" dependem disso). Manter a URL da Vercel na lista enquanto ela existir.
+
+5. Atualizar a URL da Aura na extensão Aura Conferência (ela chama /api/conferencia/\*).
+
+6. Testar: login, uma tela de casos, Vitrine (abrir imagem/PDF), extensão (login + config).
+
+
+
+⚠️ NEXT\_PUBLIC\_\* entram no bundle durante o build: depois de mudar uma delas, rodar Manual Deploy (não basta reiniciar).
+
+
+
+Deploy normal
+
+
+
+Merge do PR em claude/new-session-x4vojn → o Render faz o deploy sozinho (autoDeploy). As migrations continuam no GitHub Actions (seção 1), independentes do Render.
+
+Acompanhar em Render → aura → Events/Logs. Deploy só fica "Live" depois que /api/saude responde 200; se o build ou o health check falhar, a versão anterior continua no ar.
+
+Forçar um deploy sem commit: Render → aura → Manual Deploy → Deploy latest commit.
+
+
+
+Rollback
+
+
+
+1. Mais rápido: Render → aura → Events → escolher o deploy anterior que estava bom → Rollback. O deploy automático fica pausado até o próximo push/merge; reative em Settings → Auto-Deploy se o painel avisar.
+
+2. Definitivo: reverter o commit/PR no GitHub (git revert + PR) — o autoDeploy publica a versão revertida.
+
+3. Voltar para a Vercel: reativar o projeto guizadas-projects/sistema (seção 11 — vercel --prod) e devolver a Site URL/Redirect URLs do Supabase e a URL da extensão para o domínio da Vercel.
+
+⚠️ Rollback do Render não desfaz migration já aplicada no Supabase. Migration nova precisa ser compatível com a versão anterior do app, ou ser revertida por outra migration.
+
+
+
+Limites do plano Free
+
+
+
+O serviço dorme depois de ~15 min sem acesso; a primeira requisição depois disso demora (~1 min) para acordar. 512 MB de RAM e 750 h/mês de instância. Se o build estourar memória, o log do Render mostra "JavaScript heap out of memory" — nesse caso, avaliar plano pago.
+
+
+
+Última atualização: novembro/2026. Manter este documento vivo — atualizar sempre que um novo processo operacional crítico for estabelecido.
 

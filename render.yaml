@@ -1,0 +1,30 @@
+# Render Blueprint — hospedagem da Aura (ver RUNBOOK, "Hospedagem: Render").
+# O Supabase continua o mesmo; aqui é só o app Next.js (next build + next start).
+# Variáveis com "sync: false" são pedidas no painel ao criar o Blueprint
+# (valores nunca vão para o repositório).
+services:
+  - type: web
+    name: aura
+    runtime: node
+    plan: free
+    # Mais perto do Supabase/usuários no Brasil entre as regiões do Render.
+    region: virginia
+    repo: https://github.com/guizadaaa/sistema
+    branch: claude/new-session-x4vojn
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    # `next start` lê a porta da variável PORT (definida pelo Render) e escuta em 0.0.0.0.
+    startCommand: npm run start
+    # Rota leve: não toca no banco nem passa pelo proxy (src/app/api/saude/route.ts).
+    healthCheckPath: /api/saude
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # NEXT_PUBLIC_* entram no bundle no build: precisam existir antes do deploy.
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      # Só servidor (módulos com "server-only"); nunca no navegador.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
