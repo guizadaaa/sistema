@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nomeArquivoValido, nomePdfVitrine, nomesImagensVitrine, slugArquivo } from "./nomes";
+import { extensaoDaImagem, nomeArquivoValido, nomeMiniatura, nomePdfVitrine, nomesImagensVitrine, slugArquivo } from "./nomes";
 
 describe("nomes de arquivo da vitrine", () => {
   it("PNG = slug do título, sem acento; capa = capa.png; repetido ganha sufixo", () => {
@@ -28,5 +28,16 @@ describe("nomes de arquivo da vitrine", () => {
     expect(nomeArquivoValido("../x.pdf", "pdf")).toBe(false);
     expect(nomeArquivoValido("a/b.png", "png")).toBe(false);
     expect(nomeArquivoValido(`${slugArquivo("Ç")}x.png`, "png")).toBe(true);
+  });
+
+  it("imagem WebP/JPEG com a extensão certa e miniatura '-mini' ao lado", () => {
+    const nomes = nomesImagensVitrine([{ pagina: 2, titulo: "MSC VIRTUOSA BÚZIOS" }, { pagina: 1, titulo: "", capa: true }], "webp");
+    expect([...nomes.values()]).toEqual(["msc-virtuosa-buzios.webp", "capa.webp"]);
+    expect(nomeMiniatura("msc-virtuosa-buzios.webp", "webp")).toBe("msc-virtuosa-buzios-mini.webp");
+    expect(nomeMiniatura("msc-virtuosa-buzios.jpg", "jpg")).toBe("msc-virtuosa-buzios-mini.jpg");
+    expect(extensaoDaImagem("image/webp")).toBe("webp");
+    expect(extensaoDaImagem("image/jpeg")).toBe("jpg");
+    expect(nomeArquivoValido("msc-virtuosa-buzios-mini.webp", "webp")).toBe(true);
+    expect(nomeArquivoValido("msc.webp", "jpg")).toBe(false);
   });
 });

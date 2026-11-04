@@ -744,6 +744,8 @@ export interface Database {
           pagina: number | null;
           titulo: string;
           imagem_path: string;
+          /** Miniatura do card; null nas ofertas antigas (usa imagem_path). */
+          miniatura_path: string | null;
           link: string | null;
           validade: string | null;
           ordem: number;
@@ -863,7 +865,14 @@ export interface Database {
           p_capa_pagina: number | null;
           /** "{categoria} - {titulo}.pdf" — nome do arquivo na pasta {filial}/{arquivo_id}/. */
           p_pdf_nome: string;
-          p_ofertas: { pagina: number | null; titulo: string; link: string | null; validade: string | null; imagem: string }[];
+          p_ofertas: {
+            pagina: number | null;
+            titulo: string;
+            link: string | null;
+            validade: string | null;
+            imagem: string;
+            miniatura?: string;
+          }[];
           p_copiar_para?: FilialCvc[];
         };
         Returns: string;

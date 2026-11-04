@@ -1,13 +1,24 @@
-import { VITRINE_PNG_LARGURA } from "@/lib/validation/vitrine";
+import {
+  VITRINE_IMAGEM_LARGURA,
+  VITRINE_IMAGEM_QUALIDADE,
+  VITRINE_MINIATURA_LARGURA,
+  VITRINE_MINIATURA_META_BYTES,
+  VITRINE_MINIATURA_QUALIDADE,
+  VITRINE_MINIATURA_QUALIDADE_JPEG,
+} from "@/lib/validation/vitrine";
 
 import { sugerirTituloOferta, type TrechoTexto } from "./titulo";
 
-// Só no navegador: pdf.js renderiza cada página num <canvas> e lê o texto.
+// Só no navegador: pdf.js renderiza cada página num <canvas> e lê o texto;
+// o canvas vira a imagem grande e a miniatura do card (WebP, fallback JPEG).
 // O PDF (9–14 MB) nunca passa pelo servidor do Next.
 
 export type PaginaProcessada = {
   numero: number;
-  png: Blob;
+  /** WebP 1600 px (JPEG se o navegador não gerar WebP): abre em nova aba. */
+  imagem: Blob;
+  /** WebP 800 px (JPEG no fallback), ≤ ~150 KB: a que o card mostra. */
+  miniatura: Blob;
   texto: string;
   tituloSugerido: string;
 };
@@ -22,13 +33,39 @@ async function carregarPdfJs() {
   return pdfjs;
 }
 
-function canvasParaPng(canvas: HTMLCanvasElement): Promise<Blob> {
+function canvasParaBlob(canvas: HTMLCanvasElement, tipo: string, qualidade: number): Promise<Blob> {
   return new Promise((resolve, reject) =>
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Falha ao gerar a imagem da página."))), "image/png")
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Falha ao gerar a imagem da página."))), tipo, qualidade)
   );
 }
 
-/** Gera o PNG (~1600 px de largura) e o texto de cada página. */
+/**
+ * WebP na qualidade pedida; se o navegador não gera WebP (o toBlob devolve
+ * PNG nesse caso), JPEG na qualidade de fallback.
+ */
+async function comprimir(canvas: HTMLCanvasElement, qualidadeWebp: number, qualidadeJpeg: number): Promise<Blob> {
+  const webp = await canvasParaBlob(canvas, "image/webp", qualidadeWebp);
+  if (webp.type === "image/webp") return webp;
+  return canvasParaBlob(canvas, "image/jpeg", qualidadeJpeg);
+}
+
+/** Miniatura do card: 800 px, baixando a qualidade até caber na meta (~150 KB). */
+async function gerarMiniatura(origem: HTMLCanvasElement): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  canvas.width = VITRINE_MINIATURA_LARGURA;
+  canvas.height = Math.round((origem.height * VITRINE_MINIATURA_LARGURA) / origem.width);
+  const contexto = canvas.getContext("2d")!;
+  contexto.imageSmoothingQuality = "high";
+  contexto.drawImage(origem, 0, 0, canvas.width, canvas.height);
+
+  let miniatura = await comprimir(canvas, VITRINE_MINIATURA_QUALIDADE, VITRINE_MINIATURA_QUALIDADE_JPEG);
+  for (let q = 0.7; miniatura.size > VITRINE_MINIATURA_META_BYTES && q >= 0.5; q -= 0.1) {
+    miniatura = await comprimir(canvas, q, q);
+  }
+  return miniatura;
+}
+
+/** Gera a imagem (1600 px), a miniatura (800 px) e o texto de cada página. */
 export async function processarPdfVitrine(
   arquivo: Blob,
   aoProgredir?: (feitas: number, total: number) => void
@@ -41,14 +78,15 @@ export async function processarPdfVitrine(
     const paginas: PaginaProcessada[] = [];
     for (let numero = 1; numero <= documento.numPages; numero++) {
       const pagina = await documento.getPage(numero);
-      const escala = VITRINE_PNG_LARGURA / pagina.getViewport({ scale: 1 }).width;
+      const escala = VITRINE_IMAGEM_LARGURA / pagina.getViewport({ scale: 1 }).width;
       const viewport = pagina.getViewport({ scale: escala });
 
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(viewport.width);
       canvas.height = Math.round(viewport.height);
       await pagina.render({ canvas, viewport }).promise;
-      const png = await canvasParaPng(canvas);
+      const imagem = await comprimir(canvas, VITRINE_IMAGEM_QUALIDADE, VITRINE_IMAGEM_QUALIDADE);
+      const miniatura = await gerarMiniatura(canvas);
 
       // Tamanho da fonte = escala vertical da matriz do trecho (para achar as
       // "linhas com fonte grande" quando a página não tem "Valor").
@@ -58,7 +96,7 @@ export async function processarPdfVitrine(
       );
       const texto = trechos.map((t) => t.texto + (t.fimDeLinha ? "\n" : " ")).join("");
 
-      paginas.push({ numero, png, texto, tituloSugerido: sugerirTituloOferta(trechos) });
+      paginas.push({ numero, imagem, miniatura, texto, tituloSugerido: sugerirTituloOferta(trechos) });
       pagina.cleanup();
       aoProgredir?.(numero, documento.numPages);
     }

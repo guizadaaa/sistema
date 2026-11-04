@@ -11,11 +11,11 @@ import { FILIAL_LABELS } from "@/lib/labels";
 import { createClient } from "@/lib/supabase/client";
 import type { FilialCvc } from "@/lib/supabase/types";
 import { FILIAIS } from "@/lib/validation/caso";
-import { VITRINE_PDF_TAMANHO_MAXIMO_BYTES } from "@/lib/validation/vitrine";
+import { VITRINE_CACHE_CONTROL_S, VITRINE_PDF_TAMANHO_MAXIMO_BYTES } from "@/lib/validation/vitrine";
 import type { CategoriaVitrine } from "@/lib/vitrine/listar";
 import { processarPdfVitrine, type PaginaProcessada } from "@/lib/vitrine/processar-pdf";
 
-import { nomePdfVitrine, nomesImagensVitrine } from "@/lib/vitrine/nomes";
+import { extensaoDaImagem, nomeMiniatura, nomePdfVitrine, nomesImagensVitrine } from "@/lib/vitrine/nomes";
 
 import { prepararEnvioVitrine, salvarEnvioVitrine } from "./actions";
 import { confirmarLinksExternos } from "./oferta-card";
@@ -30,8 +30,8 @@ type Etapa =
 
 /**
  * Envio da vitrine (PDF de até 25 MB). Tudo pesado acontece no navegador:
- * pdf.js gera o PNG e lê o texto de cada página; a revisão vem em seguida
- * (miniaturas locais) e, ao publicar, o PDF e os PNGs sobem direto para o
+ * pdf.js gera a imagem (WebP) e a miniatura e lê o texto de cada página; a revisão vem em seguida
+ * (miniaturas locais) e, ao publicar, o PDF e as imagens sobem direto para o
  * Supabase Storage por URL assinada de upload (o teto de corpo da Vercel é
  * 4,5 MB), já com os nomes legíveis — título da oferta e "{categoria} -
  * {titulo}" —, que são os nomes do "Salvar como". O servidor só gera as
@@ -64,7 +64,7 @@ export function EnviarVitrine({
 
   // Miniaturas (blob:) liberadas só ao sair — editar uma linha não as recria.
   const miniaturas = useRef<string[]>([]);
-  const pngs = useRef(new Map<number, Blob>());
+  const imagens = useRef(new Map<number, Pick<PaginaProcessada, "imagem" | "miniatura">>());
   useEffect(() => () => miniaturas.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
   const enviar = async () => {
@@ -93,10 +93,10 @@ export function EnviarVitrine({
       link: "",
       validade: "",
       capa: p.numero === 1 && paginas.length > 1,
-      miniatura: URL.createObjectURL(p.png),
+      miniatura: URL.createObjectURL(p.miniatura),
     }));
     miniaturas.current = novas.map((l) => l.miniatura);
-    pngs.current = new Map(paginas.map((p) => [p.numero, p.png]));
+    imagens.current = new Map(paginas.map((p) => [p.numero, { imagem: p.imagem, miniatura: p.miniatura }]));
     setLinhas(novas);
     setEtapa({ tipo: "revisao" });
   };
@@ -112,13 +112,30 @@ export function EnviarVitrine({
 
     // Nomes legíveis dos arquivos (são os nomes do "Salvar como").
     const pdfNome = nomePdfVitrine(categorias.find((c) => c.id === categoriaId)?.nome ?? "", titulo);
-    const nomesPng = nomesImagensVitrine([
-      ...(capa ? [{ pagina: capa.pagina, titulo: "", capa: true }] : []),
-      ...paginasOferta.map(({ pagina, titulo }) => ({ pagina, titulo })),
-    ]);
+    // Imagem grande (WebP, ou JPEG no fallback) por página usada e miniatura
+    // "-mini" ao lado, para o card. A capa não vira oferta: só a grande.
+    const primeira = imagens.current.get(paginasOferta[0]?.pagina ?? 1)!;
+    const extensao = extensaoDaImagem(primeira.imagem.type);
+    const extensaoMini = extensaoDaImagem(primeira.miniatura.type);
+    const nomesImagem = nomesImagensVitrine(
+      [
+        ...(capa ? [{ pagina: capa.pagina, titulo: "", capa: true }] : []),
+        ...paginasOferta.map(({ pagina, titulo }) => ({ pagina, titulo })),
+      ],
+      extensao
+    );
+    const nomesMini = new Map(paginasOferta.map(({ pagina }) => [pagina, nomeMiniatura(nomesImagem.get(pagina)!, extensaoMini)]));
+    const tipo = (blob: Blob) => (blob.type === "image/webp" ? ("image/webp" as const) : ("image/jpeg" as const));
     const arquivos = [
       { nome: pdfNome, tipo: "application/pdf" as const, corpo: arquivo as Blob },
-      ...[...nomesPng].map(([pagina, nome]) => ({ nome, tipo: "image/png" as const, corpo: pngs.current.get(pagina)! })),
+      ...[...nomesImagem].map(([pagina, nome]) => {
+        const corpo = imagens.current.get(pagina)!.imagem;
+        return { nome, tipo: tipo(corpo), corpo };
+      }),
+      ...[...nomesMini].map(([pagina, nome]) => {
+        const corpo = imagens.current.get(pagina)!.miniatura;
+        return { nome, tipo: tipo(corpo), corpo };
+      }),
     ];
 
     setSalvando(true);
@@ -135,6 +152,9 @@ export function EnviarVitrine({
     for (const upload of preparado.uploads) {
       const { error } = await storage.uploadToSignedUrl(upload.caminho, upload.token, corpoPorNome.get(upload.nome)!, {
         contentType: upload.tipo,
+        // Caminho único por envio (pasta {filial}/{arquivo_id}/, nunca
+        // sobrescrito): pode ficar em cache por 1 ano no navegador.
+        cacheControl: VITRINE_CACHE_CONTROL_S,
       });
       if (error) {
         console.error("Erro ao enviar arquivo da vitrine:", error);
@@ -153,7 +173,7 @@ export function EnviarVitrine({
       paginas: linhas.length,
       capaPagina: capa?.pagina ?? null,
       pdfNome,
-      ofertas: paginasOferta.map((o) => ({ ...o, pagina: pdfInteiro ? null : o.pagina, imagem: nomesPng.get(o.pagina)! })),
+      ofertas: paginasOferta.map((o) => ({ ...o, pagina: pdfInteiro ? null : o.pagina, imagem: nomesImagem.get(o.pagina)!, miniatura: nomesMini.get(o.pagina)! })),
       copiarPara,
       linksExternosConfirmados: true,
     });
@@ -239,7 +259,7 @@ export function EnviarVitrine({
       {pdfInteiro ? (
         <div className="grid gap-3 rounded-md border p-3 sm:grid-cols-[12rem_1fr]">
           {/* eslint-disable-next-line @next/next/no-img-element -- blob: local */}
-          <img src={linhas[0]?.miniatura} alt="Página 1" className="w-full rounded border bg-black object-contain" />
+          <img src={linhas[0]?.miniatura} alt="Página 1" loading="lazy" decoding="async" className="w-full rounded border bg-black object-contain" />
           <div className="grid gap-2 sm:grid-cols-3">
             <Input aria-label="Título da oferta" value={unica.titulo} onChange={(e) => setUnica({ ...unica, titulo: e.target.value })} />
             <Input aria-label="Link da oferta" type="url" placeholder="https://www.cvc.com.br/..." value={unica.link}
@@ -252,7 +272,7 @@ export function EnviarVitrine({
           {linhas.map((l) => (
             <li key={l.pagina} className={`grid gap-3 rounded-md border p-3 sm:grid-cols-[12rem_1fr] ${l.capa ? "bg-muted/50" : ""}`}>
               {/* eslint-disable-next-line @next/next/no-img-element -- blob: local */}
-              <img src={l.miniatura} alt={`Página ${l.pagina}`} className="w-full rounded border bg-black object-contain" />
+              <img src={l.miniatura} alt={`Página ${l.pagina}`} loading="lazy" decoding="async" className="w-full rounded border bg-black object-contain" />
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm font-medium">Página {l.pagina}</span>

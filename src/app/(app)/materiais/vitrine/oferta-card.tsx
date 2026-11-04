@@ -134,7 +134,15 @@ export function OfertaCard({
         // pelo botão direito (o nome do objeto é o título da oferta).
         <a href={oferta.imagemUrl} target="_blank" rel="noopener noreferrer" title="Abrir imagem em nova aba">
           {/* eslint-disable-next-line @next/next/no-img-element -- URL assinada do Storage, next/image não se aplica */}
-          <img src={oferta.imagemUrl} alt={oferta.titulo} className="aspect-[1190/425] w-full bg-black object-contain" />
+          <img
+            // Card mostra a miniatura (800 px); a grande só ao abrir. Ofertas
+            // antigas sem miniatura usam a grande.
+            src={oferta.miniaturaUrl ?? oferta.imagemUrl}
+            alt={oferta.titulo}
+            loading="lazy"
+            decoding="async"
+            className="aspect-[1190/425] w-full bg-black object-contain"
+          />
         </a>
       ) : (
         <div className="bg-muted aspect-[1190/425] w-full" />

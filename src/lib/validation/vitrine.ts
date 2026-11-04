@@ -1,8 +1,19 @@
 /** Mesmo limite do bucket "vitrine" (migration 20261029000001). */
 export const VITRINE_PDF_TAMANHO_MAXIMO_BYTES = 25 * 1024 * 1024;
 
-/** Largura do PNG gerado por página (vitrine LED, ~1190×425 pt). */
-export const VITRINE_PNG_LARGURA = 1600;
+/** Imagem grande de cada página (abre em nova aba / "Salvar como"): WebP, fallback JPEG. */
+export const VITRINE_IMAGEM_LARGURA = 1600;
+export const VITRINE_IMAGEM_QUALIDADE = 0.85;
+
+/** Miniatura do card (~400 px na tela; 800 px para telas de alta densidade). */
+export const VITRINE_MINIATURA_LARGURA = 800;
+export const VITRINE_MINIATURA_QUALIDADE = 0.8;
+export const VITRINE_MINIATURA_QUALIDADE_JPEG = 0.82;
+/** Meta de tamanho da miniatura: acima disso, a qualidade desce até achar. */
+export const VITRINE_MINIATURA_META_BYTES = 150 * 1024;
+
+/** Cache-Control dos arquivos no Storage: 1 ano (o caminho é único por envio). */
+export const VITRINE_CACHE_CONTROL_S = "31536000";
 
 export type ResultadoLinkVitrine =
   | { ok: true; url: string | null; dominioCvc: boolean }
