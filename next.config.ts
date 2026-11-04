@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 
+// Hospedagem: Render (plano Free), com `next build` + `next start` — ver
+// render.yaml e RUNBOOK. Nada aqui é específico de uma plataforma: o mesmo
+// build continua funcionando na Vercel. Sem `output: "standalone"`: ele
+// exige iniciar com `node .next/standalone/server.js` (o `next start`
+// recusa), e no Render o `next start` padrão já basta. A porta vem da
+// variável PORT, que o próprio `next start` lê (e escuta em 0.0.0.0).
 const nextConfig: NextConfig = {
+  // Nenhuma imagem do app passa pelo otimizador do next/image: as da Vitrine
+  // já são PNGs prontos servidos por URL assinada do Storage, e o resto é
+  // blob: local. Desligar evita CPU de redimensionamento no servidor.
+  images: { unoptimized: true },
   experimental: {
     serverActions: {
       // Server Actions usam 1 MB por padrão. O formulário de novo caso aceita

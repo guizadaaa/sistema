@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
@@ -17,6 +18,16 @@ export type CurrentUser = Database["public"]["Tables"]["usuarios"]["Row"];
  * por este gate (senão o redirect pra elas viraria um loop infinito).
  */
 export async function requireCurrentUser(options?: { skipMfaGate?: boolean }): Promise<CurrentUser> {
+  return carregarUsuarioAtual(options?.skipMfaGate ?? false);
+}
+
+/**
+ * Memoizado por requisição (React cache): o layout de (app) e a página
+ * chamam requireCurrentUser na mesma renderização — sem isso eram dois
+ * getUser() no Supabase Auth, duas consultas a usuarios e duas checagens de
+ * MFA por página. Argumento primitivo para a chave do cache bater.
+ */
+const carregarUsuarioAtual = cache(async (skipMfaGate: boolean): Promise<CurrentUser> => {
   const supabase = await createClient();
 
   const {
@@ -48,7 +59,7 @@ export async function requireCurrentUser(options?: { skipMfaGate?: boolean }): P
     redirect("/login?erro=conta_desativada");
   }
 
-  if (!options?.skipMfaGate) {
+  if (!skipMfaGate) {
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     // nextLevel === 'aal2' significa que existe um fator verificado — vale
     // pra qualquer perfil que tenha ativado por conta própria em /seguranca,
@@ -63,4 +74,4 @@ export async function requireCurrentUser(options?: { skipMfaGate?: boolean }): P
   }
 
   return usuario;
-}
+});
