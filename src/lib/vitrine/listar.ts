@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database, FilialCvc } from "@/lib/supabase/types";
 import { ofertaVencida } from "@/lib/validation/vitrine";
 
+import { CacheUrlsAssinadas } from "./cache-urls";
+
 export type CategoriaVitrine = Database["public"]["Tables"]["vitrine_categorias"]["Row"];
 export type ArquivoVitrine = Database["public"]["Tables"]["vitrine_arquivos"]["Row"] & {
   /** URL assinada do PDF, inline (abre no visualizador do navegador). */
@@ -13,8 +15,10 @@ export type ArquivoVitrine = Database["public"]["Tables"]["vitrine_arquivos"]["R
   legado: boolean;
 };
 export type OfertaVitrine = Database["public"]["Tables"]["vitrine_ofertas"]["Row"] & {
-  /** URL assinada do PNG da página (1 h), inline — exibir e abrir em nova aba. */
+  /** URL assinada da imagem grande (7 dias, estável), inline — abre em nova aba. */
   imagemUrl: string | null;
+  /** URL assinada da miniatura do card; null nas ofertas antigas (usar imagemUrl). */
+  miniaturaUrl: string | null;
   vencida: boolean;
 };
 
@@ -24,7 +28,8 @@ export type DadosVitrine = {
   ofertas: OfertaVitrine[];
 };
 
-const VALIDADE_URL_IMAGEM_S = 60 * 60;
+/** Cache das URLs assinadas por caminho, compartilhado pelo processo (ver cache-urls.ts). */
+const cacheUrls = new CacheUrlsAssinadas();
 
 /** Layout antigo: PDF na raiz da filial ({filial}/{arquivo_id}.pdf). */
 export function ehPdfLegado(pdfPath: string): boolean {
@@ -50,16 +55,18 @@ export async function carregarVitrine(filial: FilialCvc): Promise<DadosVitrine> 
   if (ofertas.error) throw ofertas.error;
 
   // URLs sem a opção "download": o Storage serve inline e "Salvar como" usa o
-  // nome legível do objeto (migration 20261030000001).
-  const caminhos = [...new Set([...(ofertas.data ?? []).map((o) => o.imagem_path), ...(arquivos.data ?? []).map((a) => a.pdf_path)])];
-  const urlPorCaminho = new Map<string, string>();
-  if (caminhos.length > 0) {
-    const { data, error } = await supabase.storage.from("vitrine").createSignedUrls(caminhos, VALIDADE_URL_IMAGEM_S);
+  // nome legível do objeto. Estáveis (cache por caminho, 7 dias): o navegador
+  // repete a mesma URL e usa o cache em vez de baixar tudo a cada visita.
+  // Só caminhos de linhas que o select acima (com RLS) devolveu.
+  const caminhos = [
+    ...(ofertas.data ?? []).flatMap((o) => [o.imagem_path, ...(o.miniatura_path ? [o.miniatura_path] : [])]),
+    ...(arquivos.data ?? []).map((a) => a.pdf_path),
+  ];
+  const urlPorCaminho = await cacheUrls.obter(caminhos, async (faltando, validadeS) => {
+    const { data, error } = await supabase.storage.from("vitrine").createSignedUrls(faltando, validadeS);
     if (error) throw error;
-    for (const item of data ?? []) {
-      if (item.path && item.signedUrl) urlPorCaminho.set(item.path, item.signedUrl);
-    }
-  }
+    return new Map((data ?? []).flatMap((item) => (item.path && item.signedUrl ? [[item.path, item.signedUrl] as const] : [])));
+  });
 
   const hoje = hojeSaoPaulo();
   return {
@@ -72,6 +79,7 @@ export async function carregarVitrine(filial: FilialCvc): Promise<DadosVitrine> 
     ofertas: (ofertas.data ?? []).map((o) => ({
       ...o,
       imagemUrl: urlPorCaminho.get(o.imagem_path) ?? null,
+      miniaturaUrl: (o.miniatura_path && urlPorCaminho.get(o.miniatura_path)) || null,
       vencida: ofertaVencida(o.validade, hoje),
     })),
   };

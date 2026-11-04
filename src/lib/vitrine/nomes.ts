@@ -1,7 +1,8 @@
 // Nomes legíveis dos arquivos no bucket "vitrine" — a URL de visualização é
 // inline (sem "download"), então "Salvar como" usa o nome do objeto:
 //   {filial}/{arquivo_id}/{categoria} - {titulo da vitrine}.pdf
-//   {filial}/{arquivo_id}/{titulo-da-oferta}.png
+//   {filial}/{arquivo_id}/{titulo-da-oferta}.webp        (ou .jpg; .png nas antigas)
+//   {filial}/{arquivo_id}/{titulo-da-oferta}-mini.webp   miniatura do card
 // Sem acento e só com [A-Za-z0-9 ._-] (mesmo padrão validado no banco).
 
 const TAMANHO_MAXIMO = 90;
@@ -35,11 +36,16 @@ export function nomePdfVitrine(categoria: string, tituloVitrine: string): string
   return `${nome || "vitrine"}.pdf`;
 }
 
+export type ExtensaoImagem = "png" | "webp" | "jpg";
+
 /**
- * Nome do PNG de cada página: "{titulo-da-oferta}.png" (capa = "capa.png").
- * Repetidos ganham "-2", "-3"...
+ * Nome da imagem de cada página: "{titulo-da-oferta}.{extensao}" (capa =
+ * "capa.{extensao}"). Repetidos ganham "-2", "-3"...
  */
-export function nomesImagensVitrine(paginas: { pagina: number; titulo: string; capa?: boolean }[]): Map<number, string> {
+export function nomesImagensVitrine(
+  paginas: { pagina: number; titulo: string; capa?: boolean }[],
+  extensao: ExtensaoImagem = "png"
+): Map<number, string> {
   const usados = new Set<string>();
   const nomes = new Map<number, string>();
   for (const { pagina, titulo, capa } of paginas) {
@@ -47,12 +53,22 @@ export function nomesImagensVitrine(paginas: { pagina: number; titulo: string; c
     let nome = base;
     for (let n = 2; usados.has(nome); n++) nome = `${base}-${n}`;
     usados.add(nome);
-    nomes.set(pagina, `${nome}.png`);
+    nomes.set(pagina, `${nome}.${extensao}`);
   }
   return nomes;
 }
 
+/** Miniatura ao lado da imagem: "msc-virtuosa.webp" -> "msc-virtuosa-mini.webp". */
+export function nomeMiniatura(nomeImagem: string, extensao: Exclude<ExtensaoImagem, "png">): string {
+  return `${nomeImagem.replace(/\.(png|webp|jpg)$/, "")}-mini.${extensao}`;
+}
+
+/** Extensão do arquivo pelo tipo gerado no navegador. */
+export function extensaoDaImagem(tipo: string): Exclude<ExtensaoImagem, "png"> {
+  return tipo === "image/webp" ? "webp" : "jpg";
+}
+
 /** Mesma regra do banco (vitrine_salvar_envio): só o nome do arquivo, sem pasta. */
-export function nomeArquivoValido(nome: string, extensao: "png" | "pdf"): boolean {
+export function nomeArquivoValido(nome: string, extensao: ExtensaoImagem | "pdf"): boolean {
   return new RegExp(`^[A-Za-z0-9][A-Za-z0-9 ._-]*\\.${extensao}$`).test(nome) && nome.length <= 120;
 }

@@ -118,9 +118,13 @@ export async function moverVitrine(tabela: "categoria" | "oferta", id: string, d
 // Envio do PDF: direto do navegador para o Storage
 // ----------------------------------------------------------------------------
 
+export type TipoArquivoVitrine = "application/pdf" | "image/webp" | "image/jpeg" | "image/png";
+
+const EXTENSAO_POR_TIPO = { "application/pdf": "pdf", "image/webp": "webp", "image/jpeg": "jpg", "image/png": "png" } as const;
+
 export type EnvioPreparado = {
   arquivoId: string;
-  uploads: { nome: string; caminho: string; token: string; tipo: "application/pdf" | "image/png" }[];
+  uploads: { nome: string; caminho: string; token: string; tipo: TipoArquivoVitrine }[];
 };
 
 /**
@@ -131,13 +135,15 @@ export type EnvioPreparado = {
  */
 export async function prepararEnvioVitrine(
   filial: FilialCvc,
-  arquivos: { nome: string; tipo: "application/pdf" | "image/png" }[]
+  arquivos: { nome: string; tipo: TipoArquivoVitrine }[]
 ): Promise<EnvioPreparado | { error: string }> {
   if (!ehFilial(filial)) return { error: "Filial inválida." };
-  if (arquivos.length < 2 || arquivos.length > MAX_PAGINAS + 1) return { error: "Envio sem arquivos válidos." };
+  // PDF + imagem grande por página + miniatura por oferta.
+  if (arquivos.length < 2 || arquivos.length > 2 * MAX_PAGINAS + 1) return { error: "Envio sem arquivos válidos." };
   const nomes = new Set<string>();
   for (const { nome, tipo } of arquivos) {
-    if (!nomeArquivoValido(nome, tipo === "application/pdf" ? "pdf" : "png") || nomes.has(nome)) {
+    const extensao = EXTENSAO_POR_TIPO[tipo];
+    if (!extensao || !nomeArquivoValido(nome, extensao) || nomes.has(nome)) {
       return { error: `Nome de arquivo inválido: ${nome}` };
     }
     nomes.add(nome);
@@ -160,7 +166,15 @@ export async function prepararEnvioVitrine(
   return { arquivoId, uploads };
 }
 
-export type OfertaRevisada = { pagina: number | null; titulo: string; link: string; validade: string; imagem: string };
+export type OfertaRevisada = {
+  pagina: number | null;
+  titulo: string;
+  link: string;
+  validade: string;
+  imagem: string;
+  /** Miniatura do card ("-mini.webp"/"-mini.jpg"). */
+  miniatura?: string;
+};
 
 export async function salvarEnvioVitrine(entrada: {
   arquivoId: string;
@@ -190,7 +204,14 @@ export async function salvarEnvioVitrine(entrada: {
     if ("error" in link) return { error: `${rotulo}: ${link.error}` };
     const validade = validarValidadeVitrine(oferta.validade);
     if (!validade.ok) return { error: `${rotulo}: ${validade.erro}` };
-    ofertas.push({ pagina: oferta.pagina, titulo: oferta.titulo.trim(), link: link.link, validade: validade.data, imagem: oferta.imagem });
+    ofertas.push({
+      pagina: oferta.pagina,
+      titulo: oferta.titulo.trim(),
+      link: link.link,
+      validade: validade.data,
+      imagem: oferta.imagem,
+      miniatura: oferta.miniatura,
+    });
   }
 
   const supabase = await createClient();
