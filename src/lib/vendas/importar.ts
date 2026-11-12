@@ -8,6 +8,8 @@ import type { FilialCvc } from "@/lib/supabase/types";
 export type ResultadoImportacaoVendas = {
   novas: number;
   atualizadas: number;
+  /** Maior Data Venda (yyyy-mm-dd) entre as linhas importadas; null se nenhuma linha entrou. */
+  ate: string | null;
   /** Uma mensagem por linha COM Venda Nº que não pôde ser importada (ex. "Linha 12: sem Vendedor — ignorada."). */
   avisos: string[];
 };
@@ -177,7 +179,7 @@ export async function importarVendasPlanilha(
   const { linhas, avisos } = lerLinhas(sheet, colunas);
 
   if (linhas.length === 0) {
-    return { novas: 0, atualizadas: 0, avisos };
+    return { novas: 0, atualizadas: 0, ate: null, avisos };
   }
 
   const numeros = linhas.map((l) => l.venda_numero);
@@ -198,7 +200,10 @@ export async function importarVendasPlanilha(
     if (error) throw erroDeBanco("gravar as vendas", error);
   }
 
-  return { novas, atualizadas, avisos };
+  // ISO yyyy-mm-dd: comparação de string já é cronológica.
+  const ate = linhas.reduce((max, l) => (l.data_venda > max ? l.data_venda : max), linhas[0].data_venda);
+
+  return { novas, atualizadas, ate, avisos };
 }
 
 function mensagemDe(erro: unknown): string {

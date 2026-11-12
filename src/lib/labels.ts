@@ -121,4 +121,5 @@ export const TIPO_NOTIFICACAO_LABELS: Record<TipoNotificacao, string> = {
   prazo_vencendo: "Prazo vencendo",
   caso_novo: "Caso novo",
   delegacao_expirando: "Delegação expirando",
+  vendas_importadas: "Vendas atualizadas",
 };

@@ -5,12 +5,13 @@ import { revalidatePath } from "next/cache";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { ErroImportacaoVendas, importarVendasPlanilha, type ResultadoImportacaoVendas } from "@/lib/vendas/importar";
+import { avisarImportacaoVendas, type ResultadoAvisoImportacao } from "@/lib/vendas/notificar-importacao";
 import { FILIAIS } from "@/lib/validation/caso";
 import type { FilialCvc } from "@/lib/supabase/types";
 
 export type ImportarVendasState = {
   error?: string;
-  resultado?: ResultadoImportacaoVendas;
+  resultado?: ResultadoImportacaoVendas & ResultadoAvisoImportacao;
 };
 
 /**
@@ -43,8 +44,11 @@ export async function importarVendas(_prevState: ImportarVendasState, formData: 
   try {
     const buffer = await arquivo.arrayBuffer();
     const resultado = await importarVendasPlanilha(supabase, filial as FilialCvc, buffer);
+    // Falha ao avisar não desfaz a importação: volta como aviso no resultado.
+    const aviso = await avisarImportacaoVendas(supabase, filial as FilialCvc, resultado);
     revalidatePath("/vendas");
-    return { resultado };
+    revalidatePath("/vendas/importar");
+    return { resultado: { ...resultado, ...aviso } };
   } catch (erro) {
     console.error("Erro ao importar vendas:", erro);
     // ErroImportacaoVendas já traz a causa real escrita pra humanos (coluna

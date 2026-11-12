@@ -4,7 +4,8 @@ import type { PerfilUsuario } from "@/lib/supabase/types";
 
 /**
  * Mesmo padrão de usuarios-tabs.tsx: só mostra abas que o perfil atual pode
- * abrir — Importar é adm/adm_master, Mapeamento é exclusivo adm_master.
+ * abrir — Importar é adm/adm_master (gerente vê só a lista de importações
+ * da própria loja), Mapeamento é exclusivo adm_master.
  */
 export function VendasTabs({ ativo, perfil }: { ativo: "vendas" | "importar" | "mapeamento"; perfil: PerfilUsuario }) {
   const tabs = [
@@ -13,7 +14,7 @@ export function VendasTabs({ ativo, perfil }: { ativo: "vendas" | "importar" | "
       href: "/vendas/importar",
       label: "Importar",
       chave: "importar" as const,
-      visivel: perfil === "adm" || perfil === "adm_master",
+      visivel: perfil === "adm" || perfil === "adm_master" || perfil === "gerente",
     },
     { href: "/vendas/mapeamento", label: "Mapeamento", chave: "mapeamento" as const, visivel: perfil === "adm_master" },
   ].filter((tab) => tab.visivel);

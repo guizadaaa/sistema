@@ -35,16 +35,18 @@ describe("marcarNotificacaoComoLida", () => {
 });
 
 describe("marcarTodasNotificacoesComoLidas", () => {
-  it("atualiza só as ainda não lidas (is lida_em null)", async () => {
+  it("atualiza só as ainda não lidas (is lida_em null), nunca o aviso de vendas importadas", async () => {
     requireCurrentUserMock.mockResolvedValue({ id: "u1", perfil: "vendedor" });
 
-    const isMock = vi.fn().mockResolvedValue({ error: null });
+    const neqMock = vi.fn().mockResolvedValue({ error: null });
+    const isMock = vi.fn().mockReturnValue({ neq: neqMock });
     const updateMock = vi.fn().mockReturnValue({ is: isMock });
     createClientMock.mockResolvedValue({ from: vi.fn().mockReturnValue({ update: updateMock }) });
 
     const resultado = await marcarTodasNotificacoesComoLidas();
 
     expect(isMock).toHaveBeenCalledWith("lida_em", null);
+    expect(neqMock).toHaveBeenCalledWith("tipo", "vendas_importadas");
     expect(resultado.error).toBeUndefined();
   });
 });

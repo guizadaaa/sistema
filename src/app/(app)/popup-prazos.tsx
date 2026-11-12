@@ -77,15 +77,26 @@ export function PopupPrazosView({
  * refeito do zero a cada novo carregamento) — o sino continua contando
  * normalmente até alguém marcar como lida de verdade.
  */
-export function PopupPrazos() {
-  const [prazos, setPrazos] = useState<NotificacaoListada[]>([]);
+const ACOES_PADRAO = { buscarPrazosNaoLidos, marcarNotificacaoComoLida, marcarTodosPrazosComoLidos };
+export type AcoesPopupPrazos = typeof ACOES_PADRAO;
+
+export function PopupPrazos({
+  onOcupadoChange,
+  acoes = ACOES_PADRAO,
+}: {
+  /** true enquanto ainda carrega ou há prazo na tela — o pop-up de vendas espera. */
+  onOcupadoChange?: (ocupado: boolean) => void;
+  /** Ponto de injeção para teste de navegador; em produção, as server actions. */
+  acoes?: typeof ACOES_PADRAO;
+} = {}) {
+  const [prazos, setPrazos] = useState<NotificacaoListada[] | null>(null);
   const [dispensados, setDispensados] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelado = false;
 
     const atualizar = async () => {
-      const lista = await buscarPrazosNaoLidos();
+      const lista = await acoes.buscarPrazosNaoLidos();
       if (!cancelado) setPrazos(lista);
     };
 
@@ -95,23 +106,28 @@ export function PopupPrazos() {
       cancelado = true;
       clearInterval(intervalo);
     };
-  }, []);
+  }, [acoes]);
 
-  const visiveis = prazos.filter((p) => !dispensados.has(p.id));
+  const visiveis = (prazos ?? []).filter((p) => !dispensados.has(p.id));
+  const ocupado = prazos === null || visiveis.length > 0;
+
+  useEffect(() => {
+    onOcupadoChange?.(ocupado);
+  }, [ocupado, onOcupadoChange]);
 
   const dispensarSemMarcar = () => {
     setDispensados((prev) => new Set([...prev, ...visiveis.map((p) => p.id)]));
   };
 
   const marcarUmaComoLida = (id: string) => {
-    setPrazos((prev) => prev.filter((p) => p.id !== id));
-    void marcarNotificacaoComoLida(id);
+    setPrazos((prev) => (prev ?? []).filter((p) => p.id !== id));
+    void acoes.marcarNotificacaoComoLida(id);
   };
 
   const marcarTodasComoLidas = () => {
     const ids = new Set(visiveis.map((p) => p.id));
-    setPrazos((prev) => prev.filter((p) => !ids.has(p.id)));
-    void marcarTodosPrazosComoLidos();
+    setPrazos((prev) => (prev ?? []).filter((p) => !ids.has(p.id)));
+    void acoes.marcarTodosPrazosComoLidos();
   };
 
   return (

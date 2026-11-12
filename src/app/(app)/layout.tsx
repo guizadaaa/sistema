@@ -7,7 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 import { DelegacaoAvisoBanner } from "./delegacao-aviso-banner";
 import { NavLinks } from "./nav-links";
-import { PopupPrazos } from "./popup-prazos";
+import { PopupsAvisos } from "./popup-vendas-importadas";
 import { SinoNotificacoes } from "./sino-notificacoes";
 import { logout } from "../login/actions";
 
@@ -46,7 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
       {proximaDelegacao && <DelegacaoAvisoBanner inicio={proximaDelegacao.inicio} />}
       <main className="flex-1 p-4">{children}</main>
-      <PopupPrazos />
+      <PopupsAvisos />
     </div>
   );
 }

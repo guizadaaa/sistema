@@ -34,7 +34,8 @@ export type TipoDocumentoAnexo =
   // Descrição, fora da lista de Anexos (20261006000001).
   | "imagem_descricao";
 export type AcaoAuditoria = "insert" | "update" | "delete" | "download_signed_url";
-export type TipoNotificacao = "prazo_vencendo" | "caso_novo" | "delegacao_expirando";
+export type TipoNotificacao = "prazo_vencendo" | "caso_novo" | "delegacao_expirando" | "vendas_importadas";
+export type StatusAvisoImportacao = "confirmado" | "pendente" | "substituido";
 export type TipoMaterialApoio = "pdf" | "imagem" | "docx" | "xlsx" | "link";
 
 export interface Database {
@@ -545,6 +546,8 @@ export interface Database {
           mensagem: string;
           caso_id: string | null;
           marco_dias: number | null;
+          /** Só em vendas_importadas: a importação que gerou o aviso. */
+          importacao_id: string | null;
           lida_em: string | null;
           criado_em: string;
         };
@@ -557,6 +560,20 @@ export interface Database {
         Update: Partial<{
           lida_em: string | null;
         }>;
+        Relationships: [];
+      };
+      // Uma linha por importação de vendas bem-sucedida (20261112000002).
+      // Só notificar_vendas_importadas grava.
+      vendas_importacoes: {
+        Row: {
+          id: string;
+          filial: FilialCvc;
+          ate: string;
+          importado_por: string;
+          importado_em: string;
+        };
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
       // ----------------------------------------------------------------------
@@ -858,6 +875,21 @@ export interface Database {
       };
     };
     Functions: {
+      notificar_vendas_importadas: {
+        Args: { p_filial: FilialCvc; p_ate: string };
+        Returns: number;
+      };
+      listar_vendas_importacoes: {
+        Args: { p_por_filial?: number };
+        Returns: {
+          id: string;
+          filial: FilialCvc;
+          ate: string;
+          importado_por_nome: string;
+          importado_em: string;
+          destinatarios: { nome: string; status: StatusAvisoImportacao; confirmado_em: string | null }[];
+        }[];
+      };
       vitrine_salvar_envio: {
         Args: {
           p_arquivo_id: string;

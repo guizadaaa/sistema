@@ -14,8 +14,13 @@ import { importarVendas, type ImportarVendasState } from "./actions";
 
 const initialState: ImportarVendasState = {};
 
-export function ImportarForm() {
-  const [state, formAction, isPending] = useActionState(importarVendas, initialState);
+export function ImportarForm({
+  acao = importarVendas,
+}: {
+  /** Ponto de injeção para teste de navegador; em produção, a server action. */
+  acao?: typeof importarVendas;
+} = {}) {
+  const [state, formAction, isPending] = useActionState(acao, initialState);
 
   return (
     <Card>
@@ -58,6 +63,16 @@ export function ImportarForm() {
                 Importação concluída: <strong>{state.resultado.novas}</strong> nova(s),{" "}
                 <strong>{state.resultado.atualizadas}</strong> atualizada(s).
               </p>
+              {state.resultado.avisados !== undefined && (
+                <p data-testid="avisados">
+                  <strong>{state.resultado.avisados}</strong> usuário(s) da loja avisado(s).
+                </p>
+              )}
+              {state.resultado.avisoNotificacao && (
+                <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                  {state.resultado.avisoNotificacao}
+                </p>
+              )}
               {state.resultado.avisos.length > 0 && (
                 <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
                   <p className="font-medium">{state.resultado.avisos.length} linha(s) não importada(s):</p>
