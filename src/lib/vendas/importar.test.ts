@@ -67,9 +67,20 @@ describe("importarVendasPlanilha", () => {
 
     const resultado = await importarVendasPlanilha(supabase, "1710", arquivo);
 
-    expect(resultado).toEqual({ novas: 1, atualizadas: 1, avisos: [] });
+    expect(resultado).toEqual({ novas: 1, atualizadas: 1, ate: "2026-09-15", avisos: [] });
     expect(upserts.map((u) => u.venda_numero)).toEqual([1001, 1002]);
     expect(upserts[0]).toMatchObject({ filial: "1710", data_venda: "2026-09-15", valor_total: 1000 });
+  });
+
+  it("devolve em `ate` a maior Data Venda das linhas importadas (fora de ordem na planilha)", async () => {
+    const arquivo = await montarPlanilha([
+      [null, 1001, "Ana", new Date(Date.UTC(2026, 10, 3)), "Cliente A", "Pacote X", 100, 1000],
+      [null, 1002, "Bruno", new Date(Date.UTC(2026, 10, 11)), "Cliente B", "Pacote Y", 50, 500],
+      [null, 1003, "Caio", new Date(Date.UTC(2026, 9, 30)), "Cliente C", "Pacote Z", 10, 100],
+    ]);
+    const { supabase } = criarSupabaseFake();
+
+    expect((await importarVendasPlanilha(supabase, "1710", arquivo)).ate).toBe("2026-11-11");
   });
 
   it("rodapé com fórmula (Comissão/Valor Total como { formula, result }) também é silencioso", async () => {
@@ -109,7 +120,7 @@ describe("importarVendasPlanilha", () => {
 
     const resultado = await importarVendasPlanilha(supabase, "1710", arquivo);
 
-    expect(resultado).toEqual({ novas: 0, atualizadas: 0, avisos: ["Linha 2: sem Vendedor — ignorada."] });
+    expect(resultado).toEqual({ novas: 0, atualizadas: 0, ate: null, avisos: ["Linha 2: sem Vendedor — ignorada."] });
     expect(upserts).toEqual([]);
   });
 

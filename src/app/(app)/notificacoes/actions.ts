@@ -35,6 +35,10 @@ export async function marcarNotificacaoComoLida(id: string): Promise<{ error?: s
   return {};
 }
 
+/**
+ * "Marcar todas" do sino nunca confirma o aviso de vendas importadas — esse
+ * só sai pelo "Li e estou ciente" do pop-up (ver popup-vendas-importadas.tsx).
+ */
 export async function marcarTodasNotificacoesComoLidas(): Promise<{ error?: string }> {
   await requireCurrentUser();
   const supabase = await createClient();
@@ -42,7 +46,8 @@ export async function marcarTodasNotificacoesComoLidas(): Promise<{ error?: stri
   const { error } = await supabase
     .from("notificacoes")
     .update({ lida_em: new Date().toISOString() })
-    .is("lida_em", null);
+    .is("lida_em", null)
+    .neq("tipo", "vendas_importadas");
   if (error) {
     console.error("Erro ao marcar notificações como lidas:", error);
     return { error: "Não foi possível marcar todas como lidas." };
@@ -87,4 +92,20 @@ export async function marcarTodosPrazosComoLidos(): Promise<{ error?: string }> 
   }
 
   return {};
+}
+
+/** Pop-up "Vendas atualizadas": o aviso não lido (a dedup deixa no máximo 1). */
+export async function buscarVendasImportadasNaoLidas(): Promise<NotificacaoListada[]> {
+  await requireCurrentUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("notificacoes")
+    .select("*")
+    .eq("tipo", "vendas_importadas")
+    .is("lida_em", null)
+    .order("criado_em", { ascending: false });
+  if (error) throw error;
+
+  return data ?? [];
 }

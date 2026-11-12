@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ShoppingBag } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -21,12 +22,20 @@ function formatarDataHora(iso: string) {
   return new Date(iso).toLocaleString("pt-BR");
 }
 
+const ACOES_PADRAO = { buscarSinoNotificacoes, marcarNotificacaoComoLida, marcarTodasNotificacoesComoLidas };
+
+/** Aviso que só sai pelo "Li e estou ciente" do pop-up — o sino não confirma. */
+const soConfirmaNoPopup = (n: NotificacaoListada) => n.tipo === "vendas_importadas";
+
 export function SinoNotificacoes({
   naoLidasInicial,
   recentesIniciais,
+  acoes = ACOES_PADRAO,
 }: {
   naoLidasInicial: number;
   recentesIniciais: NotificacaoListada[];
+  /** Ponto de injeção para teste de navegador; em produção, as server actions. */
+  acoes?: typeof ACOES_PADRAO;
 }) {
   const [naoLidas, setNaoLidas] = useState(naoLidasInicial);
   const [recentes, setRecentes] = useState(recentesIniciais);
@@ -34,25 +43,30 @@ export function SinoNotificacoes({
 
   useEffect(() => {
     const atualizar = async () => {
-      const estado = await buscarSinoNotificacoes();
+      const estado = await acoes.buscarSinoNotificacoes();
       setNaoLidas(estado.naoLidas);
       setRecentes(estado.recentes);
     };
 
     const intervalo = setInterval(atualizar, INTERVALO_POLLING_MS);
     return () => clearInterval(intervalo);
-  }, []);
+  }, [acoes]);
 
   const marcarUmaComoLida = async (id: string) => {
     setRecentes((prev) => prev.map((n) => (n.id === id ? { ...n, lida_em: new Date().toISOString() } : n)));
     setNaoLidas((prev) => Math.max(0, prev - 1));
-    await marcarNotificacaoComoLida(id);
+    await acoes.marcarNotificacaoComoLida(id);
   };
 
+  // Não lidas que o "Marcar todas" deixa como estão (vendas_importadas).
+  const pendentesDoPopup = recentes.filter((n) => !n.lida_em && soConfirmaNoPopup(n)).length;
+
   const marcarTodasComoLidas = async () => {
-    setRecentes((prev) => prev.map((n) => (n.lida_em ? n : { ...n, lida_em: new Date().toISOString() })));
-    setNaoLidas(0);
-    await marcarTodasNotificacoesComoLidas();
+    setRecentes((prev) =>
+      prev.map((n) => (n.lida_em || soConfirmaNoPopup(n) ? n : { ...n, lida_em: new Date().toISOString() }))
+    );
+    setNaoLidas(pendentesDoPopup);
+    await acoes.marcarTodasNotificacoesComoLidas();
   };
 
   return (
@@ -83,7 +97,7 @@ export function SinoNotificacoes({
             <p className="text-muted-foreground text-sm">Nenhuma notificação ainda.</p>
           ) : (
             <div className="flex flex-col gap-2">
-              {naoLidas > 0 && (
+              {naoLidas > pendentesDoPopup && (
                 <Button type="button" variant="outline" size="sm" className="w-fit" onClick={marcarTodasComoLidas}>
                   Marcar todas como lidas
                 </Button>
@@ -96,10 +110,16 @@ export function SinoNotificacoes({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col">
-                        <span className="text-muted-foreground text-xs tracking-wide uppercase">
+                        <span className="text-muted-foreground flex items-center gap-1 text-xs tracking-wide uppercase">
+                          {n.tipo === "vendas_importadas" && <ShoppingBag className="size-3" aria-hidden />}
                           {TIPO_NOTIFICACAO_LABELS[n.tipo]}
                         </span>
-                        {n.caso_id ? (
+                        {n.tipo === "vendas_importadas" ? (
+                          // Abre as vendas sem confirmar: só o pop-up confirma.
+                          <Link href="/vendas" className="hover:underline" onClick={() => setAberto(false)}>
+                            {n.mensagem}
+                          </Link>
+                        ) : n.caso_id ? (
                           <Link href={`/casos/${n.caso_id}`} className="hover:underline" onClick={() => setAberto(false)}>
                             {n.mensagem}
                           </Link>
@@ -108,7 +128,7 @@ export function SinoNotificacoes({
                         )}
                         <span className="text-muted-foreground text-xs">{formatarDataHora(n.criado_em)}</span>
                       </div>
-                      {!n.lida_em && (
+                      {!n.lida_em && !soConfirmaNoPopup(n) && (
                         <Button type="button" variant="ghost" size="sm" onClick={() => marcarUmaComoLida(n.id)}>
                           Marcar lida
                         </Button>
