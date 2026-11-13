@@ -20,6 +20,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Fuso do servidor: sem isto o Render roda em UTC e as datas/horas
+      # formatadas no servidor (toLocaleString sem timeZone) saem 3 h adiantadas.
+      - key: TZ
+        value: America/Sao_Paulo
       # NEXT_PUBLIC_* entram no bundle no build: precisam existir antes do deploy.
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
