@@ -1,22 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ShoppingBag } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TIPO_NOTIFICACAO_LABELS } from "@/lib/labels";
+import { INTERVALO_POLLING_MS, usePollingVisivel } from "@/lib/polling";
 import type { NotificacaoListada } from "@/lib/notificacoes/listar";
 
 import { buscarSinoNotificacoes, marcarNotificacaoComoLida, marcarTodasNotificacoesComoLidas } from "./notificacoes/actions";
-
-// Nenhum dos 3 gatilhos (prazo a N dias, caso novo, delegação expirando)
-// exige latência de segundos — dois são avaliados uma vez por dia, o
-// terceiro no momento da criação do caso — então polling simples resolve
-// sem o custo de manter uma conexão Realtime viva (reconexão, expiração de
-// token). Ver comentário da migration 20260723000003_notificacoes.sql.
-const INTERVALO_POLLING_MS = 30_000;
 
 function formatarDataHora(iso: string) {
   return new Date(iso).toLocaleString("pt-BR");
@@ -41,16 +35,17 @@ export function SinoNotificacoes({
   const [recentes, setRecentes] = useState(recentesIniciais);
   const [aberto, setAberto] = useState(false);
 
-  useEffect(() => {
-    const atualizar = async () => {
+  // O estado inicial vem do servidor; a primeira consulta é só no 1º intervalo.
+  usePollingVisivel(
+    async (cancelado) => {
       const estado = await acoes.buscarSinoNotificacoes();
+      if (cancelado()) return;
       setNaoLidas(estado.naoLidas);
       setRecentes(estado.recentes);
-    };
-
-    const intervalo = setInterval(atualizar, INTERVALO_POLLING_MS);
-    return () => clearInterval(intervalo);
-  }, [acoes]);
+    },
+    INTERVALO_POLLING_MS,
+    { imediato: false }
+  );
 
   const marcarUmaComoLida = async (id: string) => {
     setRecentes((prev) => prev.map((n) => (n.id === id ? { ...n, lida_em: new Date().toISOString() } : n)));

@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { usePollingVisivel } from "@/lib/polling";
 import type { NotificacaoListada } from "@/lib/notificacoes/listar";
 
 import { buscarVendasImportadasNaoLidas, marcarNotificacaoComoLida } from "./notificacoes/actions";
 import { PopupPrazos, type AcoesPopupPrazos } from "./popup-prazos";
 
-// Mesmo intervalo do sino e do pop-up de prazos.
-const INTERVALO_POLLING_MS = 30_000;
 
 const impedirFechar = (evento: Event) => evento.preventDefault();
 
@@ -76,24 +75,13 @@ export function PopupVendasImportadas({
   const [aviso, setAviso] = useState<NotificacaoListada | null>(null);
   const [adiado, setAdiado] = useState(false);
 
-  useEffect(() => {
-    let cancelado = false;
-
-    const atualizar = async () => {
-      const lista = await acoes.buscarVendasImportadasNaoLidas();
-      if (cancelado) return;
-      setAviso(lista[0] ?? null);
-      // Novo ciclo: o "Ver vendas" adiou só até aqui.
-      setAdiado(false);
-    };
-
-    atualizar();
-    const intervalo = setInterval(atualizar, INTERVALO_POLLING_MS);
-    return () => {
-      cancelado = true;
-      clearInterval(intervalo);
-    };
-  }, [acoes]);
+  usePollingVisivel(async (cancelado) => {
+    const lista = await acoes.buscarVendasImportadasNaoLidas();
+    if (cancelado()) return;
+    setAviso(lista[0] ?? null);
+    // Novo ciclo: o "Ver vendas" adiou só até aqui.
+    setAdiado(false);
+  });
 
   const ciente = (id: string) => {
     setAviso(null);
