@@ -8,14 +8,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { corPorDias } from "@/lib/casos/prazo";
 import { PRAZO_COR_TEXT_CLASSES } from "@/lib/prazo-colors";
 import { cn } from "@/lib/utils";
+import { usePollingVisivel } from "@/lib/polling";
 import type { NotificacaoListada } from "@/lib/notificacoes/listar";
 
 import { buscarPrazosNaoLidos, marcarNotificacaoComoLida, marcarTodosPrazosComoLidos } from "./notificacoes/actions";
 
-// Mesmo intervalo do sino (ver sino-notificacoes.tsx) — nenhum dos dois
-// gatilhos que alimentam isto (marcos de prazo, avaliados uma vez por dia)
-// tem exigência de latência de segundos.
-const INTERVALO_POLLING_MS = 30_000;
 
 /** Parte apresentacional, sem busca de dados — testável/visualizável isoladamente. */
 export function PopupPrazosView({
@@ -92,21 +89,10 @@ export function PopupPrazos({
   const [prazos, setPrazos] = useState<NotificacaoListada[] | null>(null);
   const [dispensados, setDispensados] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    let cancelado = false;
-
-    const atualizar = async () => {
-      const lista = await acoes.buscarPrazosNaoLidos();
-      if (!cancelado) setPrazos(lista);
-    };
-
-    atualizar();
-    const intervalo = setInterval(atualizar, INTERVALO_POLLING_MS);
-    return () => {
-      cancelado = true;
-      clearInterval(intervalo);
-    };
-  }, [acoes]);
+  usePollingVisivel(async (cancelado) => {
+    const lista = await acoes.buscarPrazosNaoLidos();
+    if (!cancelado()) setPrazos(lista);
+  });
 
   const visiveis = (prazos ?? []).filter((p) => !dispensados.has(p.id));
   const ocupado = prazos === null || visiveis.length > 0;
