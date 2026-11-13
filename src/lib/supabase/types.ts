@@ -5,6 +5,15 @@
 export type PerfilUsuario = "vendedor" | "gerente" | "adm" | "adm_master";
 export type FilialCvc = "1710" | "1714" | "1730";
 export type TelefoneCliente = { numero: string; tipo?: string; contato?: string };
+export type FornecedorReserva = {
+  categoria?: string | null;
+  receptivo?: string | null;
+  cidade?: string | null;
+  servico?: string | null;
+  data_inicial?: string | null;
+  data_final?: string | null;
+  acordo?: string | null;
+};
 export type TipoCaso =
   | "alteracao_data"
   | "cancelamento"
@@ -609,6 +618,8 @@ export interface Database {
           primeira_compra: string | null;
           ultima_compra: string | null;
           total_comprado: number;
+          proxima_viagem: string | null;
+          qtd_viagens: number;
           revisar: boolean;
           criado_em: string;
           atualizado_em: string;
@@ -650,10 +661,69 @@ export interface Database {
           conferido_em: string | null;
           atualizado_por: string | null;
           login_systur: string | null;
+          tipo_produto: string | null;
+          descricao_roteiro: string | null;
+          destino_pais: string | null;
+          destino_estado: string | null;
+          destino_cidade: string | null;
+          origem_cidade: string | null;
+          tem_voo: boolean | null;
+          fornecedores: FornecedorReserva[] | null;
+          tipos_servico: string[] | null;
+          valor_total: number | null;
+          coletado_em: string | null;
           criado_em: string;
           atualizado_em: string;
         };
         Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      // Base de clientes (20261113000001): reserva × contratante. Escrita só
+      // pelo gatilho de cliente_excursoes (service_role).
+      cliente_compras: {
+        Row: {
+          id: string;
+          reserva: string;
+          cliente_id: string;
+          pessoa_id_systur: string;
+          nome: string | null;
+          recibo: string | null;
+          valor: number | null;
+          taxa_embarque: number | null;
+          taxa_du: number | null;
+          taxa_remessa: number | null;
+          taxa_iof: number | null;
+          passageiros: string[];
+          loja: FilialCvc;
+          data_confirmacao: string | null;
+          data_viagem: string | null;
+          data_retorno: string | null;
+          destino_cidade: string | null;
+          tipos_servico: string[];
+          atualizado_em: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      base_coleta_janelas: {
+        Row: {
+          id: string;
+          loja: FilialCvc;
+          de: string;
+          ate: string;
+          reservas: number;
+          coletado_por: string | null;
+          coletado_em: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      cliente_filtros_salvos: {
+        Row: { id: string; usuario_id: string; nome: string; filtros: Record<string, string>; criado_em: string };
+        Insert: { nome: string; filtros: Record<string, string> };
         Update: never;
         Relationships: [];
       };
@@ -951,6 +1021,72 @@ export interface Database {
           eventos_voo: number;
           vendedores_sem_vinculo: string[];
         };
+      };
+      conferencia_base: {
+        Args: { p_usuario: string; p_payload: unknown };
+        Returns: {
+          recebidas: number;
+          novas: number;
+          atualizadas: number;
+          clientes_novos: number;
+          vendedores_sem_vinculo: string[];
+        };
+      };
+      clientes_gravar_tipos_servico: {
+        Args: { p_itens: { reserva: string; tipos: string[] }[]; p_so_vazios?: boolean };
+        Returns: number;
+      };
+      base_clientes_buscar: {
+        Args: { p_filtros: Record<string, string>; p_limite?: number; p_offset?: number };
+        Returns: {
+          cliente_id: string;
+          nome: string;
+          telefones: TelefoneCliente[];
+          lojas: string[];
+          qtd_viagens: number;
+          total_comprado: number;
+          ultima_compra: string | null;
+          proxima_viagem: string | null;
+          tipos: string[];
+          compra_reserva: string;
+          compra_destino: string | null;
+          compra_embarque: string | null;
+          compra_retorno: string | null;
+          compra_valor: number | null;
+          compra_vendedor: string | null;
+          compra_loja: FilialCvc;
+          compra_tipos: string[];
+          total_clientes: number;
+          soma_valores: number;
+        }[];
+      };
+      base_clientes_compras: {
+        Args: { p_cliente: string };
+        Returns: {
+          reserva: string;
+          tipo_produto: string | null;
+          descricao: string | null;
+          destino_cidade: string | null;
+          destino_estado: string | null;
+          destino_pais: string | null;
+          data_confirmacao: string | null;
+          data_viagem: string | null;
+          data_retorno: string | null;
+          tipos_servico: string[];
+          valor: number | null;
+          recibo: string | null;
+          vendedor: string | null;
+          loja: FilialCvc;
+          passageiros: string[];
+        }[];
+      };
+      base_clientes_vendedores: {
+        Args: Record<string, never>;
+        Returns: { vendedor: string; loja: FilialCvc }[];
+      };
+      base_clientes_destinos: {
+        Args: { p_termo: string; p_limite?: number };
+        Returns: { destino: string; compras: number }[];
       };
       conferencia_recibos: {
         Args: { p_usuario: string; p_payload: unknown };

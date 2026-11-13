@@ -330,17 +330,19 @@ select public.conferencia_sync('00000000-0000-0000-0000-000000000004', $json${
       "contratantes": [{ "pessoa_id": "1714001", "nome": "Cliente Batel" }] } ]
 }$json$::jsonb);
 
--- Vendedor A
+-- Vendedor A — base de clientes por loja (20261113000001): todo usuário
+-- ativo da loja vê todas as reservas, clientes e recibos da loja.
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 set role authenticated;
 select public._test_assert('vendedor A vê a própria reserva', exists (select 1 from public.cliente_excursoes where reserva = '303999143'));
-select public._test_assert('vendedor A não vê reserva do B',
-  not exists (select 1 from public.cliente_excursoes where reserva in ('303999200', '303999300')));
-select public._test_assert('vendedor A não vê cliente do B', not exists (select 1 from public.clientes where pessoa_id_systur in ('555', '777')));
-select public._test_assert('vendedor A não vê recibo do B', not exists (select 1 from public.recibos where recibo = '17100000158900'));
-select public._test_assert('vendedor A vê os eventos de voo da própria reserva', (select count(*) = 2 from public.cliente_voo_eventos));
-select public._test_assert('vendedor A não vê recibo sem vendedor', not exists (select 1 from public.recibos where recibo = '17100000161708'));
+select public._test_assert('vendedor A vê as reservas do B (mesma loja)',
+  (select count(*) = 2 from public.cliente_excursoes where reserva in ('303999200', '303999300')));
+select public._test_assert('vendedor A vê os clientes do B (mesma loja)', (select count(*) = 2 from public.clientes where pessoa_id_systur in ('555', '777')));
+select public._test_assert('vendedor A vê recibo do B e recibo sem vendedor',
+  (select count(*) = 2 from public.recibos where recibo in ('17100000158900', '17100000161708')));
+select public._test_assert('vendedor A vê os eventos de voo da loja', (select count(*) >= 2 from public.cliente_voo_eventos));
 select public._test_assert('vendedor A não vê a 1714', not exists (select 1 from public.cliente_excursoes where loja = '1714'));
+select public._test_assert('vendedor A não vê cliente da 1714', not exists (select 1 from public.clientes where pessoa_id_systur = '1714001'));
 select public._test_assert('vendedor A lê modelos e config',
   (select count(*) = 2 from public.mensagem_modelos) and (select count(*) = 1 from public.conferencia_config));
 select public._test_assert('vendedor A não lê o mapeamento', not exists (select 1 from public.systur_vendedor_mapeamento));
@@ -355,9 +357,9 @@ select public._test_assert('vendedor não altera modelos nem config',
 -- Vendedor B
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
 set role authenticated;
-select public._test_assert('vendedor B vê só as próprias reservas',
-  (select array_agg(reserva order by reserva) = '{303999200,303999300}' from public.cliente_excursoes));
-select public._test_assert('vendedor B não vê cliente da A', not exists (select 1 from public.clientes where pessoa_id_systur = '21287851'));
+select public._test_assert('vendedor B vê todas as reservas da 1710',
+  (select count(*) = 6 from public.cliente_excursoes) and not exists (select 1 from public.cliente_excursoes where loja = '1714'));
+select public._test_assert('vendedor B vê cliente da A (mesma loja)', exists (select 1 from public.clientes where pessoa_id_systur = '21287851'));
 reset role;
 reset request.jwt.claim.sub;
 
@@ -434,7 +436,11 @@ select public._test_assert('storage: dona vê o PDF', exists (select 1 from stor
 reset role;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
 set role authenticated;
-select public._test_assert('storage: outro vendedor não vê o PDF', not exists (select 1 from storage.objects where bucket_id = 'recibos'));
+select public._test_assert('storage: outro vendedor da mesma loja vê o PDF', exists (select 1 from storage.objects where bucket_id = 'recibos'));
+reset role;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000005';
+set role authenticated;
+select public._test_assert('storage: outra loja não vê o PDF', not exists (select 1 from storage.objects where bucket_id = 'recibos'));
 reset role;
 reset request.jwt.claim.sub;
 
