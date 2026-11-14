@@ -1,4 +1,5 @@
 import { autenticar } from "@/lib/conferencia/auth";
+import { tiposDaExcursaoSync } from "@/lib/conferencia/base";
 import { erro, erroDoBanco, json, lerJson } from "@/lib/conferencia/respostas";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FilialCvc } from "@/lib/supabase/types";
@@ -25,5 +26,17 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("conferencia_sync", { p_usuario: usuario.id, p_payload: corpo });
   if (error) return erroDoBanco("conferencia_sync", error);
+
+  // Tipos de serviço (base de clientes) só onde a reserva ainda não tem —
+  // a coleta do bot, com fornecedores, é mais completa e não é sobrescrita.
+  // Falha aqui não desfaz o sync: `npm run recalcular-tipos` refaz.
+  const tipos = (corpo.excursoes as Record<string, unknown>[]).flatMap((e) => {
+    const item = e && typeof e === "object" ? tiposDaExcursaoSync(e) : null;
+    return item ? [item] : [];
+  });
+  if (tipos.length > 0) {
+    const r = await admin.rpc("clientes_gravar_tipos_servico", { p_itens: tipos, p_so_vazios: true });
+    if (r.error) console.error("Erro ao gravar tipos de serviço do sync:", r.error);
+  }
   return json(data);
 }

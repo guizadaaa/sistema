@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:rls": "bash scripts/test-rls.sh"
+    "test:rls": "bash scripts/test-rls.sh",
+    "recalcular-tipos": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/recalcular-tipos.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

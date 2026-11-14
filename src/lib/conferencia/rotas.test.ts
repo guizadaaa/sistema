@@ -22,6 +22,7 @@ const estado = vi.hoisted(() => ({
   challenge: vi.fn(),
   verify: vi.fn(),
   fatores: new Map<string, { id: string; factor_type: string; status: string }[]>(),
+  janelas: [] as { loja: string; de: string; ate: string; reservas: number; coletado_em: string }[],
 }));
 
 /** access_token falso no formato JWT (só o payload importa: sub e aal). */
@@ -46,6 +47,9 @@ function builder(tabela: string) {
     if (tabela === "usuarios") return { data: estado.usuarios.get(filtros.id as string) ?? null, error: null };
     if (tabela === "conferencia_config") return { data: estado.config, error: null };
     if (tabela === "recibos") return { data: estado.recibos.get(filtros.recibo as string) ?? null, error: null };
+    if (tabela === "base_coleta_janelas") {
+      return { data: estado.janelas.filter((j) => !filtros.loja || j.loja === filtros.loja), error: null };
+    }
     return { data: null, error: null };
   };
 
@@ -65,6 +69,7 @@ function builder(tabela: string) {
       valores = v;
       return b;
     },
+    order: () => b,
     maybeSingle: async () => resolver(),
     single: async () => resolver(),
     then: (ok: (r: unknown) => unknown) => Promise.resolve(resolver()).then(ok),
@@ -113,6 +118,8 @@ const VENDEDOR_1714 = "00000000-0000-0000-0000-000000000005";
 const INATIVO = "00000000-0000-0000-0000-000000000009";
 const VENDEDOR_1710 = "00000000-0000-0000-0000-000000000001";
 const ADMIN_2FA = "00000000-0000-0000-0000-000000000006";
+const ADM = "00000000-0000-0000-0000-000000000007";
+const GERENTE_1710 = "00000000-0000-0000-0000-000000000003";
 
 function req(url: string, init: RequestInit & { token?: string } = {}) {
   const headers = new Headers(init.headers);
@@ -138,7 +145,13 @@ beforeEach(() => {
     [ADMIN_2FA, { id: ADMIN_2FA, nome_completo: "Adm com 2FA", perfil: "adm", filial: null, ativo: true }],
     [VENDEDOR_1710, { id: VENDEDOR_1710, nome_completo: "Vendedora Palladium", perfil: "vendedor", filial: "1710", ativo: true }],
     [INATIVO, { id: INATIVO, nome_completo: "Ex", perfil: "vendedor", filial: "1710", ativo: false }],
+    [ADM, { id: ADM, nome_completo: "Adm", perfil: "adm", filial: null, ativo: true }],
+    [GERENTE_1710, { id: GERENTE_1710, nome_completo: "Gerente", perfil: "gerente", filial: "1710", ativo: true }],
   ]);
+  estado.janelas = [
+    { loja: "1710", de: "2026-01-01", ate: "2026-04-10", reservas: 812, coletado_em: "2026-11-12T10:00:00Z" },
+    { loja: "1714", de: "2026-01-01", ate: "2026-02-28", reservas: 300, coletado_em: "2026-11-12T11:00:00Z" },
+  ];
   estado.recibos = new Map([
     ["17100000161708", { recibo: "17100000161708", loja: "1710", data_venda: "2026-10-22", vendedor_usuario_id: null }],
   ]);
@@ -272,6 +285,145 @@ describe("POST /sync", () => {
     const resposta = await POST(req("sync", { method: "POST", token: `valido-${ADMIN}`, body: JSON.stringify(corpoSync) }));
     expect(resposta.status).toBe(400);
     expect(await resposta.json()).toEqual({ erro: "Excursão sem número de reserva." });
+  });
+});
+
+describe("POST /sync — tipos de serviço", () => {
+  it("depois do sync grava os tipos só onde a reserva ainda não tem", async () => {
+    estado.rpc.mockResolvedValue({ data: { recebidas: 1, novas: 1, atualizadas: 0, eventos_voo: 0, vendedores_sem_vinculo: [] }, error: null });
+    const { POST } = await import("@/app/api/conferencia/sync/route");
+    const corpo = {
+      ...corpoSync,
+      excursoes: [{ reserva: "303999143", excursao: "5.1.1", descricao: "ORLANDO - 8 Dias 7 Noites", apolices: [{ n: 1 }] }],
+    };
+    const resposta = await POST(req("sync", { method: "POST", token: `valido-${ADMIN}`, body: JSON.stringify(corpo) }));
+    expect(resposta.status).toBe(200);
+    expect(estado.rpc).toHaveBeenCalledWith("clientes_gravar_tipos_servico", {
+      p_itens: [{ reserva: "303999143", tipos: ["aereo", "hotel", "seguro"] }],
+      p_so_vazios: true,
+    });
+  });
+});
+
+describe("POST /base (bot da base de clientes)", () => {
+  const reservaDisney = {
+    reserva: "305990175",
+    roteiro: "292242913",
+    excursao: "9.06246325.26092201",
+    vendedor_systur: "Alejandra Beatriz Garcia",
+    data_confirmacao: "2026-03-02",
+    data_viagem: "2026-09-22",
+    data_retorno: "2026-09-22",
+    voucher_status: "Emitido",
+    reserva_site: false,
+    tipo_produto: "PRODUTO FÁCIL",
+    descricao_roteiro: "DISNEY - PARIS - 1 Dias 0 Noites",
+    origem: { pais: "BRASIL", estado: "PR", cidade: "CURITIBA" },
+    destino: { pais: "FRANCA", estado: "IL", cidade: "DISNEY - PARIS" },
+    tem_voo: false,
+    fornecedores: [
+      {
+        categoria: "ATIVIDADE",
+        receptivo: "9540738 - Disneyland Paris",
+        cidade: "PARIS",
+        servico: "59058422 - Disneyland Paris · Ingresso Datado De 1 Dia / 1 Parque ...",
+        data_inicial: "2026-09-22",
+        data_final: "2026-09-22",
+        acordo: "59795402",
+      },
+    ],
+    contratantes: [
+      {
+        pessoa_id: "21287851",
+        nome: "Rodrigo Escurra",
+        recibo: "1710-0000161196",
+        valor: 1102.16,
+        taxa_embarque: 0,
+        taxa_du: 0,
+        taxa_remessa: 0,
+        taxa_iof: 33.59,
+        passageiros: ["Olga Mabel Ruiz", "Valentina Escurra Bordet"],
+        telefones: [{ numero: "41 99999-0000", tipo: "Celular", contato: "" }],
+      },
+    ],
+  };
+  const corpoBase = {
+    versao_extensao: "0.12.0",
+    loja: "1710",
+    janela: { de: "2026-01-01", ate: "2026-04-10" },
+    fim_da_janela: true,
+    reservas: [reservaDisney],
+  };
+
+  it("adm_master: grava via conferencia_base com tipos_servico calculados (Disney -> ingresso)", async () => {
+    const resultado = { recebidas: 1, novas: 1, atualizadas: 0, clientes_novos: 1, vendedores_sem_vinculo: ["Alejandra Beatriz Garcia"] };
+    estado.rpc.mockResolvedValue({ data: resultado, error: null });
+    const { POST } = await import("@/app/api/conferencia/base/route");
+    const resposta = await POST(req("base", { method: "POST", token: `valido-${ADMIN}`, body: JSON.stringify(corpoBase) }));
+    expect(resposta.status).toBe(200);
+    expect(await resposta.json()).toEqual(resultado);
+    expect(estado.rpc).toHaveBeenCalledWith("conferencia_base", {
+      p_usuario: ADMIN,
+      p_payload: { ...corpoBase, reservas: [{ ...reservaDisney, tipos_servico: ["ingresso"] }] },
+    });
+  });
+
+  it("qualquer outro papel -> 403 (adm, gerente, vendedor); sem token -> 401; nada gravado", async () => {
+    const { POST } = await import("@/app/api/conferencia/base/route");
+    for (const id of [ADM, GERENTE_1710, VENDEDOR_1710]) {
+      const resposta = await POST(req("base", { method: "POST", token: `valido-${id}`, body: JSON.stringify(corpoBase) }));
+      expect(resposta.status).toBe(403);
+    }
+    expect((await POST(req("base", { method: "POST", body: JSON.stringify(corpoBase) }))).status).toBe(401);
+    expect(estado.rpc).not.toHaveBeenCalled();
+  });
+
+  it("mais de 200 reservas -> 413; loja/reservas inválidas -> 400", async () => {
+    const { POST } = await import("@/app/api/conferencia/base/route");
+    const muitas = { ...corpoBase, reservas: Array.from({ length: 201 }, (_, i) => ({ ...reservaDisney, reserva: String(i) })) };
+    expect((await POST(req("base", { method: "POST", token: `valido-${ADMIN}`, body: JSON.stringify(muitas) }))).status).toBe(413);
+    const duzentas = { ...corpoBase, reservas: Array.from({ length: 200 }, (_, i) => ({ ...reservaDisney, reserva: String(i) })) };
+    estado.rpc.mockResolvedValue({ data: {}, error: null });
+    expect((await POST(req("base", { method: "POST", token: `valido-${ADMIN}`, body: JSON.stringify(duzentas) }))).status).toBe(200);
+    estado.rpc.mockClear();
+    for (const corpo of [{ ...corpoBase, loja: "9999" }, { ...corpoBase, reservas: null }, { ...corpoBase, reservas: [1] }]) {
+      expect((await POST(req("base", { method: "POST", token: `valido-${ADMIN}`, body: JSON.stringify(corpo) }))).status).toBe(400);
+    }
+    expect(estado.rpc).not.toHaveBeenCalled();
+  });
+
+  it("idempotente: o mesmo corpo vai igual ao banco nas duas chamadas (upsert lá)", async () => {
+    estado.rpc
+      .mockResolvedValueOnce({ data: { recebidas: 1, novas: 1, atualizadas: 0, clientes_novos: 1, vendedores_sem_vinculo: [] }, error: null })
+      .mockResolvedValueOnce({ data: { recebidas: 1, novas: 0, atualizadas: 1, clientes_novos: 0, vendedores_sem_vinculo: [] }, error: null });
+    const { POST } = await import("@/app/api/conferencia/base/route");
+    const r1 = await POST(req("base", { method: "POST", token: `valido-${ADMIN}`, body: JSON.stringify(corpoBase) }));
+    const r2 = await POST(req("base", { method: "POST", token: `valido-${ADMIN}`, body: JSON.stringify(corpoBase) }));
+    expect((await r2.json()).novas).toBe(0);
+    expect((await r1.json()).novas).toBe(1);
+    expect(estado.rpc.mock.calls[0]).toEqual(estado.rpc.mock.calls[1]);
+  });
+
+  it("erro de validação do banco -> 400", async () => {
+    estado.rpc.mockResolvedValue({ data: null, error: { code: "22023", message: "Reserva sem número." } });
+    const { POST } = await import("@/app/api/conferencia/base/route");
+    const resposta = await POST(req("base", { method: "POST", token: `valido-${ADMIN}`, body: JSON.stringify(corpoBase) }));
+    expect(resposta.status).toBe(400);
+    expect(await resposta.json()).toEqual({ erro: "Reserva sem número." });
+  });
+});
+
+describe("GET /base/janelas", () => {
+  it("adm_master recebe as janelas (filtro por loja); outros papéis -> 403", async () => {
+    const { GET } = await import("@/app/api/conferencia/base/janelas/route");
+    const ok = await GET(req("base/janelas?loja=1710", { token: `valido-${ADMIN}` }));
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({
+      janelas: [{ loja: "1710", de: "2026-01-01", ate: "2026-04-10", reservas: 812, coletado_em: "2026-11-12T10:00:00Z" }],
+    });
+    expect((await GET(req("base/janelas?loja=1710", { token: `valido-${ADM}` }))).status).toBe(403);
+    expect((await GET(req("base/janelas", { token: `valido-${VENDEDOR_1710}` }))).status).toBe(403);
+    expect((await GET(req("base/janelas?loja=xx", { token: `valido-${ADMIN}` }))).status).toBe(400);
   });
 });
 
