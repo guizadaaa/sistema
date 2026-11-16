@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
 import type { FiltrosBase } from "./base-util";
+import type { OpcaoVendedorBase } from "./vendedor-opcoes";
 
 export type ClienteBase = Database["public"]["Functions"]["base_clientes_buscar"]["Returns"][number];
 export type CompraCliente = Database["public"]["Functions"]["base_clientes_compras"]["Returns"][number];
@@ -33,9 +34,10 @@ export async function listarComprasCliente(clienteId: string): Promise<CompraCli
   return data ?? [];
 }
 
-export async function listarVendedoresBase(): Promise<{ vendedor: string; loja: string }[]> {
+/** Opções do filtro "Vendedor": equipe atual (usuários ativos vinculados) e nomes de ex-vendedores. */
+export async function listarOpcoesVendedor(): Promise<OpcaoVendedorBase[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("base_clientes_vendedores", {});
+  const { data, error } = await supabase.rpc("base_clientes_vendedores_opcoes", {});
   if (error) throw error;
   return data ?? [];
 }
@@ -73,14 +75,25 @@ export async function listarJanelasColeta(): Promise<JanelaColeta[]> {
   return data ?? [];
 }
 
-/** Nomes do Systur ativos sem usuário vinculado (adm/adm_master — RLS do mapeamento). */
-export async function contarVendedoresSemVinculo(): Promise<number> {
+/** adm/adm_master: nomes do Systur sem vínculo iguais (sem acento/caixa) ao de um usuário ativo. */
+export async function contarNomesParecemAtivos(): Promise<number> {
   const supabase = await createClient();
-  const { count, error } = await supabase
-    .from("systur_vendedor_mapeamento")
-    .select("id", { count: "exact", head: true })
-    .is("usuario_id", null)
-    .eq("ativo", true);
+  const { data, error } = await supabase.rpc("systur_nomes_parecem_ativos", {});
   if (error) throw error;
-  return count ?? 0;
+  return (data ?? []).length;
+}
+
+export type CoberturaMes = Database["public"]["Functions"]["base_cobertura_meses"]["Returns"][number];
+export type CoberturaResumo = Database["public"]["Functions"]["base_cobertura_resumo"]["Returns"][number];
+
+/** adm_master: meses cobertos e resumo por loja (as funções devolvem vazio para os outros). */
+export async function listarCobertura(): Promise<{ meses: CoberturaMes[]; resumo: CoberturaResumo[] }> {
+  const supabase = await createClient();
+  const [meses, resumo] = await Promise.all([
+    supabase.rpc("base_cobertura_meses", {}),
+    supabase.rpc("base_cobertura_resumo", {}),
+  ]);
+  if (meses.error) throw meses.error;
+  if (resumo.error) throw resumo.error;
+  return { meses: meses.data ?? [], resumo: resumo.data ?? [] };
 }

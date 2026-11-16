@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useState } from "react";
 
@@ -118,11 +119,14 @@ export function VendedoresSysturLista({
   usuarios,
   loja,
   semVinculo,
+  parecemAtivos = false,
 }: {
   linhas: LinhaMapeamentoSystur[];
   usuarios: UsuarioParaVinculo[];
   loja?: FilialCvc;
   semVinculo: boolean;
+  /** ?parecem=1: só nomes sem vínculo iguais ao de um usuário ativo (aviso da aba Clientes). */
+  parecemAtivos?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -135,6 +139,14 @@ export function VendedoresSysturLista({
       <div className="flex flex-wrap items-center gap-4">
         <SeletorLoja loja={loja} />
         <FiltroSemVinculo semVinculo={semVinculo} />
+        {parecemAtivos && (
+          <span className="bg-muted inline-flex items-center gap-2 rounded-md px-2 py-1 text-sm">
+            Só nomes que parecem ser de usuários ativos
+            <Link href="/cliques/vendedores-systur" className="text-muted-foreground hover:text-foreground" aria-label="Limpar filtro">
+              ×
+            </Link>
+          </span>
+        )}
       </div>
 
       <Card>

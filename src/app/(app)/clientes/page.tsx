@@ -1,11 +1,12 @@
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import {
   buscarClientesBase,
-  contarVendedoresSemVinculo,
+  contarNomesParecemAtivos,
   listarFiltrosSalvos,
+  listarCobertura,
   listarJanelasColeta,
   listarModelosMensagem,
-  listarVendedoresBase,
+  listarOpcoesVendedor,
   POR_PAGINA,
 } from "@/lib/clientes/base";
 import { lerFiltros } from "@/lib/clientes/base-util";
@@ -33,13 +34,15 @@ export default async function ClientesPage({
   const ehAdmMaster = usuario.perfil === "adm_master";
   const lojas: FilialCvc[] = ehAdmin ? [...FILIAIS] : usuario.filial ? [usuario.filial] : [];
 
-  const [clientes, vendedores, modelos, salvos, janelas, semVinculo] = await Promise.all([
+  const [clientes, opcoesVendedor, modelos, salvos, cobertura, parecemAtivos] = await Promise.all([
     buscarClientesBase(filtros, pagina),
-    listarVendedoresBase(),
+    listarOpcoesVendedor(),
     listarModelosMensagem(),
     listarFiltrosSalvos(),
-    ehAdmMaster ? listarJanelasColeta() : Promise.resolve(null),
-    ehAdmin ? contarVendedoresSemVinculo() : Promise.resolve(0),
+    ehAdmMaster
+      ? Promise.all([listarJanelasColeta(), listarCobertura()]).then(([janelas, c]) => ({ janelas, ...c }))
+      : Promise.resolve(null),
+    ehAdmin ? contarNomesParecemAtivos() : Promise.resolve(0),
   ]);
 
   return (
@@ -49,12 +52,12 @@ export default async function ClientesPage({
       porPagina={POR_PAGINA}
       clientes={clientes}
       lojas={lojas}
-      vendedores={vendedores}
+      opcoesVendedor={opcoesVendedor}
       modelos={modelos}
       salvos={salvos}
-      janelas={janelas}
+      cobertura={cobertura}
       podeEditarModelos={ehAdmin}
-      vendedoresSemVinculo={semVinculo}
+      nomesParecemAtivos={parecemAtivos}
     />
   );
 }

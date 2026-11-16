@@ -5,14 +5,17 @@ import Link from "next/link";
 import { Megaphone, Save, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { filtrosParaQuery, type FiltrosBase } from "@/lib/clientes/base-util";
 import { TIPO_SERVICO_LABELS, TIPOS_SERVICO } from "@/lib/clientes/tipos-servico";
 import { FILIAL_LABELS } from "@/lib/labels";
+import type { OpcaoVendedorBase } from "@/lib/clientes/vendedor-opcoes";
 import type { FilialCvc } from "@/lib/supabase/types";
 
 import type { FiltroSalvo } from "@/lib/clientes/base";
+
+import { VendedorCombobox } from "./vendedor-combobox";
 
 export type AcoesFiltros = {
   buscarSugestoesDestino: (termo: string) => Promise<string[]>;
@@ -113,14 +116,14 @@ function DestinoComSugestoes({
 export function FiltrosBaseClientes({
   filtros,
   lojas,
-  vendedores,
+  opcoesVendedor,
   salvos,
   acoes,
 }: {
   filtros: FiltrosBase;
   /** Lojas que o usuário pode filtrar (só aparece com mais de uma). */
   lojas: FilialCvc[];
-  vendedores: { vendedor: string; loja: string }[];
+  opcoesVendedor: OpcaoVendedorBase[];
   salvos: FiltroSalvo[];
   acoes: AcoesFiltros;
 }) {
@@ -128,18 +131,15 @@ export function FiltrosBaseClientes({
   const [erro, setErro] = useState<string | undefined>();
   const [pendente, startTransition] = useTransition();
   const query = filtrosParaQuery(filtros);
-  const nomesVendedores = [...new Set(vendedores.map((v) => v.vendedor))];
 
   return (
-    <form method="get" className="flex flex-col gap-4" data-testid="filtros-base">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Megaphone className="size-4" /> Campanha
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-3 text-sm">
+    <form method="get" data-testid="filtros-base">
+      <Card className="gap-0 py-0">
+        <CardContent className="flex flex-col gap-3 border-b py-4">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="flex items-center gap-1.5 font-medium">
+              <Megaphone className="size-4" /> Campanha
+            </span>
             {[
               ["", "Nenhuma"],
               ["adicional", "Venda adicional"],
@@ -190,10 +190,7 @@ export function FiltrosBaseClientes({
             </div>
           )}
         </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="flex flex-col gap-3">
+        <CardContent className="flex flex-col gap-3 py-4">
           <div className="flex flex-wrap items-end gap-3">
             {lojas.length > 1 && (
               <Campo rotulo="Loja">
@@ -208,14 +205,7 @@ export function FiltrosBaseClientes({
               </Campo>
             )}
             <Campo rotulo="Vendedor">
-              <select name="vendedor" defaultValue={filtros.vendedor ?? ""} className={`${campoSelect} w-52`} aria-label="vendedor">
-                <option value="">Todos</option>
-                {nomesVendedores.map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
+              <VendedorCombobox opcoes={opcoesVendedor} valor={filtros.vendedor} />
             </Campo>
             <Campo rotulo="Destino">
               <DestinoComSugestoes name="destino" valor={filtros.destino} buscar={acoes.buscarSugestoesDestino} />

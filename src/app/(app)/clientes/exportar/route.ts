@@ -32,7 +32,9 @@ export async function GET(request: Request) {
       dataBr(c.compra_retorno),
       c.compra_valor === null ? null : Number(c.compra_valor),
       tipos(c.compra_tipos),
-      c.compra_vendedor,
+      c.compra_vendedor && c.compra_vendedor_categoria !== "atual"
+        ? `${c.compra_vendedor} (${c.compra_vendedor_categoria === "ex" ? "ex-vendedor" : "site"})`
+        : c.compra_vendedor,
       c.compra_loja,
     ])
   );

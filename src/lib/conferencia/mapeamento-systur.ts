@@ -18,7 +18,9 @@ export type LinhaMapeamentoSystur = {
 export type UsuarioParaVinculo = { id: string; nome: string; perfil: PerfilUsuario; filial: FilialCvc | null };
 
 /** Roda como o próprio admin (RLS de systur_vendedor_mapeamento). */
-export async function listarMapeamentoSystur(filtros: { loja?: FilialCvc; semVinculo?: boolean } = {}): Promise<LinhaMapeamentoSystur[]> {
+export async function listarMapeamentoSystur(
+  filtros: { loja?: FilialCvc; semVinculo?: boolean; parecemAtivos?: boolean } = {}
+): Promise<LinhaMapeamentoSystur[]> {
   const supabase = await createClient();
 
   let consulta = supabase
@@ -28,6 +30,12 @@ export async function listarMapeamentoSystur(filtros: { loja?: FilialCvc; semVin
     .order("nome_systur");
   if (filtros.loja) consulta = consulta.eq("loja", filtros.loja);
   if (filtros.semVinculo) consulta = consulta.is("usuario_id", null);
+  if (filtros.parecemAtivos) {
+    // Nomes sem vínculo iguais (sem acento/caixa) ao de um usuário ativo — o aviso da aba Clientes.
+    const { data: ids, error: erroIds } = await supabase.rpc("systur_nomes_parecem_ativos", {});
+    if (erroIds) throw erroIds;
+    consulta = consulta.in("id", (ids ?? []).map((i) => i.mapeamento_id));
+  }
 
   const [{ data, error }, { data: sugestoes, error: erroSugestoes }] = await Promise.all([
     consulta,
