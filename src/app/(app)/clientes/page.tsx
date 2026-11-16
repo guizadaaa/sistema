@@ -1,6 +1,7 @@
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import {
   buscarClientesBase,
+  contarVendedoresSemVinculo,
   listarFiltrosSalvos,
   listarJanelasColeta,
   listarModelosMensagem,
@@ -32,12 +33,13 @@ export default async function ClientesPage({
   const ehAdmMaster = usuario.perfil === "adm_master";
   const lojas: FilialCvc[] = ehAdmin ? [...FILIAIS] : usuario.filial ? [usuario.filial] : [];
 
-  const [clientes, vendedores, modelos, salvos, janelas] = await Promise.all([
+  const [clientes, vendedores, modelos, salvos, janelas, semVinculo] = await Promise.all([
     buscarClientesBase(filtros, pagina),
     listarVendedoresBase(),
     listarModelosMensagem(),
     listarFiltrosSalvos(),
     ehAdmMaster ? listarJanelasColeta() : Promise.resolve(null),
+    ehAdmin ? contarVendedoresSemVinculo() : Promise.resolve(0),
   ]);
 
   return (
@@ -52,6 +54,7 @@ export default async function ClientesPage({
       salvos={salvos}
       janelas={janelas}
       podeEditarModelos={ehAdmin}
+      vendedoresSemVinculo={semVinculo}
     />
   );
 }

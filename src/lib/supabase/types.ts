@@ -1044,7 +1044,8 @@ export interface Database {
           telefones: TelefoneCliente[];
           lojas: string[];
           qtd_viagens: number;
-          total_comprado: number;
+          /** Soma dos valores conhecidos; null quando nenhuma compra visível tem valor coletado. */
+          total_comprado: number | null;
           ultima_compra: string | null;
           proxima_viagem: string | null;
           tipos: string[];
@@ -1058,6 +1059,10 @@ export interface Database {
           compra_tipos: string[];
           total_clientes: number;
           soma_valores: number;
+          /** Compras visíveis do cliente ainda sem valor (> 0 = total parcial). */
+          compras_sem_valor: number;
+          /** Alguma compra que casou no filtro está sem valor. */
+          soma_parcial: boolean;
         }[];
       };
       base_clientes_compras: {

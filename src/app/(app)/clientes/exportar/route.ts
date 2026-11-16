@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
   const csv = montarCsv(
     [
-      "Cliente", "Telefones", "Lojas", "Viagens", "Total comprado", "Última compra", "Próxima viagem", "Tipos já comprados",
+      "Cliente", "Telefones", "Lojas", "Viagens", "Total comprado (valores coletados)", "Total parcial", "Última compra", "Próxima viagem", "Tipos já comprados",
       "Reserva (compra do filtro)", "Destino", "Embarque", "Retorno", "Valor", "Tipos da compra", "Vendedor", "Loja da compra",
     ],
     clientes.map((c) => [
@@ -21,7 +21,8 @@ export async function GET(request: Request) {
       (c.telefones ?? []).map((t) => t.numero).join(" / "),
       c.lojas.join(", "),
       c.qtd_viagens,
-      Number(c.total_comprado),
+      c.total_comprado === null ? null : Number(c.total_comprado),
+      c.compras_sem_valor > 0 ? `sim (${c.compras_sem_valor} sem valor)` : "",
       dataBr(c.ultima_compra),
       dataBr(c.proxima_viagem),
       tipos(c.tipos),

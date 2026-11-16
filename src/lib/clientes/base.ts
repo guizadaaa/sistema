@@ -72,3 +72,15 @@ export async function listarJanelasColeta(): Promise<JanelaColeta[]> {
   if (error) throw error;
   return data ?? [];
 }
+
+/** Nomes do Systur ativos sem usuário vinculado (adm/adm_master — RLS do mapeamento). */
+export async function contarVendedoresSemVinculo(): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("systur_vendedor_mapeamento")
+    .select("id", { count: "exact", head: true })
+    .is("usuario_id", null)
+    .eq("ativo", true);
+  if (error) throw error;
+  return count ?? 0;
+}

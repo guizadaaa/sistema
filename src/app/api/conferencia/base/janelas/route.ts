@@ -3,7 +3,12 @@ import { erro, json } from "@/lib/conferencia/respostas";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { FILIAIS } from "@/lib/validation/caso";
 
-/** GET ?loja=1710 -> {janelas: [{loja, de, ate, reservas, coletado_em}]} (adm_master), para o bot continuar de onde parou. */
+/**
+ * GET ?loja=1710 -> {janelas: [{loja, de, ate, reservas, coletado_em}]} (adm_master), para o bot continuar de onde parou.
+ * de/ate são datas de SAÍDA da viagem (o bot percorre as Excursões Confirmadas pela data de saída);
+ * reservas = reservas da loja coletadas pelo bot com data_viagem na janela. Janelas por data de
+ * confirmação (gravadas antes de 16/11/2026 17:00 UTC) foram apagadas em 20261116000001.
+ */
 export async function GET(request: Request) {
   const usuario = await autenticar(request);
   if (usuario instanceof Response) return usuario;

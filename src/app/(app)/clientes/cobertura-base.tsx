@@ -10,7 +10,7 @@ function dataHora(iso: string) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
 }
 
-/** adm_master: até onde o bot já coletou a base, por loja. */
+/** adm_master: até onde o bot já coletou a base, por loja (janelas por data de saída da viagem). */
 export function CoberturaBase({ janelas }: { janelas: JanelaColeta[] }) {
   return (
     <Card data-testid="cobertura">
@@ -27,13 +27,13 @@ export function CoberturaBase({ janelas }: { janelas: JanelaColeta[] }) {
             <div key={loja} className="rounded-md border p-3 text-sm">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-medium">{FILIAL_LABELS[loja]}</span>
-                <span className="text-muted-foreground text-xs">{ate ? `coletada até ${dataBr(ate)}` : "nada coletado"}</span>
+                <span className="text-muted-foreground text-xs">{ate ? `saídas até ${dataBr(ate)}` : "nada coletado"}</span>
               </div>
               {daLoja.length > 0 && (
                 <table className="mt-2 w-full text-xs">
                   <thead className="text-muted-foreground text-left">
                     <tr>
-                      <th className="font-medium">Janela</th>
+                      <th className="font-medium">Janela (data de saída)</th>
                       <th className="text-right font-medium">Reservas</th>
                       <th className="text-right font-medium">Coletada em</th>
                     </tr>
@@ -42,7 +42,7 @@ export function CoberturaBase({ janelas }: { janelas: JanelaColeta[] }) {
                     {daLoja.map((j) => (
                       <tr key={j.id}>
                         <td>
-                          {dataBr(j.de)} – {dataBr(j.ate)}
+                          Saída de {dataBr(j.de)} a {dataBr(j.ate)}
                         </td>
                         <td className="text-right">{j.reservas.toLocaleString("pt-BR")}</td>
                         <td className="text-right">{dataHora(j.coletado_em)}</td>
