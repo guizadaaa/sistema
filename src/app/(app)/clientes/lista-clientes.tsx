@@ -18,6 +18,15 @@ export type AcoesLista = {
 
 const moeda = (v: number | string | null | undefined) => (v === null || v === undefined ? "—" : formatarMoeda(Number(v)));
 
+/** Compra só da conferência: o bot ainda não coletou valor/destino. */
+function NaoColetado({ oque }: { oque: "valor" | "destino" }) {
+  return <span className="text-muted-foreground italic">{oque} não coletado</span>;
+}
+
+function Valor({ valor }: { valor: number | string | null | undefined }) {
+  return valor === null || valor === undefined ? <NaoColetado oque="valor" /> : <>{formatarMoeda(Number(valor))}</>;
+}
+
 export function TiposBadges({ tipos }: { tipos: string[] }) {
   return (
     <span className="flex flex-wrap gap-1">
@@ -80,7 +89,9 @@ function ComprasCliente({ compras }: { compras: CompraCliente[] }) {
                   {c.tipo_produto && c.descricao ? `${c.tipo_produto} · ` : ""}reserva {c.reserva}
                 </div>
               </td>
-              <td className="py-1.5 pr-3">{[c.destino_cidade, c.destino_pais].filter(Boolean).join(" · ") || "—"}</td>
+              <td className="py-1.5 pr-3">
+                {c.destino_cidade ? [c.destino_cidade, c.destino_pais].filter(Boolean).join(" · ") : <NaoColetado oque="destino" />}
+              </td>
               <td className="py-1.5 pr-3 whitespace-nowrap">
                 {dataBr(c.data_viagem) || "—"}
                 {c.data_retorno && c.data_retorno !== c.data_viagem ? ` → ${dataBr(c.data_retorno)}` : ""}
@@ -88,7 +99,9 @@ function ComprasCliente({ compras }: { compras: CompraCliente[] }) {
               <td className="py-1.5 pr-3">
                 <TiposBadges tipos={c.tipos_servico} />
               </td>
-              <td className="py-1.5 pr-3 text-right whitespace-nowrap">{moeda(c.valor)}</td>
+              <td className="py-1.5 pr-3 text-right whitespace-nowrap">
+                <Valor valor={c.valor} />
+              </td>
               <td className="py-1.5 pr-3 whitespace-nowrap">{c.recibo ?? "—"}</td>
               <td className="py-1.5 pr-3">{c.vendedor ?? "—"}</td>
               <td className="py-1.5">{c.loja}</td>
@@ -183,8 +196,18 @@ function LinhaCliente({
             <span>
               <strong className="text-foreground">{cliente.qtd_viagens}</strong> {cliente.qtd_viagens === 1 ? "viagem" : "viagens"}
             </span>
-            <span>
-              Total <strong className="text-foreground">{moeda(cliente.total_comprado)}</strong>
+            <span data-testid="total-cliente">
+              Total{" "}
+              {cliente.total_comprado === null ? (
+                <NaoColetado oque="valor" />
+              ) : (
+                <>
+                  <strong className="text-foreground">{moeda(cliente.total_comprado)}</strong>
+                  {cliente.compras_sem_valor > 0 && (
+                    <span title={`${cliente.compras_sem_valor} compra(s) ainda sem valor coletado`}> (parcial)</span>
+                  )}
+                </>
+              )}
             </span>
             <span>Última compra {dataBr(cliente.ultima_compra) || "—"}</span>
             <span>
@@ -195,8 +218,9 @@ function LinhaCliente({
           <TiposBadges tipos={cliente.tipos} />
           {mostrarCompraFiltro && (
             <p className="bg-muted/60 rounded-md px-2 py-1 text-sm" data-testid="compra-filtro">
-              Compra do filtro: <strong>{cliente.compra_destino ?? "—"}</strong> · embarque {dataBr(cliente.compra_embarque) || "—"}
-              {cliente.compra_retorno ? ` → ${dataBr(cliente.compra_retorno)}` : ""} · {moeda(cliente.compra_valor)}
+              Compra do filtro: {cliente.compra_destino ? <strong>{cliente.compra_destino}</strong> : <NaoColetado oque="destino" />} ·
+              embarque {dataBr(cliente.compra_embarque) || "—"}
+              {cliente.compra_retorno ? ` → ${dataBr(cliente.compra_retorno)}` : ""} · <Valor valor={cliente.compra_valor} />
               {cliente.compra_vendedor ? ` · ${cliente.compra_vendedor}` : ""} · {cliente.compra_loja}
             </p>
           )}
@@ -241,6 +265,7 @@ export function ListaClientes({
   );
   const total = Number(clientes[0]?.total_clientes ?? 0);
   const soma = Number(clientes[0]?.soma_valores ?? 0);
+  const somaParcial = Boolean(clientes[0]?.soma_parcial);
   const paginas = Math.max(1, Math.ceil(total / porPagina));
   const modelo = modelos.find((m) => m.id === modeloId);
   const temFiltro = Object.keys(filtros).length > 0;
@@ -252,13 +277,14 @@ export function ListaClientes({
           <p className="text-sm" data-testid="resumo">
             <strong>{total.toLocaleString("pt-BR")}</strong> {total === 1 ? "cliente" : "clientes"} ·{" "}
             {temFiltro ? "compras do filtro" : "compras"} somam <strong>{formatarMoeda(soma)}</strong>
+            {somaParcial && <span className="text-muted-foreground"> (parcial: há compras com valor não coletado)</span>}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {modelos.length > 0 && (
               <label className="flex items-center gap-1.5 text-sm">
                 <MessageSquareText className="size-4" /> Mensagem:
                 <select value={modeloId} onChange={(e) => setModeloId(e.target.value)}
-                  className="border-input h-8 rounded-md border bg-transparent px-2 text-sm" aria-label="Modelo de mensagem">
+                  className="border-input dark:bg-input/30 h-8 rounded-md border bg-transparent px-2 text-sm" aria-label="Modelo de mensagem">
                   {modelos.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.titulo}

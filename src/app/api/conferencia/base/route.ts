@@ -10,6 +10,11 @@ import { FILIAIS } from "@/lib/validation/caso";
  * reserva × contratante). tipos_servico é calculado aqui
  * (src/lib/clientes/tipos-servico.ts) e a gravação inteira acontece em
  * conferencia_base() numa transação — ver 20261113000001_base_clientes.sql.
+ *
+ * Contrato: {versao_extensao, loja, janela: {de, ate}, fim_da_janela, reservas: [...]}.
+ * janela.de/ate = datas de SAÍDA (data_viagem) percorridas pelo bot; com
+ * fim_da_janela true a janela é registrada em base_coleta_janelas, contando as
+ * reservas coletadas com data_viagem nela (20261116000001).
  */
 export async function POST(request: Request) {
   const usuario = await autenticar(request);

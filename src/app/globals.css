@@ -141,4 +141,21 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Controles nativos (select, date, scrollbar) seguem o tema: sem isto a
+     lista aberta de um <select> nativo fica com texto escuro sobre fundo
+     escuro no tema escuro. */
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+  select {
+    color: var(--foreground);
+  }
+  select option,
+  select optgroup {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
 }

@@ -7,6 +7,8 @@ set role postgres;
 -- Testes anteriores reaplicam versões antigas (policies por vendedor,
 -- _conferencia_recalcular_cliente): reaplica esta.
 \ir ../migrations/20261113000001_base_clientes.sql
+\ir ../migrations/20261116000001_base_janelas_por_saida.sql
+\ir ../migrations/20261116000002_base_valor_nao_coletado.sql
 
 create or replace function public._test_assert(p_rotulo text, p_condicao boolean)
 returns void
@@ -31,7 +33,7 @@ on conflict (id) do nothing;
 create temp table _lote37 (corpo jsonb);
 insert into _lote37 values ($json${
   "versao_extensao": "0.12.0", "loja": "1710",
-  "janela": { "de": "2026-01-01", "ate": "2026-10-31" },
+  "janela": { "de": "2026-01-01", "ate": "2027-12-31" },
   "fim_da_janela": true,
   "reservas": [
     { "reserva": "R37-1", "roteiro": "1", "excursao": "9.1.1", "vendedor_systur": "Vendedor Novo 37",
@@ -100,7 +102,7 @@ select public._test_assert('cliente criado com telefone; totais a partir das com
 
 select public._test_assert('janela registrada (fim_da_janela)',
   (select reservas = 5 and coletado_por = '00000000-0000-0000-0000-000000000004'
-   from public.base_coleta_janelas where loja = '1710' and de = '2026-01-01' and ate = '2026-10-31'));
+   from public.base_coleta_janelas where loja = '1710' and de = '2026-01-01' and ate = '2027-12-31'));
 
 -- Campos da conferência não são tocados pela coleta.
 update public.cliente_excursoes set status_voos = 'ok', avisos = '[{"x":1}]', pendencias = '[1]', apolices = '[{"n":"A1"}]'
@@ -315,6 +317,8 @@ select public._test_assert('recalcular (sobrescreve): compras acompanham',
 -- Idempotência da migration.
 select count(*) as compras_antes, sum(coalesce(valor, 0)) as valor_antes from public.cliente_compras \gset
 \ir ../migrations/20261113000001_base_clientes.sql
+\ir ../migrations/20261116000001_base_janelas_por_saida.sql
+\ir ../migrations/20261116000002_base_valor_nao_coletado.sql
 select public._test_assert('reaplicar a migration não duplica nem perde compras',
   (select count(*) = :compras_antes and sum(coalesce(valor, 0)) = :valor_antes from public.cliente_compras)
   and (select count(*) = 8 from public.cliente_compras where reserva like 'R37-%'));
