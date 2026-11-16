@@ -5,6 +5,8 @@
 export type PerfilUsuario = "vendedor" | "gerente" | "adm" | "adm_master";
 export type FilialCvc = "1710" | "1714" | "1730";
 export type TelefoneCliente = { numero: string; tipo?: string; contato?: string };
+/** Vendedor da venda (calculado na consulta): atual = usuário ativo vinculado; ex = o resto; site = vendas pela internet. */
+export type CategoriaVendedor = "atual" | "ex" | "site";
 export type FornecedorReserva = {
   categoria?: string | null;
   receptivo?: string | null;
@@ -1055,6 +1057,7 @@ export interface Database {
           compra_retorno: string | null;
           compra_valor: number | null;
           compra_vendedor: string | null;
+          compra_vendedor_categoria: CategoriaVendedor;
           compra_loja: FilialCvc;
           compra_tipos: string[];
           total_clientes: number;
@@ -1081,13 +1084,26 @@ export interface Database {
           valor: number | null;
           recibo: string | null;
           vendedor: string | null;
+          vendedor_categoria: CategoriaVendedor;
           loja: FilialCvc;
           passageiros: string[];
         }[];
       };
-      base_clientes_vendedores: {
+      base_clientes_vendedores_opcoes: {
         Args: Record<string, never>;
-        Returns: { vendedor: string; loja: FilialCvc }[];
+        Returns: { categoria: "atual" | "ex"; valor: string; rotulo: string; loja: FilialCvc | null }[];
+      };
+      systur_nomes_parecem_ativos: {
+        Args: Record<string, never>;
+        Returns: { mapeamento_id: string; nome_systur: string; loja: FilialCvc; usuario_id: string; usuario_nome: string }[];
+      };
+      base_cobertura_meses: {
+        Args: Record<string, never>;
+        Returns: { loja: FilialCvc; mes: string; coberto: boolean; reservas: number }[];
+      };
+      base_cobertura_resumo: {
+        Args: Record<string, never>;
+        Returns: { loja: FilialCvc; saida_de: string; saida_ate: string; reservas: number; ultima_coleta: string }[];
       };
       base_clientes_destinos: {
         Args: { p_termo: string; p_limite?: number };

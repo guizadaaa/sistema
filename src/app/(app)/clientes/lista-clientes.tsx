@@ -11,6 +11,7 @@ import { dataBr, filtrosParaQuery, linkWhatsapp, montarMensagem, type FiltrosBas
 import type { ClienteBase, CompraCliente, ModeloMensagem } from "@/lib/clientes/base";
 import { isTipoServico, TIPO_SERVICO_LABELS } from "@/lib/clientes/tipos-servico";
 import { formatarMoeda } from "@/lib/formatacao";
+import type { CategoriaVendedor } from "@/lib/supabase/types";
 
 export type AcoesLista = {
   buscarComprasCliente: (id: string) => Promise<{ compras?: CompraCliente[]; error?: string }>;
@@ -21,6 +22,22 @@ const moeda = (v: number | string | null | undefined) => (v === null || v === un
 /** Compra só da conferência: o bot ainda não coletou valor/destino. */
 function NaoColetado({ oque }: { oque: "valor" | "destino" }) {
   return <span className="text-muted-foreground italic">{oque} não coletado</span>;
+}
+
+/** Nome do vendedor da venda; ex-vendedor (nome do Systur) e site com etiqueta cinza. */
+export function Vendedor({ nome, categoria }: { nome: string | null; categoria: CategoriaVendedor }) {
+  if (!nome) return <>—</>;
+  return (
+    <>
+      {nome}
+      {categoria !== "atual" && " "}
+      {categoria !== "atual" && (
+        <span className="text-muted-foreground text-xs" data-testid="etiqueta-vendedor">
+          {categoria === "ex" ? "ex-vendedor" : "site"}
+        </span>
+      )}
+    </>
+  );
 }
 
 function Valor({ valor }: { valor: number | string | null | undefined }) {
@@ -103,7 +120,9 @@ function ComprasCliente({ compras }: { compras: CompraCliente[] }) {
                 <Valor valor={c.valor} />
               </td>
               <td className="py-1.5 pr-3 whitespace-nowrap">{c.recibo ?? "—"}</td>
-              <td className="py-1.5 pr-3">{c.vendedor ?? "—"}</td>
+              <td className="py-1.5 pr-3">
+                <Vendedor nome={c.vendedor} categoria={c.vendedor_categoria} />
+              </td>
               <td className="py-1.5">{c.loja}</td>
             </tr>
           ))}
@@ -221,7 +240,13 @@ function LinhaCliente({
               Compra do filtro: {cliente.compra_destino ? <strong>{cliente.compra_destino}</strong> : <NaoColetado oque="destino" />} ·
               embarque {dataBr(cliente.compra_embarque) || "—"}
               {cliente.compra_retorno ? ` → ${dataBr(cliente.compra_retorno)}` : ""} · <Valor valor={cliente.compra_valor} />
-              {cliente.compra_vendedor ? ` · ${cliente.compra_vendedor}` : ""} · {cliente.compra_loja}
+              {cliente.compra_vendedor && (
+                <>
+                  {" · "}
+                  <Vendedor nome={cliente.compra_vendedor} categoria={cliente.compra_vendedor_categoria} />
+                </>
+              )}{" "}
+              · {cliente.compra_loja}
             </p>
           )}
         </div>
