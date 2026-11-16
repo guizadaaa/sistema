@@ -289,8 +289,6 @@ export function ListaClientes({
     () => modelos.find((m) => m.chave === (filtros.camp === "recompra" ? "recompra" : "venda_adicional"))?.id ?? modelos[0]?.id ?? ""
   );
   const total = Number(clientes[0]?.total_clientes ?? 0);
-  const soma = Number(clientes[0]?.soma_valores ?? 0);
-  const somaParcial = Boolean(clientes[0]?.soma_parcial);
   const paginas = Math.max(1, Math.ceil(total / porPagina));
   const modelo = modelos.find((m) => m.id === modeloId);
   const temFiltro = Object.keys(filtros).length > 0;
@@ -300,9 +298,7 @@ export function ListaClientes({
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm" data-testid="resumo">
-            <strong>{total.toLocaleString("pt-BR")}</strong> {total === 1 ? "cliente" : "clientes"} ·{" "}
-            {temFiltro ? "compras do filtro" : "compras"} somam <strong>{formatarMoeda(soma)}</strong>
-            {somaParcial && <span className="text-muted-foreground"> (parcial: há compras com valor não coletado)</span>}
+            <strong>{total.toLocaleString("pt-BR")}</strong> {total === 1 ? "cliente" : "clientes"}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {modelos.length > 0 && (
