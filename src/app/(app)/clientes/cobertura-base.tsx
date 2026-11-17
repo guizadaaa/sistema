@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { ChevronDown, ChevronRight, Database } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { dataBr } from "@/lib/clientes/base-util";
-import type { CoberturaMes, CoberturaResumo, JanelaColeta } from "@/lib/clientes/base";
+import type { CoberturaMes, DadosCobertura, JanelaColeta } from "@/lib/clientes/base";
 import { FILIAL_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { FILIAIS } from "@/lib/validation/caso";
@@ -44,12 +44,6 @@ const CORES = [
   "bg-emerald-600 border-emerald-700 dark:bg-emerald-500 dark:border-emerald-400",
   "bg-emerald-800 border-emerald-900 dark:bg-emerald-300 dark:border-emerald-200",
 ];
-
-export function resumoLoja(loja: string, resumo?: CoberturaResumo): string {
-  const nome = FILIAL_LABELS[loja as keyof typeof FILIAL_LABELS] ?? loja;
-  if (!resumo) return `${nome} · nada coletado`;
-  return `${nome} · saídas de ${mesAno(resumo.saida_de)} a ${mesAno(resumo.saida_ate)} · ${resumo.reservas.toLocaleString("pt-BR")} reservas · última coleta ${dataHoraCurta(resumo.ultima_coleta)}`;
-}
 
 function MesesLoja({ meses }: { meses: CoberturaMes[] }) {
   if (meses.length === 0) return null;
@@ -130,69 +124,89 @@ function JanelasLoja({ janelas }: { janelas: JanelaColeta[] }) {
   );
 }
 
-/** adm_master: até onde o bot já coletou a base (por data de saída), recolhido por padrão. */
-export function CoberturaBase({
-  janelas,
-  meses,
-  resumo,
-  abertoInicial = false,
-}: {
-  janelas: JanelaColeta[];
-  meses: CoberturaMes[];
-  resumo: CoberturaResumo[];
-  abertoInicial?: boolean;
-}) {
-  const [aberto, setAberto] = useState(abertoInicial);
+export type CarregarCobertura = () => Promise<{ dados?: DadosCobertura; error?: string }>;
+
+function ConteudoCobertura({ janelas, meses, resumo }: DadosCobertura) {
+  return (
+    <CardContent className="flex flex-col gap-3 pb-4">
+      <div className="grid gap-4 md:grid-cols-3">
+        {FILIAIS.map((loja) => {
+          const r = resumo.find((x) => x.loja === loja);
+          return (
+            <div key={loja} className="flex flex-col gap-2 rounded-md border p-3" data-testid={`loja-${loja}`}>
+              <div className="text-sm font-medium">{FILIAL_LABELS[loja]}</div>
+              <p className="text-muted-foreground text-xs" data-testid="resumo-loja">
+                {r
+                  ? `saídas de ${mesAno(r.saida_de)} a ${mesAno(r.saida_ate)} · ${r.reservas.toLocaleString("pt-BR")} reservas · última coleta ${dataHoraCurta(r.ultima_coleta)}`
+                  : "nada coletado"}
+              </p>
+              <MesesLoja meses={meses.filter((m) => m.loja === loja)} />
+              <JanelasLoja janelas={janelas.filter((j) => j.loja === loja)} />
+            </div>
+          );
+        })}
+      </div>
+      <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+        <span className="border-muted-foreground/40 inline-block size-3 rounded-[3px] border border-dashed" /> não coletado
+        <span className="ml-2">menos</span>
+        {CORES.map((c) => (
+          <span key={c} className={cn("inline-block size-3 rounded-[3px] border", c)} />
+        ))}
+        <span>mais reservas</span>
+      </div>
+    </CardContent>
+  );
+}
+
+/**
+ * adm_master: até onde o bot já coletou a base (por data de saída). Recolhido
+ * por padrão e sem consulta nenhuma: os dados só são buscados ao expandir.
+ */
+export function CoberturaBase({ carregar, dadosIniciais }: { carregar: CarregarCobertura; dadosIniciais?: DadosCobertura }) {
+  const [aberto, setAberto] = useState(Boolean(dadosIniciais));
+  const [dados, setDados] = useState<DadosCobertura | undefined>(dadosIniciais);
+  const [erro, setErro] = useState<string | undefined>();
+  const [carregando, startTransition] = useTransition();
+
+  const buscar = () => {
+    setErro(undefined);
+    startTransition(async () => {
+      try {
+        const r = await carregar();
+        if (r.error || !r.dados) setErro(r.error ?? "Não foi possível carregar esta parte — tente de novo.");
+        else setDados(r.dados);
+      } catch {
+        setErro("Não foi possível carregar esta parte — tente de novo.");
+      }
+    });
+  };
 
   return (
     <Card className="gap-0 py-0" data-testid="cobertura">
       <button
         type="button"
-        onClick={() => setAberto((v) => !v)}
+        onClick={() => {
+          const abrir = !aberto;
+          setAberto(abrir);
+          if (abrir && !dados && !carregando) buscar();
+        }}
         aria-expanded={aberto}
-        className="flex w-full flex-col gap-1 px-6 py-4 text-left"
+        className="flex w-full items-center gap-2 px-6 py-4 text-left text-sm font-medium"
       >
-        <span className="flex items-center gap-2 text-sm font-medium">
-          {aberto ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-          <Database className="size-4" /> Cobertura da base
-          <span className="text-muted-foreground font-normal">· por data de saída</span>
-        </span>
-        {!aberto &&
-          FILIAIS.map((loja) => (
-            <span key={loja} className="text-muted-foreground ml-6 text-sm" data-testid="resumo-loja">
-              {resumoLoja(loja, resumo.find((r) => r.loja === loja))}
-            </span>
-          ))}
+        {aberto ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        <Database className="size-4" /> Cobertura da base
+        <span className="text-muted-foreground font-normal">· por data de saída</span>
       </button>
-      {aberto && (
-        <CardContent className="flex flex-col gap-3 pb-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            {FILIAIS.map((loja) => {
-              const r = resumo.find((x) => x.loja === loja);
-              return (
-                <div key={loja} className="flex flex-col gap-2 rounded-md border p-3" data-testid={`loja-${loja}`}>
-                  <div className="text-sm font-medium">{FILIAL_LABELS[loja]}</div>
-                  <p className="text-muted-foreground text-xs">
-                    {r
-                      ? `saídas de ${mesAno(r.saida_de)} a ${mesAno(r.saida_ate)} · ${r.reservas.toLocaleString("pt-BR")} reservas · última coleta ${dataHoraCurta(r.ultima_coleta)}`
-                      : "nada coletado"}
-                  </p>
-                  <MesesLoja meses={meses.filter((m) => m.loja === loja)} />
-                  <JanelasLoja janelas={janelas.filter((j) => j.loja === loja)} />
-                </div>
-              );
-            })}
-          </div>
-          <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-            <span className="border-muted-foreground/40 inline-block size-3 rounded-[3px] border border-dashed" /> não coletado
-            <span className="ml-2">menos</span>
-            {CORES.map((c) => (
-              <span key={c} className={cn("inline-block size-3 rounded-[3px] border", c)} />
-            ))}
-            <span>mais reservas</span>
-          </div>
-        </CardContent>
+      {aberto && carregando && <p className="text-muted-foreground px-6 pb-4 text-sm">Carregando cobertura...</p>}
+      {aberto && erro && (
+        <p className="text-muted-foreground flex items-center gap-2 px-6 pb-4 text-sm" role="alert">
+          {erro}
+          <button type="button" onClick={buscar} className="text-foreground underline underline-offset-2">
+            Tentar de novo
+          </button>
+        </p>
       )}
+      {aberto && dados && !carregando && <ConteudoCobertura {...dados} />}
     </Card>
   );
 }
