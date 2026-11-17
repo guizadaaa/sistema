@@ -4,7 +4,14 @@ import { revalidatePath } from "next/cache";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { lerFiltros } from "@/lib/clientes/base-util";
-import { listarComprasCliente, sugerirDestinos, type CompraCliente } from "@/lib/clientes/base";
+import {
+  listarCobertura,
+  listarComprasCliente,
+  listarJanelasColeta,
+  sugerirDestinos,
+  type CompraCliente,
+  type DadosCobertura,
+} from "@/lib/clientes/base";
 import { createClient } from "@/lib/supabase/server";
 
 /** Compras visíveis do cliente (expandir na lista). */
@@ -70,4 +77,17 @@ export async function salvarModeloMensagem(id: string, texto: string): Promise<{
   }
   revalidatePath("/clientes");
   return {};
+}
+
+/** Cobertura da base (adm_master): só é chamada quando o quadro é expandido. */
+export async function carregarCoberturaBase(): Promise<{ dados?: DadosCobertura; error?: string }> {
+  const usuario = await requireCurrentUser();
+  if (usuario.perfil !== "adm_master") return { error: "Só o adm_master vê a cobertura." };
+  try {
+    const [janelas, cobertura] = await Promise.all([listarJanelasColeta(), listarCobertura()]);
+    return { dados: { janelas, ...cobertura } };
+  } catch (erro) {
+    console.error("Erro ao carregar a cobertura da base:", erro);
+    return { error: "Não foi possível carregar esta parte — tente de novo." };
+  }
 }

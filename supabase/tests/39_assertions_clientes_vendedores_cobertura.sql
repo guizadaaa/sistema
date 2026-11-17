@@ -7,6 +7,7 @@ set role postgres;
 
 -- Testes anteriores reaplicam versões antigas de base_clientes_buscar.
 \ir ../migrations/20261116000003_clientes_vendedores_cobertura.sql
+\ir ../migrations/20261116000004_clientes_desempenho.sql
 
 create or replace function public._test_assert(p_rotulo text, p_condicao boolean)
 returns void

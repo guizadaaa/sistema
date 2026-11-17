@@ -86,6 +86,8 @@ export async function contarNomesParecemAtivos(): Promise<number> {
 export type CoberturaMes = Database["public"]["Functions"]["base_cobertura_meses"]["Returns"][number];
 export type CoberturaResumo = Database["public"]["Functions"]["base_cobertura_resumo"]["Returns"][number];
 
+export type DadosCobertura = { janelas: JanelaColeta[]; meses: CoberturaMes[]; resumo: CoberturaResumo[] };
+
 /** adm_master: meses cobertos e resumo por loja (as funções devolvem vazio para os outros). */
 export async function listarCobertura(): Promise<{ meses: CoberturaMes[]; resumo: CoberturaResumo[] }> {
   const supabase = await createClient();
