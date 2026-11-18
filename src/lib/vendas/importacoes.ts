@@ -3,15 +3,15 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
-export type ImportacaoVendas = Database["public"]["Functions"]["listar_vendas_importacoes"]["Returns"][number];
+export type ImportacaoDoDia = Database["public"]["Functions"]["vendas_importacoes_calendario"]["Returns"][number];
 
 /**
- * Últimas importações por loja, com o status do aviso de cada usuário. A
- * função filtra por perfil: adm/adm_master todas as lojas, gerente a própria.
+ * Importações entre duas datas (dia de São Paulo). A função filtra por
+ * perfil: adm/adm_master todas as lojas, gerente a própria.
  */
-export async function listarImportacoesVendas(porFilial = 5): Promise<ImportacaoVendas[]> {
+export async function listarImportacoesCalendario(de: string, ate: string): Promise<ImportacaoDoDia[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("listar_vendas_importacoes", { p_por_filial: porFilial });
+  const { data, error } = await supabase.rpc("vendas_importacoes_calendario", { p_de: de, p_ate: ate });
   if (error) throw error;
   return data ?? [];
 }

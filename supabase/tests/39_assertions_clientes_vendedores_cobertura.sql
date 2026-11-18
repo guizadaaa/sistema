@@ -8,6 +8,7 @@ set role postgres;
 -- Testes anteriores reaplicam versões antigas de base_clientes_buscar.
 \ir ../migrations/20261116000003_clientes_vendedores_cobertura.sql
 \ir ../migrations/20261116000004_clientes_desempenho.sql
+\ir ../migrations/20261118000002_mapeamento_sem_ativo.sql
 
 create or replace function public._test_assert(p_rotulo text, p_condicao boolean)
 returns void
@@ -121,10 +122,10 @@ select public._test_assert('reativada: volta para a Equipe atual',
   exists (select 1 from public.base_clientes_vendedores_opcoes() where valor = 'usuario:39000000-0000-0000-0000-000000000001'));
 reset role;
 
--- Mapeamento marcado inativo: vira ex.
-update public.systur_vendedor_mapeamento set ativo = false where loja = '1730' and nome_systur = 'Bia Atual Trinta';
+-- Desvincular (o "ativo" do mapeamento saiu em 20261118000002): vira ex.
+update public.systur_vendedor_mapeamento set usuario_id = null where loja = '1730' and nome_systur = 'Bia Atual Trinta';
 set role authenticated;
-select public._test_assert('nome inativo no mapeamento: ex-vendedor',
+select public._test_assert('nome desvinculado: ex-vendedor',
   (select compra_vendedor_categoria = 'ex' from public.base_clientes_buscar('{"loja":"1730"}', 50, 0) where nome = 'Cliente Da Bia'));
 reset role;
 reset request.jwt.claim.sub;

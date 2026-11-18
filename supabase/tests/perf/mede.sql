@@ -69,6 +69,19 @@ begin
   perform perf.medir(p_usuario, 'clientes (tabela, RLS)', $q$select count(*) from public.clientes$q$);
   perform perf.medir(p_usuario, 'compras (tabela, RLS)', $q$select count(*) from public.cliente_compras$q$);
   perform perf.medir(p_usuario, 'reservas (tabela, RLS)', $q$select count(*) from public.cliente_excursoes$q$);
+  -- Vendas → Importar (calendário) e Vendas (mês de referência).
+  perform perf.medir(p_usuario, 'calendário: importações do mês', format($q$select * from public.vendas_importacoes_calendario(%L, %L)$q$,
+    date_trunc('month', current_date)::date, (date_trunc('month', current_date) + interval '1 month - 1 day')::date));
+  perform perf.medir(p_usuario, 'calendário: feriados do mês (tabela)', format($q$select * from public.feriados where data between %L and %L$q$,
+    date_trunc('month', current_date)::date, (date_trunc('month', current_date) + interval '1 month - 1 day')::date));
+  perform perf.medir(p_usuario, 'vendas: referência por loja', $q$select * from public.vendas_referencia_lojas()$q$);
+  perform perf.medir(p_usuario, 'vendas: resumo do mês (Todas)', format($q$select * from public.vendas_resumo_periodos(%L)$q$,
+    (select jsonb_agg(jsonb_build_object('filial', loja, 'de', date_trunc('month', ate)::date, 'ate', ate)) from public.vendas_referencia_lojas())));
+  perform perf.medir(p_usuario, 'vendas: resumo de 1 ano (período escolhido)', format($q$select * from public.vendas_resumo_periodos(%L)$q$,
+    (select jsonb_agg(jsonb_build_object('filial', l, 'de', current_date - 365, 'ate', current_date)) from unnest(array['1710', '1714', '1730']) l)));
+  perform perf.medir(p_usuario, 'vendas: lista do mês (tabela)', format($q$select id, filial, data_venda, pagante, produto, valor_total from public.vendas_com_vendedor where filial = '1710' and data_venda between %L and current_date order by data_venda desc$q$,
+    date_trunc('month', current_date)::date));
+  perform perf.medir(p_usuario, 'mapeamento: grupos (Vendedores Systur)', $q$select * from public.systur_mapeamento_grupos(null)$q$);
   perform perf.medir(p_usuario, 'exportar CSV (até 20 mil)', $q$select * from public.base_clientes_buscar('{}', 20000, 0)$q$);
 end;
 $$;

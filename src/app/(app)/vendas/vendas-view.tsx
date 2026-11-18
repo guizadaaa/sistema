@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatarDataBr, formatarMoeda } from "@/lib/formatacao";
 import { FILIAL_LABELS } from "@/lib/labels";
 import type { ResumoVendedor, VendaListada } from "@/lib/vendas/listar";
+import type { PeriodoVendas } from "@/lib/vendas/mes-referencia";
 import { FILIAIS } from "@/lib/validation/caso";
 import type { FilialCvc } from "@/lib/supabase/types";
 
@@ -67,6 +68,22 @@ export function FiltroPeriodo({
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+/** Período mostrado (mês de referência de cada filial ou período escolhido). */
+export function RotuloPeriodo({ periodo, voltarHref }: { periodo: PeriodoVendas; voltarHref: string }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2" data-testid="rotulo-periodo">
+      <p className={periodo.alertas.length > 0 ? "text-sm font-medium text-amber-700 dark:text-amber-400" : "text-sm font-medium"}>
+        {periodo.rotulo}
+      </p>
+      {periodo.manual && (
+        <Button asChild variant="outline" size="sm">
+          <Link href={voltarHref}>Voltar ao mês atual</Link>
+        </Button>
+      )}
+    </div>
   );
 }
 

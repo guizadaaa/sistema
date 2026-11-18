@@ -8,6 +8,7 @@
 set role postgres;
 
 \ir ../migrations/20261116000004_clientes_desempenho.sql
+\ir ../migrations/20261118000002_mapeamento_sem_ativo.sql
 
 create or replace function public._test_assert(p_rotulo text, p_condicao boolean)
 returns void
