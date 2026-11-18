@@ -103,8 +103,10 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('41000000-0000-0000-0000-0000000000a1', 'lia41@teste.com', '{"nome_completo":"Lia Equipe Atual","perfil":"gerente","filial":"1730"}'),
   ('41000000-0000-0000-0000-0000000000a2', 'rui41@teste.com', '{"nome_completo":"Rui Parece Ativo","perfil":"gerente","filial":"1730"}')
 on conflict (id) do nothing;
-insert into public.systur_vendedor_mapeamento (nome_systur, loja) values
-  ('Lia Equipe Atual', '1730'), ('RUI PARECE ATIVO', '1730'), ('Zé Saiu Sem Vínculo', '1730'), ('Agencia De Viagens Cvc Tur - Internet', '1730')
+-- Bloqueados (como se o adm tivesse desvinculado): sem isso o vínculo
+-- automático (20261119000001) já vincularia os nomes iguais aos usuários.
+insert into public.systur_vendedor_mapeamento (nome_systur, loja, vinculo_automatico_bloqueado) values
+  ('Lia Equipe Atual', '1730', true), ('RUI PARECE ATIVO', '1730', true), ('Zé Saiu Sem Vínculo', '1730', false), ('Agencia De Viagens Cvc Tur - Internet', '1730', false)
 on conflict do nothing;
 
 create temp table _grupos41 (fase text, nome_systur text, grupo text, parece_ativo boolean);

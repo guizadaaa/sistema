@@ -32,7 +32,12 @@ begin
 end;
 $$;
 
--- Usuárias que batem com nomes do Systur (sugestão de vínculo).
+-- Usuárias que batem com nomes do Systur (sugestão de vínculo). Os nomes
+-- ficam bloqueados para o vínculo automático (20261119000001, testado no
+-- 42): aqui o assunto é a sugestão e o vínculo feito pelo admin.
+update public.systur_vendedor_mapeamento set vinculo_automatico_bloqueado = true
+where loja = '1710' and nome_systur in ('Rosane Karina Dos Santos', 'Tálita Marcela Gomes Damas');
+
 insert into auth.users (id, email, raw_user_meta_data) values
   ('30000000-0000-0000-0000-0000000000a1', 'rosane@teste.com', '{"nome_completo":"Rosane Karina dos Santos","perfil":"vendedor","filial":"1710"}'),
   ('30000000-0000-0000-0000-0000000000a2', 'talita@teste.com', '{"nome_completo":"TALITA Marcela Gomes Damas","perfil":"vendedor","filial":"1710"}')

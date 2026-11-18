@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { filtrosParaQuery, lerFiltros, linkWhatsapp, montarCsv, montarMensagem } from "./base-util";
+import { filtrosParaQuery, lerFiltros, linkFastzap, linkWhatsapp, montarCsv, montarMensagem, telefoneNacional } from "./base-util";
 
 describe("lerFiltros", () => {
   it("aceita só chaves e valores válidos", () => {
@@ -56,5 +56,22 @@ describe("mensagem, WhatsApp e CSV", () => {
     expect(montarCsv(["nome", "valor"], [["Ana; Bia", 10.5], ['Diz "oi"', null]])).toBe(
       '﻿nome;valor\r\n"Ana; Bia";10,5\r\n"Diz ""oi""";\r\n'
     );
+  });
+});
+
+describe("FastZap", () => {
+  it("telefone nacional sem o 55", () => {
+    expect(telefoneNacional("41 99280-1401")).toBe("41992801401");
+    expect(telefoneNacional("+55 (41) 99280-1401")).toBe("41992801401");
+    expect(telefoneNacional("4121091700")).toBe("4121091700");
+    expect(telefoneNacional("9280-1401")).toBeNull();
+  });
+  it("link com nome e telefone no #, legível de volta (acentos)", () => {
+    const url = linkFastzap("José Ávila", "41 99280-1401")!;
+    expect(url.startsWith("https://gestor.fastzap.chat/chat/#aura-novo=")).toBe(true);
+    const b64 = decodeURIComponent(url.split("aura-novo=")[1]);
+    const json = JSON.parse(decodeURIComponent(escape(atob(b64))));
+    expect(json).toEqual({ nome: "José Ávila", telefone: "41992801401" });
+    expect(linkFastzap("X", "123")).toBeNull();
   });
 });

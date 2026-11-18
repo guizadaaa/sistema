@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight, Copy, Download, MessageCircle, MessageSquare
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { dataBr, filtrosParaQuery, linkWhatsapp, montarMensagem, type FiltrosBase } from "@/lib/clientes/base-util";
+import { dataBr, filtrosParaQuery, linkFastzap, telefoneNacional, montarMensagem, type FiltrosBase } from "@/lib/clientes/base-util";
 import type { ClienteBase, CompraCliente, ModeloMensagem } from "@/lib/clientes/base";
 import { isTipoServico, TIPO_SERVICO_LABELS } from "@/lib/clientes/tipos-servico";
 import { formatarMoeda } from "@/lib/formatacao";
@@ -195,14 +195,25 @@ function LinhaCliente({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             {(cliente.telefones ?? []).length === 0 && <span className="text-muted-foreground">Sem telefone</span>}
             {(cliente.telefones ?? []).map((t) => {
-              const wa = linkWhatsapp(t.numero);
+              const fz = linkFastzap(cliente.nome, t.numero);
+              const nacional = telefoneNacional(t.numero);
               return (
                 <span key={t.numero} className="inline-flex items-center gap-0.5">
                   <span>{t.numero}</span>
                   <BotaoCopiar texto={t.numero} rotulo={`Copiar ${t.numero}`} />
-                  {wa && (
+                  {fz && (
                     <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-green-700 dark:text-green-400">
-                      <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${t.numero}`} title="Abrir no WhatsApp">
+                      {/* Abre o FastZap numa aba só ("fastzap"); a extensão Aura Conferência preenche o novo
+                          atendimento. O número também vai para a área de transferência (sem extensão: colar). */}
+                      <a
+                        href={fz}
+                        target="fastzap"
+                        aria-label={`Atender ${t.numero} no FastZap`}
+                        title="Abrir no FastZap (novo atendimento já preenchido)"
+                        onClick={() => {
+                          if (nacional) void navigator.clipboard?.writeText(nacional).catch(() => undefined);
+                        }}
+                      >
                         <MessageCircle className="size-3.5" />
                       </a>
                     </Button>

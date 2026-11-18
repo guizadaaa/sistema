@@ -9,15 +9,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ehDiaUtil, feriadoDoDia, type Feriado } from "@/lib/feriados/dia-util";
 import { FILIAL_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
-import { mesAnterior, mesSeguinte, nomeMes, resumoDoMes, semanasDoMes, statusMarcador, type StatusMarcador } from "@/lib/vendas/calendario";
+import {
+  cobrancaDesde,
+  mesAnterior,
+  mesSeguinte,
+  nomeMes,
+  resumoDoMes,
+  semanasDoMes,
+  statusMarcador,
+  type HistoricoLoja,
+  type StatusMarcador,
+} from "@/lib/vendas/calendario";
 import type { ImportacaoDoDia } from "@/lib/vendas/importacoes";
 
 const DIAS_SEMANA = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 const COR: Record<StatusMarcador, string> = {
   importou: "bg-emerald-500 border-emerald-600",
+  reconstruido: "bg-emerald-500 border-emerald-600",
+  presumido: "bg-emerald-500/45 border-emerald-600",
   atrasada: "bg-red-500 border-red-600",
   vazio: "bg-transparent border-muted-foreground/40",
+  antes: "bg-muted-foreground/25 border-muted-foreground/40",
+};
+
+const TITULO: Record<StatusMarcador, string> = {
+  importou: "importou",
+  reconstruido: "importou (antes do registro diário — pelas vendas gravadas no dia)",
+  presumido: "antes do registro diário — considerado importado",
+  atrasada: "dia útil sem importação",
+  vazio: "sem cobrança",
+  antes: "antes da primeira importação da loja — sem cobrança",
 };
 
 function hora(iso: string) {
@@ -36,7 +58,9 @@ function Marcador({ status, titulo }: { status: StatusMarcador; titulo: string }
 /**
  * Importações do mês: cada dia mostra um marcador por loja (sempre na mesma
  * ordem). Verde = importou; vermelho = dia útil passado sem importação;
- * vazio = futuro, hoje antes de importar, fim de semana ou feriado.
+ * vazio = futuro, hoje antes de importar, fim de semana ou feriado. Sem
+ * cobrança retroativa: cinza antes da primeira importação da loja e verde
+ * claro ("presumido") antes do início do registro diário.
  */
 export function CalendarioImportacoes({
   mes,
@@ -44,18 +68,24 @@ export function CalendarioImportacoes({
   lojas,
   feriados,
   importacoes,
+  historicos = {},
 }: {
   mes: string;
   hoje: string;
   lojas: string[];
   feriados: Feriado[];
   importacoes: ImportacaoDoDia[];
+  /** Por loja (vendas_calendario_historico); sem entrada = regra atual. */
+  historicos?: Record<string, HistoricoLoja>;
 }) {
   const [selecionado, setSelecionado] = useState<string | null>(hoje.startsWith(mes) ? hoje : null);
   const porDia = new Map<string, ImportacaoDoDia[]>();
   for (const i of importacoes) porDia.set(i.dia, [...(porDia.get(i.dia) ?? []), i]);
   const importouEm = (dia: string, loja: string) => (porDia.get(dia) ?? []).some((i) => i.filial === loja);
-  const resumo = resumoDoMes(mes, lojas, hoje, importouEm, feriados);
+  const resumo = resumoDoMes(mes, lojas, hoje, importouEm, feriados, (l) => historicos[l]);
+  // Início da cobrança dentro do mês (registro diário / primeira importação).
+  const desdes = lojas.map((l) => cobrancaDesde(historicos[l])).filter((d): d is string => !!d && d > `${mes}-01` && d.startsWith(mes));
+  const desdeNoMes = desdes.length ? desdes.sort()[0] : null;
   const doDia = selecionado ? porDia.get(selecionado) ?? [] : [];
   const visaoGeral = lojas.length > 1 ? null : lojas[0];
 
@@ -87,6 +117,9 @@ export function CalendarioImportacoes({
               <Marcador status="importou" titulo="importou" /> importou
             </span>
             <span className="flex items-center gap-1">
+              <Marcador status="presumido" titulo={TITULO.presumido} /> antes do registro diário
+            </span>
+            <span className="flex items-center gap-1">
               <Marcador status="atrasada" titulo="dia útil sem importação" /> dia útil sem importação
             </span>
             <span className="flex items-center gap-1">
@@ -105,6 +138,7 @@ export function CalendarioImportacoes({
               </strong>
             </span>
           ))}
+          {desdeNoMes && <span className="text-muted-foreground"> (conta a partir de {diaMes(desdeNoMes)}: antes disso, sem cobrança retroativa)</span>}
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -144,9 +178,8 @@ export function CalendarioImportacoes({
                   )}
                   <span className="mt-auto flex gap-1">
                     {lojas.map((loja) => {
-                      const status = statusMarcador(dia, loja, hoje, importouEm(dia, loja), feriados);
-                      const titulo =
-                        status === "importou" ? `${loja}: importou` : status === "atrasada" ? `${loja}: dia útil sem importação` : `${loja}: sem cobrança`;
+                      const status = statusMarcador(dia, loja, hoje, importouEm(dia, loja), feriados, historicos[loja]);
+                      const titulo = `${loja}: ${TITULO[status]}`;
                       return <Marcador key={loja} status={status} titulo={titulo} />;
                     })}
                   </span>

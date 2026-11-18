@@ -6,34 +6,73 @@ import { useActionState, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { casaMostrar, contarPorMostrar, OPCOES_MOSTRAR, type MostrarMapeamento } from "@/lib/conferencia/mapeamento-grupos";
-import type { LinhaMapeamentoSystur, UsuarioParaVinculo } from "@/lib/conferencia/mapeamento-systur";
+import type { LinhaMapeamentoSystur } from "@/lib/conferencia/mapeamento-systur";
+import { agruparUsuariosParaVinculo, type UsuarioParaVinculo } from "@/lib/conferencia/usuarios-vinculo";
 import { FILIAL_LABELS, PERFIL_LABELS } from "@/lib/labels";
 import type { FilialCvc } from "@/lib/supabase/types";
 
 import { SeletorLoja } from "../seletor-loja";
-import { salvarVinculoSystur, type SalvarVinculoSysturState } from "./actions";
+import { salvarVinculoSystur, vincularSugestoesFortes, type SalvarVinculoSysturState, type VincularSugestoesState } from "./actions";
 
 const initialState: SalvarVinculoSysturState = {};
+const initialLote: VincularSugestoesState = {};
 
 function rotuloUsuario(u: UsuarioParaVinculo): string {
   return `${u.nome} · ${PERFIL_LABELS[u.perfil]}${u.filial ? ` ${u.filial}` : ""}`;
 }
 
+function ItensUsuarios({ usuarios }: { usuarios: UsuarioParaVinculo[] }) {
+  return usuarios.map((u) => (
+    <SelectItem key={u.id} value={u.id}>
+      {rotuloUsuario(u)}
+    </SelectItem>
+  ));
+}
+
 function LinhaVendedor({ linha, usuarios }: { linha: LinhaMapeamentoSystur; usuarios: UsuarioParaVinculo[] }) {
   const [state, formAction, isPending] = useActionState(salvarVinculoSystur, initialState);
-  // Sem vínculo: já vem com a sugestão selecionada — o admin confirma em Salvar.
-  const [usuarioId, setUsuarioId] = useState(linha.usuarioId ?? linha.sugestaoUsuarioId ?? "nenhum");
-  const sugerido = !linha.usuarioId && linha.sugestaoUsuarioId !== null && usuarioId === linha.sugestaoUsuarioId;
+  const [usuarioId, setUsuarioId] = useState(linha.usuarioId ?? "nenhum");
+  const grupos = agruparUsuariosParaVinculo(
+    usuarios,
+    linha.loja,
+    linha.sugestoes.map((s) => s.usuarioId)
+  );
+  // "Outras lojas" começa recolhido — aberto se o selecionado estiver lá.
+  const [verOutras, setVerOutras] = useState(() => grupos.outrasLojas.some((u) => u.id === usuarioId));
+  const outrasVisivel = verOutras || grupos.outrasLojas.some((u) => u.id === usuarioId);
+  const forte = linha.sugestoes.find((s) => s.forte);
+  const nomeForte = forte ? usuarios.find((u) => u.id === forte.usuarioId)?.nome : null;
 
   return (
-    <tr className="border-b align-top last:border-0">
+    <tr className="border-b align-top last:border-0" data-testid="linha-systur" data-nome={linha.nomeSystur}>
       <td className="py-2 pr-4">
         <div className="flex flex-col gap-1">
-          <span>{linha.nomeSystur}</span>
+          <span className="flex flex-wrap items-center gap-1.5">
+            {linha.nomeSystur}
+            {linha.usuarioId && linha.vinculoOrigem === "automatico" && (
+              <span
+                className="text-muted-foreground rounded border px-1 text-[10px] leading-4"
+                title="Vinculado automaticamente: nome igual ao de um único usuário ativo"
+                data-testid="rotulo-automatico"
+              >
+                automático
+              </span>
+            )}
+          </span>
           {linha.grupo === "site" && <Badge variant="outline" className="w-fit">Site / Internet</Badge>}
           {linha.grupo === "sem_vinculo" && (
             <Badge variant="outline" className="w-fit">
@@ -59,17 +98,47 @@ function LinhaVendedor({ linha, usuarios }: { linha: LinhaMapeamentoSystur; usua
                   // Vinculado a usuário inativo (ex-vendedor): continua visível para trocar ou desvincular.
                   <SelectItem value={linha.usuarioId}>{linha.usuarioNome ?? "Usuário"} · inativo</SelectItem>
                 )}
-                {usuarios.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {rotuloUsuario(u)}
-                  </SelectItem>
-                ))}
+                {grupos.sugeridos.length > 0 && (
+                  <SelectGroup data-testid="grupo-sugeridos">
+                    <SelectSeparator />
+                    <SelectLabel>Sugeridos</SelectLabel>
+                    <ItensUsuarios usuarios={grupos.sugeridos} />
+                  </SelectGroup>
+                )}
+                {grupos.daLoja.length > 0 && (
+                  <SelectGroup>
+                    <SelectSeparator />
+                    <SelectLabel>Loja {linha.loja}</SelectLabel>
+                    <ItensUsuarios usuarios={grupos.daLoja} />
+                  </SelectGroup>
+                )}
+                {grupos.outrasLojas.length > 0 && (
+                  <SelectGroup>
+                    <SelectSeparator />
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground flex w-full items-center justify-between px-2 py-1.5 text-left text-xs font-medium"
+                      aria-expanded={outrasVisivel}
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={() => setVerOutras((v) => !v)}
+                    >
+                      Outras lojas ({grupos.outrasLojas.length})
+                      <span aria-hidden>{outrasVisivel ? "▾" : "▸"}</span>
+                    </button>
+                    {outrasVisivel && <ItensUsuarios usuarios={grupos.outrasLojas} />}
+                  </SelectGroup>
+                )}
+                {grupos.administracao.length > 0 && (
+                  <SelectGroup>
+                    <SelectSeparator />
+                    <SelectLabel>Administração</SelectLabel>
+                    <ItensUsuarios usuarios={grupos.administracao} />
+                  </SelectGroup>
+                )}
               </SelectContent>
             </Select>
-            {sugerido && (
-              <span className="text-muted-foreground text-xs">
-                Sugestão pelo nome{linha.sugestaoOrigem === "linkly" ? " (já mapeado no Linkly)" : ""} — confirme em Salvar.
-              </span>
+            {forte && nomeForte && usuarioId === "nenhum" && (
+              <span className="text-muted-foreground text-xs">Sugestão: {nomeForte}</span>
             )}
           </div>
           <Input
@@ -82,11 +151,68 @@ function LinhaVendedor({ linha, usuarios }: { linha: LinhaMapeamentoSystur; usua
           <Button type="submit" size="sm" variant="outline" disabled={isPending}>
             {isPending ? "Salvando..." : "Salvar"}
           </Button>
+          {forte && !linha.usuarioId && (
+            <Button type="submit" size="sm" name="aceitar" value={forte.usuarioId} disabled={isPending}>
+              Aceitar sugestão
+            </Button>
+          )}
           {state.error && <p className="text-destructive w-full text-xs">{state.error}</p>}
           {state.ok && !isPending && <p className="text-muted-foreground w-full text-xs">Salvo.</p>}
         </form>
       </td>
     </tr>
+  );
+}
+
+type ItemLote = { id: string; nomeSystur: string; loja: FilialCvc; usuarioNome: string };
+
+/** Confirmação com a lista antes de vincular (só sugestões fortes de nomes não bloqueados). */
+function VincularSugestoesFortes({ itens }: { itens: ItemLote[] }) {
+  const [aberto, setAberto] = useState(false);
+  const [state, formAction, isPending] = useActionState(vincularSugestoesFortes, initialLote);
+
+  return (
+    <>
+      <Button type="button" variant="outline" size="sm" disabled={itens.length === 0} onClick={() => setAberto(true)}>
+        Vincular todas as sugestões fortes ({itens.length})
+      </Button>
+      {state.vinculados !== undefined && !isPending && (
+        <span className="text-muted-foreground text-xs">{state.vinculados} nome(s) vinculado(s).</span>
+      )}
+      <Dialog open={aberto} onOpenChange={setAberto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vincular {itens.length} sugestões fortes?</DialogTitle>
+            <DialogDescription>Cada nome do Systur passa para o usuário abaixo (vínculo manual).</DialogDescription>
+          </DialogHeader>
+          <form
+            action={(fd) => {
+              formAction(fd);
+              setAberto(false);
+            }}
+            className="flex flex-col gap-3"
+          >
+            <ul className="max-h-80 overflow-y-auto text-sm" data-testid="lista-sugestoes-fortes">
+              {itens.map((i) => (
+                <li key={i.id} className="border-b py-1 last:border-0">
+                  <input type="hidden" name="id" value={i.id} />
+                  {i.nomeSystur} <span className="text-muted-foreground">({i.loja})</span> → <strong>{i.usuarioNome}</strong>
+                </li>
+              ))}
+            </ul>
+            {state.error && <p className="text-destructive text-xs">{state.error}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setAberto(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isPending}>
+                Vincular {itens.length}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -142,18 +268,26 @@ export function VendedoresSysturLista({
   const totais = contarPorMostrar(linhas);
   const visiveis = linhas.filter((l) => casaMostrar(l, mostrar));
   const rotulo = OPCOES_MOSTRAR.find((o) => o.valor === mostrar)?.rotulo ?? "";
+  const nomePorId = new Map(usuarios.map((u) => [u.id, u.nome]));
+  const fortes: ItemLote[] = linhas.flatMap((l) => {
+    const forte = l.sugestoes.find((s) => s.forte);
+    const usuarioNome = forte && nomePorId.get(forte.usuarioId);
+    return !l.usuarioId && !l.vinculoBloqueado && usuarioNome ? [{ id: l.id, nomeSystur: l.nomeSystur, loja: l.loja, usuarioNome }] : [];
+  });
 
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-semibold">Vendedores do Systur</h1>
       <p className="text-muted-foreground text-sm">
-        Nomes que aparecem na lista de excursões do Systur (extensão Aura Conferência). Nome novo entra aqui sem vínculo;
-        ao vincular, as reservas e recibos já recebidos com esse nome passam para o usuário.
+        Nomes que aparecem na lista de excursões do Systur (extensão Aura Conferência). Nome novo igual ao de um único
+        usuário ativo é vinculado automaticamente; os demais entram sem vínculo. Ao vincular, as reservas e recibos já
+        recebidos com esse nome passam para o usuário.
       </p>
 
       <div className="flex flex-wrap items-center gap-4">
         <SeletorLoja loja={loja} />
         <FiltroMostrar mostrar={mostrar} totais={totais} />
+        <VincularSugestoesFortes itens={fortes} />
       </div>
 
       <Card>

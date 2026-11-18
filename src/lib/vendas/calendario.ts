@@ -3,11 +3,52 @@
 
 import { ehDiaUtil, ehFimDeSemana, type Feriado } from "@/lib/feriados/dia-util";
 
-export type StatusMarcador = "importou" | "atrasada" | "vazio";
+export type StatusMarcador = "importou" | "reconstruido" | "presumido" | "atrasada" | "vazio" | "antes";
 
-/** Verde: importou naquele dia. Vermelho: dia útil já passado sem importação. Vazio: o resto. */
-export function statusMarcador(dia: string, loja: string, hoje: string, importou: boolean, feriados: Feriado[]): StatusMarcador {
+/**
+ * Marcos da loja (vendas_calendario_historico). Datas YYYY-MM-DD.
+ * - primeiraImportacao: antes dela nada é cobrado (cinza).
+ * - inicioRegistro: início do registro diário (vendas_importacoes, PR #62);
+ *   antes dele os dias úteis ficam verdes "presumido".
+ * - diasReconstruidos: dias até inicioRegistro (inclusive) em que a loja
+ *   gravou venda nova — importação real reconstruída por importado_em.
+ */
+export type HistoricoLoja = {
+  primeiraImportacao: string | null;
+  inicioRegistro: string | null;
+  diasReconstruidos: string[];
+};
+
+/** A partir de que dia a loja é cobrada: "" = sempre (sem histórico); null = ainda não é. */
+export function cobrancaDesde(historico: HistoricoLoja | undefined): string | null {
+  if (!historico) return "";
+  const { primeiraImportacao: p, inicioRegistro: r } = historico;
+  if (!p || !r) return null;
+  return p > r ? p : r;
+}
+
+/**
+ * Verde: importou naquele dia. Vermelho: dia útil já passado sem importação.
+ * Sem histórico (undefined): só essa regra. Com histórico: cinza ("antes")
+ * antes da primeira importação da loja; verde "presumido" nos dias úteis
+ * entre ela e o início do registro diário ("reconstruido" quando a venda
+ * gravada mostra a importação real); depois, a regra de sempre.
+ */
+export function statusMarcador(
+  dia: string,
+  loja: string,
+  hoje: string,
+  importou: boolean,
+  feriados: Feriado[],
+  historico?: HistoricoLoja
+): StatusMarcador {
   if (importou) return "importou";
+  if (historico) {
+    const { primeiraImportacao: p, inicioRegistro: r, diasReconstruidos } = historico;
+    if (!p || dia < p) return "antes";
+    if ((!r || dia <= r) && diasReconstruidos.includes(dia)) return "reconstruido";
+    if (!r || dia < r) return dia < hoje && ehDiaUtil(dia, loja, feriados) ? "presumido" : "vazio";
+  }
   if (dia < hoje && ehDiaUtil(dia, loja, feriados)) return "atrasada";
   return "vazio";
 }
@@ -50,18 +91,34 @@ export type ResumoMes = {
 
 /**
  * Por loja: "em dia" = dias úteis (da loja) até hoje com importação; esperados
- * = dias úteis já passados + hoje, se hoje já houve importação.
+ * = dias úteis já passados + hoje, se hoje já houve importação. Com histórico,
+ * só conta a partir de cobrancaDesde (início do registro diário ou primeira
+ * importação, o que vier depois): dias presumidos ficam fora de X e de Y.
  */
-export function resumoDoMes(mes: string, lojas: string[], hoje: string, importouEm: (dia: string, loja: string) => boolean, feriados: Feriado[]): ResumoMes {
+export function resumoDoMes(
+  mes: string,
+  lojas: string[],
+  hoje: string,
+  importouEm: (dia: string, loja: string) => boolean,
+  feriados: Feriado[],
+  historicoDe: (loja: string) => HistoricoLoja | undefined = () => undefined
+): ResumoMes {
   const dias = semanasDoMes(mes).flat().filter((d): d is string => d !== null);
   const naoMunicipais = feriados.filter((f) => f.abrangencia !== "municipal");
   const diasUteis = dias.filter((d) => !ehFimDeSemana(d) && !naoMunicipais.some((f) => f.data === d)).length;
   return {
     diasUteis,
     porLoja: lojas.map((loja) => {
-      const uteis = dias.filter((d) => ehDiaUtil(d, loja, feriados));
-      const esperados = uteis.filter((d) => d < hoje || (d === hoje && importouEm(d, loja)));
-      return { loja, esperados: esperados.length, emDia: esperados.filter((d) => importouEm(d, loja)).length };
+      const historico = historicoDe(loja);
+      const desde = cobrancaDesde(historico);
+      if (desde === null) return { loja, esperados: 0, emDia: 0 };
+      const emDia = (d: string) => {
+        const status = statusMarcador(d, loja, hoje, importouEm(d, loja), feriados, historico);
+        return status === "importou" || status === "reconstruido";
+      };
+      const uteis = dias.filter((d) => d >= desde && ehDiaUtil(d, loja, feriados));
+      const esperados = uteis.filter((d) => d < hoje || (d === hoje && emDia(d)));
+      return { loja, esperados: esperados.length, emDia: esperados.filter(emDia).length };
     }),
   };
 }

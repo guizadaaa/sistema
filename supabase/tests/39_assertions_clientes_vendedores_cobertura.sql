@@ -31,6 +31,12 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-0000-0000-000000000006', 'adm@teste.com', '{"nome_completo":"Adm","perfil":"adm"}')
 on conflict (id) do nothing;
 
+-- Bloqueados para o vínculo automático (20261119000001, testado no 42): aqui
+-- os nomes iguais a usuários ativos precisam continuar sem vínculo.
+insert into public.systur_vendedor_mapeamento (nome_systur, loja, vinculo_automatico_bloqueado) values
+  ('Bia Atual Trinta', '1730', true), ('CAIO SEM VINCULO', '1730', true)
+on conflict do nothing;
+
 select public.conferencia_base('00000000-0000-0000-0000-000000000004', $json${
   "loja": "1730", "janela": { "de": "2026-01-01", "ate": "2026-03-31" }, "fim_da_janela": true,
   "reservas": [

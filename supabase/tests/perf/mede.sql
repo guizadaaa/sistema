@@ -82,6 +82,9 @@ begin
   perform perf.medir(p_usuario, 'vendas: lista do mês (tabela)', format($q$select id, filial, data_venda, pagante, produto, valor_total from public.vendas_com_vendedor where filial = '1710' and data_venda between %L and current_date order by data_venda desc$q$,
     date_trunc('month', current_date)::date));
   perform perf.medir(p_usuario, 'mapeamento: grupos (Vendedores Systur)', $q$select * from public.systur_mapeamento_grupos(null)$q$);
+  perform perf.medir(p_usuario, 'mapeamento: sugestões (Vendedores Systur)', $q$select * from public.systur_sugestoes_usuarios(null)$q$);
+  perform perf.medir(p_usuario, 'calendário: histórico do mês (sem cobrança retroativa)', format($q$select * from public.vendas_calendario_historico(%L, %L)$q$,
+    date_trunc('month', current_date)::date, (date_trunc('month', current_date) + interval '1 month - 1 day')::date));
   perform perf.medir(p_usuario, 'exportar CSV (até 20 mil)', $q$select * from public.base_clientes_buscar('{}', 20000, 0)$q$);
 end;
 $$;
