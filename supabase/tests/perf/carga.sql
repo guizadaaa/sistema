@@ -154,6 +154,23 @@ update public.base_coleta_janelas j set reservas = (
   select count(*) from public.cliente_excursoes e
   where e.loja = j.loja and e.coletado_em is not null and e.data_viagem between j.de and j.ate);
 
+-- Vendas (planilhas) de ~1 ano nas 3 lojas e importações diárias (dias úteis).
+insert into public.vendedores_mapeamento (nome_planilha, filial, usuario_id, criado_por)
+select 'VENDEDOR CARGA ' || g, (array['1710', '1714', '1730'])[1 + g % 3]::filial_cvc,
+  ('c0000000-0000-0000-0000-' || lpad(g::text, 12, '0'))::uuid, '00000000-0000-0000-0000-000000000004'
+from generate_series(1, 50) g;
+
+insert into public.vendas_importadas (filial, venda_numero, vendedor_nome_planilha, data_venda, pagante, produto, valor_total, importado_por)
+select (array['1710', '1714', '1730'])[1 + g % 3]::filial_cvc, 9000000 + g,
+  'VENDEDOR CARGA ' || (1 + (g * 7) % 50), current_date - (g % 365), 'Pagante ' || g, 'Produto ' || (g % 40),
+  200 + (g * 37) % 9000, '00000000-0000-0000-0000-000000000004'
+from generate_series(1, 36000) g;
+
+insert into public.vendas_importacoes (filial, ate, importado_por, importado_em)
+select l::filial_cvc, d::date - 1, '00000000-0000-0000-0000-000000000004', d + interval '12 hours'
+from unnest(array['1710', '1714', '1730']) l, generate_series(current_date - 365, current_date, interval '1 day') d
+where extract(isodow from d) < 6 and random() > 0.05;
+
 set session_replication_role = origin;
 
 -- Filtros salvos e modelos com texto (a página lê os dois).
@@ -166,4 +183,6 @@ select
   (select count(*) from public.cliente_compras) as compras,
   (select count(*) from public.clientes) as clientes,
   (select count(*) from public.systur_vendedor_mapeamento) as nomes_mapeamento,
+  (select count(*) from public.vendas_importadas) as vendas,
+  (select count(*) from public.vendas_importacoes) as importacoes,
   (select max(length(f ->> 'servico')) from public.cliente_excursoes, jsonb_array_elements(fornecedores) f where reserva like 'C%') as maior_servico;

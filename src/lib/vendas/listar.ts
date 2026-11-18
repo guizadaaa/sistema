@@ -12,33 +12,42 @@ export type VendaListada = {
   valorTotal: number;
 };
 
+export type PeriodoFilial = { filial: string; de: string; ate: string };
+
 export type FiltrosVendas = {
   vendedorId?: string;
-  filial?: FilialCvc;
-  dataInicio?: string;
-  dataFim?: string;
+  /** Cada filial no próprio período (mês de referência ou período escolhido). */
+  periodos: PeriodoFilial[];
 };
 
 const DATA_FORMATO = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Filtro PostgREST: (filial = X e data no período de X) ou (filial = Y …). */
+function filtroPeriodos(periodos: PeriodoFilial[]): string {
+  return periodos
+    .filter((p) => DATA_FORMATO.test(p.de) && DATA_FORMATO.test(p.ate))
+    .map((p) => `and(filial.eq.${p.filial},data_venda.gte.${p.de},data_venda.lte.${p.ate})`)
+    .join(",");
+}
+
 /**
  * RLS (vendas_com_vendedor) já decide o escopo por perfil — vendedor: só as
- * próprias; gerente: só a própria filial; adm/adm_master: tudo. Os filtros
+ * próprias; gerente: só a própria filial; adm/adm_master: tudo. Os períodos
  * aqui são só um recorte dentro do que a RLS já libera, nunca uma forma de
  * ver mais do que o perfil já pode (mesmo princípio de listarCasos).
  */
-export async function listarVendas(filtros: FiltrosVendas = {}): Promise<VendaListada[]> {
+export async function listarVendas(filtros: FiltrosVendas): Promise<VendaListada[]> {
+  const ou = filtroPeriodos(filtros.periodos);
+  if (!ou) return [];
   const supabase = await createClient();
 
   let query = supabase
     .from("vendas_com_vendedor")
     .select("id, filial, data_venda, pagante, produto, valor_total")
+    .or(ou)
     .order("data_venda", { ascending: false });
 
   if (filtros.vendedorId) query = query.eq("usuario_id", filtros.vendedorId);
-  if (filtros.filial) query = query.eq("filial", filtros.filial);
-  if (filtros.dataInicio && DATA_FORMATO.test(filtros.dataInicio)) query = query.gte("data_venda", filtros.dataInicio);
-  if (filtros.dataFim && DATA_FORMATO.test(filtros.dataFim)) query = query.lte("data_venda", filtros.dataFim);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -64,27 +73,18 @@ export type ResumoVendedor = {
 /**
  * Visão agregada por vendedor pra gerente/adm/adm_master — só linhas já
  * resolvidas (usuario_id preenchido); pendentes de vínculo têm sua própria
- * tela (Mapeamento), não fazem sentido misturados aqui (não há "vendedor"
- * pra agrupar).
+ * tela (Mapeamento). Soma no banco (vendas_resumo_periodos, security invoker
+ * sobre a mesma view), cada filial no seu período.
  */
-export async function listarResumoPorVendedor(filtros: Pick<FiltrosVendas, "filial" | "dataInicio" | "dataFim"> = {}): Promise<ResumoVendedor[]> {
+export async function listarResumoPorVendedor(periodos: PeriodoFilial[]): Promise<ResumoVendedor[]> {
+  if (periodos.length === 0) return [];
   const supabase = await createClient();
 
-  let query = supabase
-    .from("vendas_com_vendedor")
-    .select("filial, usuario_id, valor_total")
-    .not("usuario_id", "is", null);
-
-  if (filtros.filial) query = query.eq("filial", filtros.filial);
-  if (filtros.dataInicio && DATA_FORMATO.test(filtros.dataInicio)) query = query.gte("data_venda", filtros.dataInicio);
-  if (filtros.dataFim && DATA_FORMATO.test(filtros.dataFim)) query = query.lte("data_venda", filtros.dataFim);
-
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc("vendas_resumo_periodos", { p_periodos: periodos });
   if (error) throw error;
 
-  const linhas = (data ?? []) as { filial: FilialCvc; usuario_id: string; valor_total: number }[];
-  const idsVendedores = [...new Set(linhas.map((l) => l.usuario_id))];
-
+  const linhas = data ?? [];
+  const idsVendedores = linhas.map((l) => l.usuario_id);
   const { data: usuarios, error: usuariosError } =
     idsVendedores.length > 0
       ? await supabase.from("usuarios").select("id, nome_completo").in("id", idsVendedores)
@@ -92,23 +92,21 @@ export async function listarResumoPorVendedor(filtros: Pick<FiltrosVendas, "fili
   if (usuariosError) throw usuariosError;
 
   const nomesPorId = new Map((usuarios ?? []).map((u) => [u.id, u.nome_completo]));
+  return linhas
+    .map((l) => ({
+      vendedorId: l.usuario_id,
+      vendedorNome: nomesPorId.get(l.usuario_id) ?? "—",
+      filial: l.filial,
+      quantidade: Number(l.quantidade),
+      total: Number(l.total),
+    }))
+    .sort((a, b) => a.vendedorNome.localeCompare(b.vendedorNome, "pt-BR"));
+}
 
-  const acumulado = new Map<string, ResumoVendedor>();
-  for (const linha of linhas) {
-    const atual = acumulado.get(linha.usuario_id);
-    if (!atual) {
-      acumulado.set(linha.usuario_id, {
-        vendedorId: linha.usuario_id,
-        vendedorNome: nomesPorId.get(linha.usuario_id) ?? "—",
-        filial: linha.filial,
-        quantidade: 1,
-        total: linha.valor_total,
-      });
-    } else {
-      atual.quantidade++;
-      atual.total += linha.valor_total;
-    }
-  }
-
-  return [...acumulado.values()].sort((a, b) => a.vendedorNome.localeCompare(b.vendedorNome, "pt-BR"));
+/** Última importação ("vendas até") de cada loja visível. */
+export async function listarReferenciasVendas(): Promise<{ loja: string; ate: string | null; importadoEm: string | null }[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("vendas_referencia_lojas", {});
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ loja: r.loja, ate: r.ate, importadoEm: r.importado_em }));
 }

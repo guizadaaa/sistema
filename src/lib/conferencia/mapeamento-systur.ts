@@ -3,13 +3,19 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { FilialCvc, PerfilUsuario } from "@/lib/supabase/types";
 
+import type { GrupoMapeamento } from "./mapeamento-grupos";
+
 export type LinhaMapeamentoSystur = {
   id: string;
   nomeSystur: string;
   loja: FilialCvc;
   usuarioId: string | null;
+  /** Nome do usuário vinculado (também quando ele está inativo). */
+  usuarioNome: string | null;
   loginSystur: string | null;
-  ativo: boolean;
+  grupo: GrupoMapeamento;
+  /** Sem vínculo e com o mesmo nome (sem acento/caixa) de um usuário ativo. */
+  pareceAtivo: boolean;
   /** Sugestão de vínculo (nome igual sem acento/caixa) — só quando usuarioId é null. */
   sugestaoUsuarioId: string | null;
   sugestaoOrigem: "usuario" | "linkly" | null;
@@ -17,28 +23,12 @@ export type LinhaMapeamentoSystur = {
 
 export type UsuarioParaVinculo = { id: string; nome: string; perfil: PerfilUsuario; filial: FilialCvc | null };
 
-/** Roda como o próprio admin (RLS de systur_vendedor_mapeamento). */
-export async function listarMapeamentoSystur(
-  filtros: { loja?: FilialCvc; semVinculo?: boolean; parecemAtivos?: boolean } = {}
-): Promise<LinhaMapeamentoSystur[]> {
+/** Todos os nomes (da loja, se informada) com o grupo da tela; o filtro "Mostrar" é aplicado na tela. */
+export async function listarMapeamentoSystur(filtros: { loja?: FilialCvc } = {}): Promise<LinhaMapeamentoSystur[]> {
   const supabase = await createClient();
 
-  let consulta = supabase
-    .from("systur_vendedor_mapeamento")
-    .select("id, nome_systur, loja, usuario_id, login_systur, ativo")
-    .order("loja")
-    .order("nome_systur");
-  if (filtros.loja) consulta = consulta.eq("loja", filtros.loja);
-  if (filtros.semVinculo) consulta = consulta.is("usuario_id", null);
-  if (filtros.parecemAtivos) {
-    // Nomes sem vínculo iguais (sem acento/caixa) ao de um usuário ativo — o aviso da aba Clientes.
-    const { data: ids, error: erroIds } = await supabase.rpc("systur_nomes_parecem_ativos", {});
-    if (erroIds) throw erroIds;
-    consulta = consulta.in("id", (ids ?? []).map((i) => i.mapeamento_id));
-  }
-
   const [{ data, error }, { data: sugestoes, error: erroSugestoes }] = await Promise.all([
-    consulta,
+    supabase.rpc("systur_mapeamento_grupos", { p_loja: filtros.loja ?? null }),
     supabase.rpc("systur_sugestoes_vinculo"),
   ]);
   if (error) throw error;
@@ -50,8 +40,10 @@ export async function listarMapeamentoSystur(
     nomeSystur: m.nome_systur,
     loja: m.loja,
     usuarioId: m.usuario_id,
+    usuarioNome: m.usuario_nome,
     loginSystur: m.login_systur,
-    ativo: m.ativo,
+    grupo: m.grupo,
+    pareceAtivo: m.parece_ativo,
     sugestaoUsuarioId: sugestaoPorId.get(m.id)?.usuario_id ?? null,
     sugestaoOrigem: sugestaoPorId.get(m.id)?.origem ?? null,
   }));

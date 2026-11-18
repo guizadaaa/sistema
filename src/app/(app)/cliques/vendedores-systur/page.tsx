@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { resolverLoja } from "@/lib/linkly/loja";
+import { lerMostrar } from "@/lib/conferencia/mapeamento-grupos";
 import { listarMapeamentoSystur, listarUsuariosParaVinculo } from "@/lib/conferencia/mapeamento-systur";
 
 import { CliquesTabs } from "../cliques-tabs";
@@ -16,18 +17,17 @@ export default async function VendedoresSysturPage({
   // Escrita em systur_vendedor_mapeamento: auth_is_admin() (RLS + grant por coluna).
   if (usuario.perfil !== "adm" && usuario.perfil !== "adm_master") redirect("/cliques");
 
-  // ?loja= e ?sem_vinculo=1 ficam na URL — o revalidatePath do salvar mantém os filtros.
+  // ?loja= e ?mostrar= ficam na URL — o revalidatePath do salvar mantém os filtros.
   const sp = await searchParams;
   const loja = resolverLoja(sp.loja);
-  const semVinculo = sp.sem_vinculo === "1";
-  const parecemAtivos = sp.parecem === "1";
+  const mostrar = lerMostrar(sp);
 
-  const [linhas, usuarios] = await Promise.all([listarMapeamentoSystur({ loja, semVinculo, parecemAtivos }), listarUsuariosParaVinculo()]);
+  const [linhas, usuarios] = await Promise.all([listarMapeamentoSystur({ loja }), listarUsuariosParaVinculo()]);
 
   return (
     <div className="flex flex-col gap-4">
       <CliquesTabs ativo="systur" perfil={usuario.perfil} loja={loja} />
-      <VendedoresSysturLista linhas={linhas} usuarios={usuarios} loja={loja} semVinculo={semVinculo} parecemAtivos={parecemAtivos} />
+      <VendedoresSysturLista linhas={linhas} usuarios={usuarios} loja={loja} mostrar={mostrar} />
     </div>
   );
 }

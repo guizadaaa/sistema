@@ -11,6 +11,7 @@ set role postgres;
 \ir ../migrations/20261116000002_base_valor_nao_coletado.sql
 \ir ../migrations/20261116000003_clientes_vendedores_cobertura.sql
 \ir ../migrations/20261116000004_clientes_desempenho.sql
+\ir ../migrations/20261118000002_mapeamento_sem_ativo.sql
 
 create or replace function public._test_assert(p_rotulo text, p_condicao boolean)
 returns void
@@ -323,6 +324,7 @@ select count(*) as compras_antes, sum(coalesce(valor, 0)) as valor_antes from pu
 \ir ../migrations/20261116000002_base_valor_nao_coletado.sql
 \ir ../migrations/20261116000003_clientes_vendedores_cobertura.sql
 \ir ../migrations/20261116000004_clientes_desempenho.sql
+\ir ../migrations/20261118000002_mapeamento_sem_ativo.sql
 select public._test_assert('reaplicar a migration não duplica nem perde compras',
   (select count(*) = :compras_antes and sum(coalesce(valor, 0)) = :valor_antes from public.cliente_compras)
   and (select count(*) = 8 from public.cliente_compras where reserva like 'R37-%'));

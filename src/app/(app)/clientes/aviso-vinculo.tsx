@@ -38,7 +38,7 @@ export function AvisoVinculo({ quantidade }: { quantidade: number }) {
       <Info className="size-4 shrink-0" />
       <span>
         {quantidade} nome(s) do Systur parecem ser de usuários ativos e não estão vinculados.{" "}
-        <Link href="/cliques/vendedores-systur?parecem=1" className="text-foreground underline underline-offset-2">
+        <Link href="/cliques/vendedores-systur?mostrar=parecem" className="text-foreground underline underline-offset-2">
           Vincular
         </Link>
       </span>

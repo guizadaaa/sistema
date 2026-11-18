@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 export type SalvarVinculoSysturState = { error?: string; ok?: boolean };
 
 /**
- * Atualiza vínculo, login e ativo de um nome do Systur. RLS
+ * Atualiza vínculo e login de um nome do Systur. RLS
  * (systur_vendedor_mapeamento_update) exige auth_is_admin(); o gate aqui
  * evita o round-trip. O trigger systur_mapeamento_propagar_vinculo leva o
  * vínculo para reservas/recibos/clientes já recebidos.
@@ -33,7 +33,6 @@ export async function salvarVinculoSystur(
     .update({
       usuario_id: usuarioId && usuarioId !== "nenhum" ? usuarioId : null,
       login_systur: loginSystur || null,
-      ativo: formData.get("ativo") === "1",
     })
     .eq("id", id)
     .select("id");

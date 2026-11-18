@@ -575,6 +575,32 @@ export interface Database {
       };
       // Uma linha por importação de vendas bem-sucedida (20261112000002).
       // Só notificar_vendas_importadas grava.
+      feriados: {
+        Row: {
+          id: string;
+          data: string;
+          nome: string;
+          abrangencia: "nacional" | "estadual_PR" | "municipal";
+          filial: FilialCvc | null;
+          facultativo: boolean;
+          criado_em: string;
+        };
+        Insert: {
+          data: string;
+          nome: string;
+          abrangencia: "nacional" | "estadual_PR" | "municipal";
+          filial?: FilialCvc | null;
+          facultativo?: boolean;
+        };
+        Update: Partial<{
+          data: string;
+          nome: string;
+          abrangencia: "nacional" | "estadual_PR" | "municipal";
+          filial: FilialCvc | null;
+          facultativo: boolean;
+        }>;
+        Relationships: [];
+      };
       vendas_importacoes: {
         Row: {
           id: string;
@@ -603,8 +629,9 @@ export interface Database {
           atualizado_em: string;
         };
         Insert: never;
-        // Admin só altera vínculo, login e ativo (grant por coluna).
-        Update: { usuario_id?: string | null; login_systur?: string | null; ativo?: boolean };
+        // Admin só altera vínculo e login (grant por coluna). "ativo" sem uso
+        // desde 20261118000002 (sempre true) — remover depois.
+        Update: { usuario_id?: string | null; login_systur?: string | null };
         Relationships: [];
       };
       clientes: {
@@ -947,6 +974,38 @@ export interface Database {
       };
     };
     Functions: {
+      vendas_referencia_lojas: {
+        Args: Record<string, never>;
+        Returns: { loja: FilialCvc; ate: string | null; importado_em: string | null }[];
+      };
+      vendas_resumo_periodos: {
+        Args: { p_periodos: { filial: string; de: string; ate: string }[] };
+        Returns: { usuario_id: string; filial: FilialCvc; quantidade: number; total: number }[];
+      };
+      systur_mapeamento_grupos: {
+        Args: { p_loja?: FilialCvc | null };
+        Returns: {
+          id: string;
+          nome_systur: string;
+          loja: FilialCvc;
+          usuario_id: string | null;
+          login_systur: string | null;
+          usuario_nome: string | null;
+          grupo: "atual" | "sem_vinculo" | "site";
+          parece_ativo: boolean;
+        }[];
+      };
+      vendas_importacoes_calendario: {
+        Args: { p_de: string; p_ate: string };
+        Returns: {
+          id: string;
+          filial: FilialCvc;
+          dia: string;
+          importado_em: string;
+          ate: string;
+          importado_por_nome: string;
+        }[];
+      };
       notificar_vendas_importadas: {
         Args: { p_filial: FilialCvc; p_ate: string };
         Returns: number;

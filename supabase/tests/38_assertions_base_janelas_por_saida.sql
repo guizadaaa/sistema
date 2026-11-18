@@ -61,6 +61,7 @@ select public._test_assert('reenvio da janela recalcula; reserva só do sync nã
 \ir ../migrations/20261116000002_base_valor_nao_coletado.sql
 \ir ../migrations/20261116000003_clientes_vendedores_cobertura.sql
 \ir ../migrations/20261116000004_clientes_desempenho.sql
+\ir ../migrations/20261118000002_mapeamento_sem_ativo.sql
 
 -- Cliente com uma compra do bot (valor) e outra só do sync (sem valor).
 select public.conferencia_sync('00000000-0000-0000-0000-000000000004', $json${
