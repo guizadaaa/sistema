@@ -1,9 +1,19 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import type { FilialCvc, PerfilUsuario } from "@/lib/supabase/types";
+import type { FilialCvc } from "@/lib/supabase/types";
 
 import type { GrupoMapeamento } from "./mapeamento-grupos";
+import type { UsuarioParaVinculo } from "./usuarios-vinculo";
+
+export type { UsuarioParaVinculo } from "./usuarios-vinculo";
+
+export type SugestaoVinculo = {
+  usuarioId: string;
+  criterio: "nome_igual" | "nome_sobrenome" | "parecido";
+  /** 1º lugar único por nome igual ou primeiro nome + sobrenome. */
+  forte: boolean;
+};
 
 export type LinhaMapeamentoSystur = {
   id: string;
@@ -16,12 +26,12 @@ export type LinhaMapeamentoSystur = {
   grupo: GrupoMapeamento;
   /** Sem vínculo e com o mesmo nome (sem acento/caixa) de um usuário ativo. */
   pareceAtivo: boolean;
-  /** Sugestão de vínculo (nome igual sem acento/caixa) — só quando usuarioId é null. */
-  sugestaoUsuarioId: string | null;
-  sugestaoOrigem: "usuario" | "linkly" | null;
+  vinculoOrigem: "automatico" | "manual" | null;
+  /** Um adm desvinculou: o vínculo automático não volta. */
+  vinculoBloqueado: boolean;
+  /** Até 3 sugestões (só sem vínculo), na ordem do ranking. */
+  sugestoes: SugestaoVinculo[];
 };
-
-export type UsuarioParaVinculo = { id: string; nome: string; perfil: PerfilUsuario; filial: FilialCvc | null };
 
 /** Todos os nomes (da loja, se informada) com o grupo da tela; o filtro "Mostrar" é aplicado na tela. */
 export async function listarMapeamentoSystur(filtros: { loja?: FilialCvc } = {}): Promise<LinhaMapeamentoSystur[]> {
@@ -29,12 +39,18 @@ export async function listarMapeamentoSystur(filtros: { loja?: FilialCvc } = {})
 
   const [{ data, error }, { data: sugestoes, error: erroSugestoes }] = await Promise.all([
     supabase.rpc("systur_mapeamento_grupos", { p_loja: filtros.loja ?? null }),
-    supabase.rpc("systur_sugestoes_vinculo"),
+    supabase.rpc("systur_sugestoes_usuarios", { p_loja: filtros.loja ?? null }),
   ]);
   if (error) throw error;
   if (erroSugestoes) throw erroSugestoes;
 
-  const sugestaoPorId = new Map((sugestoes ?? []).map((s) => [s.mapeamento_id, s]));
+  const sugestoesPorId = new Map<string, SugestaoVinculo[]>();
+  for (const s of [...(sugestoes ?? [])].sort((a, b) => a.posicao - b.posicao)) {
+    const lista = sugestoesPorId.get(s.mapeamento_id) ?? [];
+    lista.push({ usuarioId: s.usuario_id, criterio: s.criterio, forte: s.forte });
+    sugestoesPorId.set(s.mapeamento_id, lista);
+  }
+
   return (data ?? []).map((m) => ({
     id: m.id,
     nomeSystur: m.nome_systur,
@@ -44,8 +60,9 @@ export async function listarMapeamentoSystur(filtros: { loja?: FilialCvc } = {})
     loginSystur: m.login_systur,
     grupo: m.grupo,
     pareceAtivo: m.parece_ativo,
-    sugestaoUsuarioId: sugestaoPorId.get(m.id)?.usuario_id ?? null,
-    sugestaoOrigem: sugestaoPorId.get(m.id)?.origem ?? null,
+    vinculoOrigem: m.vinculo_origem,
+    vinculoBloqueado: m.vinculo_automatico_bloqueado,
+    sugestoes: m.usuario_id ? [] : (sugestoesPorId.get(m.id) ?? []),
   }));
 }
 

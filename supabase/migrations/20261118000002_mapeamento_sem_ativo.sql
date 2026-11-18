@@ -544,7 +544,10 @@ $$;
 
 
 -- Nomes do mapeamento com o grupo da tela de vendedores (só adm/adm_master).
-create or replace function public.systur_mapeamento_grupos(p_loja filial_cvc default null)
+-- drop: 20261119000001 acrescenta colunas ao retorno (reaplicar esta migration nos testes).
+drop function if exists public.systur_mapeamento_grupos(filial_cvc);
+
+create function public.systur_mapeamento_grupos(p_loja filial_cvc default null)
 returns table (
   id uuid,
   nome_systur text,

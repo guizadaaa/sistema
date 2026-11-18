@@ -625,6 +625,8 @@ export interface Database {
           usuario_id: string | null;
           login_systur: string | null;
           ativo: boolean;
+          vinculo_origem: "automatico" | "manual" | null;
+          vinculo_automatico_bloqueado: boolean;
           criado_em: string;
           atualizado_em: string;
         };
@@ -993,6 +995,31 @@ export interface Database {
           usuario_nome: string | null;
           grupo: "atual" | "sem_vinculo" | "site";
           parece_ativo: boolean;
+          vinculo_origem: "automatico" | "manual" | null;
+          vinculo_automatico_bloqueado: boolean;
+        }[];
+      };
+      systur_sugestoes_usuarios: {
+        Args: { p_loja?: FilialCvc | null };
+        Returns: {
+          mapeamento_id: string;
+          usuario_id: string;
+          criterio: "nome_igual" | "nome_sobrenome" | "parecido";
+          posicao: number;
+          forte: boolean;
+        }[];
+      };
+      systur_vincular_sugestoes_fortes: {
+        Args: { p_ids: string[] };
+        Returns: number;
+      };
+      vendas_calendario_historico: {
+        Args: { p_de: string; p_ate: string };
+        Returns: {
+          filial: FilialCvc;
+          primeira_importacao: string | null;
+          inicio_registro: string | null;
+          dias_reconstruidos: string[];
         }[];
       };
       vendas_importacoes_calendario: {

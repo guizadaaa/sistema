@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { listarFeriados, paraFeriado } from "@/lib/feriados/listar";
 import { hojeSaoPaulo } from "@/lib/linkly/mes";
-import { listarImportacoesCalendario } from "@/lib/vendas/importacoes";
+import { listarHistoricoCalendario, listarImportacoesCalendario } from "@/lib/vendas/importacoes";
 import { FILIAIS } from "@/lib/validation/caso";
 
 import { VendasTabs } from "../vendas-tabs";
@@ -33,13 +33,24 @@ export default async function ImportarVendasPage({
   const ate = `${mes}-${String(new Date(Date.UTC(a, m, 0)).getUTCDate()).padStart(2, "0")}`;
   const lojas: string[] = ehAdmin ? [...FILIAIS] : usuario.filial ? [usuario.filial] : [];
 
-  const [feriados, importacoes] = await Promise.all([listarFeriados(de, ate), listarImportacoesCalendario(de, ate)]);
+  const [feriados, importacoes, historicos] = await Promise.all([
+    listarFeriados(de, ate),
+    listarImportacoesCalendario(de, ate),
+    listarHistoricoCalendario(de, ate),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
       <VendasTabs ativo="importar" perfil={usuario.perfil} />
       {ehAdmin && <ImportarForm />}
-      <CalendarioImportacoes mes={mes} hoje={hoje} lojas={lojas} feriados={feriados.map(paraFeriado)} importacoes={importacoes} />
+      <CalendarioImportacoes
+        mes={mes}
+        hoje={hoje}
+        lojas={lojas}
+        feriados={feriados.map(paraFeriado)}
+        importacoes={importacoes}
+        historicos={historicos}
+      />
     </div>
   );
 }
