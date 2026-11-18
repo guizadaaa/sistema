@@ -88,6 +88,28 @@ export function linkWhatsapp(numero: string): string | null {
   return `https://wa.me/${digitos.length <= 11 ? `55${digitos}` : digitos}`;
 }
 
+/** Telefone nacional (DDD + número, sem o 55), como o FastZap pede no campo "Telefone". */
+export function telefoneNacional(numero: string): string | null {
+  let d = numero.replace(/\D/g, "");
+  if ((d.length === 12 || d.length === 13) && d.startsWith("55")) d = d.slice(2);
+  return d.length === 10 || d.length === 11 ? d : null;
+}
+
+/**
+ * Abre o FastZap (CRM de WhatsApp) com o pedido de novo atendimento no "#".
+ * A extensão Aura Conferência lê o pedido, abre "Novo Atendimento" e preenche nome, telefone e origem
+ * "Loja" — quem clica em "Iniciar" é o vendedor. Sem a extensão, abre só o FastZap.
+ */
+export function linkFastzap(nome: string, numero: string): string | null {
+  const telefone = telefoneNacional(numero);
+  if (!telefone) return null;
+  const json = JSON.stringify({ nome: nome.trim(), telefone });
+  const b64 = typeof btoa === "function"
+    ? btoa(unescape(encodeURIComponent(json)))
+    : Buffer.from(json, "utf8").toString("base64");
+  return `https://gestor.fastzap.chat/chat/#aura-novo=${encodeURIComponent(b64)}`;
+}
+
 export type DadosMensagem = { nome: string; destino?: string | null; vendedor?: string | null; data_embarque?: string | null };
 
 /** Troca {nome}, {destino}, {vendedor} e {data_embarque} (dd/mm/aaaa). */
