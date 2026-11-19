@@ -7,7 +7,19 @@ import { Megaphone, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { filtrosParaQuery, type FiltrosBase } from "@/lib/clientes/base-util";
+import {
+  atalhosEmbarque,
+  atalhosRecompra,
+  CAMPOS_FRASE,
+  estadoFrase,
+  filtrosParaQuery,
+  mostraViagemFutura,
+  segundoPeriodo,
+  type Atalho,
+  type Campanha,
+  type ChaveFiltro,
+  type FiltrosBase,
+} from "@/lib/clientes/base-util";
 import { TIPO_SERVICO_LABELS, TIPOS_SERVICO } from "@/lib/clientes/tipos-servico";
 import { FILIAL_LABELS } from "@/lib/labels";
 import type { OpcaoVendedorBase } from "@/lib/clientes/vendedor-opcoes";
@@ -37,10 +49,26 @@ function Campo({ rotulo, children, htmlFor }: { rotulo: string; children: React.
   );
 }
 
-function SelectTipo({ name, valor, vazio = "Qualquer" }: { name: string; valor?: string; vazio?: string }) {
+function SelectTipo({
+  name,
+  valor,
+  onChange,
+  vazio = "Qualquer",
+  nada = false,
+  rotulo,
+}: {
+  name: string;
+  valor?: string;
+  onChange: (v: string) => void;
+  vazio?: string;
+  /** Opção "nada" (Recompra: não comprou nada). */
+  nada?: boolean;
+  rotulo: string;
+}) {
   return (
-    <select name={name} defaultValue={valor ?? ""} className={`${campoSelect} w-36`} aria-label={name}>
+    <select name={name} value={valor ?? ""} onChange={(e) => onChange(e.target.value)} className={`${campoSelect} w-32`} aria-label={rotulo}>
       <option value="">{vazio}</option>
+      {nada && <option value="nada">nada</option>}
       {TIPOS_SERVICO.map((t) => (
         <option key={t} value={t}>
           {TIPO_SERVICO_LABELS[t]}
@@ -50,17 +78,29 @@ function SelectTipo({ name, valor, vazio = "Qualquer" }: { name: string; valor?:
   );
 }
 
-function Periodo({ prefixo, filtros, rotulo }: { prefixo: string; filtros: FiltrosBase; rotulo: string }) {
-  const f = filtros as Record<string, string | undefined>;
+function Data({ name, valor, onChange, rotulo }: { name: string; valor?: string; onChange: (v: string) => void; rotulo: string }) {
+  return <Input type="date" name={name} value={valor ?? ""} onChange={(e) => onChange(e.target.value)} className="w-36" aria-label={rotulo} />;
+}
+
+function Atalhos({ atalhos, aplicar, rotulo = "atalhos" }: { atalhos: Atalho[]; aplicar: (a: Atalho) => void; rotulo?: string }) {
   return (
-    <Campo rotulo={rotulo}>
-      <div className="flex items-center gap-1">
-        <Input type="date" name={`${prefixo}_de`} defaultValue={f[`${prefixo}_de`] ?? ""} className="w-38" aria-label={`${rotulo} de`} />
-        <span className="text-muted-foreground text-xs">até</span>
-        <Input type="date" name={`${prefixo}_ate`} defaultValue={f[`${prefixo}_ate`] ?? ""} className="w-38" aria-label={`${rotulo} até`} />
-      </div>
-    </Campo>
+    <span className="text-muted-foreground flex items-center gap-0.5 text-xs">
+      · {rotulo}:
+      {atalhos.map((a, i) => (
+        <span key={a.rotulo} className="flex items-center">
+          {i > 0 && "·"}
+          <button type="button" className="hover:text-foreground px-1 underline-offset-2 hover:underline" onClick={() => aplicar(a)} data-atalho={a.rotulo}>
+            {a.rotulo}
+          </button>
+        </span>
+      ))}
+    </span>
   );
+}
+
+/** Uma parte da frase por linha, sem quebrar no meio. */
+function Linha({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap">{children}</div>;
 }
 
 /** Texto com sugestões (datalist) vindas do banco enquanto digita. */
@@ -68,12 +108,16 @@ function DestinoComSugestoes({
   name,
   valor,
   buscar,
-  className = "w-48",
+  onChange,
+  className = "w-40",
+  rotulo,
 }: {
   name: string;
   valor?: string;
   buscar: AcoesFiltros["buscarSugestoesDestino"];
+  onChange: (v: string) => void;
   className?: string;
+  rotulo: string;
 }) {
   const id = useId();
   const [termo, setTermo] = useState(valor ?? "");
@@ -97,12 +141,14 @@ function DestinoComSugestoes({
       <Input
         name={name}
         value={termo}
-        onChange={(e) => setTermo(e.target.value)}
+        onChange={(e) => {
+          setTermo(e.target.value);
+          onChange(e.target.value);
+        }}
         list={`${id}-destinos`}
-        placeholder="Ex.: orlando"
         autoComplete="off"
         className={className}
-        aria-label={name}
+        aria-label={rotulo}
       />
       <datalist id={`${id}-destinos`}>
         {sugestoes.map((s) => (
@@ -119,6 +165,7 @@ export function FiltrosBaseClientes({
   opcoesVendedor,
   salvos,
   acoes,
+  hoje,
 }: {
   filtros: FiltrosBase;
   /** Lojas que o usuário pode filtrar (só aparece com mais de uma). */
@@ -126,11 +173,26 @@ export function FiltrosBaseClientes({
   opcoesVendedor: OpcaoVendedorBase[];
   salvos: FiltroSalvo[];
   acoes: AcoesFiltros;
+  /** aaaa-mm-dd em São Paulo (atalhos e 2º período da Recompra). */
+  hoje: string;
 }) {
-  const [campanha, setCampanha] = useState(filtros.camp ?? "");
+  const [campanha, setCampanha] = useState<Campanha>(filtros.camp === "recompra" ? "recompra" : "adicional");
+  // A frase é controlada: o Filtrar e o "Só com viagem futura" dependem dela.
+  const [frase, setFrase] = useState<FiltrosBase>(() =>
+    Object.fromEntries([...CAMPOS_FRASE.adicional, ...CAMPOS_FRASE.recompra].map((c) => [c, filtros[c] ?? ""]))
+  );
   const [erro, setErro] = useState<string | undefined>();
   const [pendente, startTransition] = useTransition();
   const query = filtrosParaQuery(filtros);
+  const atual: FiltrosBase = { camp: campanha, ...Object.fromEntries(Object.entries(frase).filter(([, v]) => v)) };
+  const estado = estadoFrase(atual);
+  const campo = (chave: ChaveFiltro) => (v: string) => setFrase((f) => ({ ...f, [chave]: v }));
+  // 1º período da Recompra escolhido: o 2º vai do dia seguinte até hoje (dá para trocar depois).
+  const primeiroPeriodo = (de: string | undefined, ate: string | undefined) =>
+    setFrase((f) => {
+      const b = segundoPeriodo(ate, hoje);
+      return { ...f, cr_a_de: de ?? f.cr_a_de, cr_a_ate: ate ?? f.cr_a_ate, ...(b ? { cr_b_de: b.de, cr_b_ate: b.ate } : {}) };
+    });
 
   return (
     <form method="get" data-testid="filtros-base">
@@ -140,11 +202,12 @@ export function FiltrosBaseClientes({
             <span className="flex items-center gap-1.5 font-medium">
               <Megaphone className="size-4" /> Campanha
             </span>
-            {[
-              ["", "Nenhuma"],
-              ["adicional", "Venda adicional"],
-              ["recompra", "Recompra"],
-            ].map(([valor, rotulo]) => (
+            {(
+              [
+                ["adicional", "Venda adicional"],
+                ["recompra", "Recompra"],
+              ] as const
+            ).map(([valor, rotulo]) => (
               <label key={valor} className="flex items-center gap-1.5">
                 <input type="radio" name="camp" value={valor} checked={campanha === valor} onChange={() => setCampanha(valor)} />
                 {rotulo}
@@ -153,45 +216,64 @@ export function FiltrosBaseClientes({
           </div>
 
           {campanha === "adicional" && (
-            <div className="flex flex-wrap items-end gap-2 text-sm" data-testid="campanha-adicional">
-              <span className="pb-2">Comprou</span>
-              <SelectTipo name="ca_tipo" valor={filtros.ca_tipo} />
-              <span className="pb-2">para</span>
-              <DestinoComSugestoes name="ca_destino" valor={filtros.ca_destino} buscar={acoes.buscarSugestoesDestino} className="w-40" />
-              <span className="pb-2">com embarque entre</span>
-              <Input type="date" name="ca_de" defaultValue={filtros.ca_de ?? ""} className="w-38" aria-label="embarque de" />
-              <span className="pb-2">e</span>
-              <Input type="date" name="ca_ate" defaultValue={filtros.ca_ate ?? ""} className="w-38" aria-label="embarque até" />
-              <span className="pb-2">e não comprou</span>
-              <SelectTipo name="ca_sem_tipo" valor={filtros.ca_sem_tipo} vazio="—" />
-              <span className="pb-2">para o mesmo destino na mesma viagem.</span>
+            <div className="flex flex-col gap-2 text-sm" data-testid="campanha-adicional">
+              <Linha>
+                Comprou
+                <SelectTipo name="ca_tipo" valor={frase.ca_tipo} onChange={campo("ca_tipo")} rotulo="comprou (tipo)" />
+                para
+                <DestinoComSugestoes name="ca_destino" valor={frase.ca_destino} onChange={campo("ca_destino")} buscar={acoes.buscarSugestoesDestino} rotulo="destino" />
+              </Linha>
+              <Linha>
+                com embarque entre
+                <Data name="ca_de" valor={frase.ca_de} onChange={campo("ca_de")} rotulo="embarque de" />e
+                <Data name="ca_ate" valor={frase.ca_ate} onChange={campo("ca_ate")} rotulo="embarque até" />
+                <Atalhos atalhos={atalhosEmbarque(hoje)} aplicar={(a) => setFrase((f) => ({ ...f, ca_de: a.de, ca_ate: a.ate }))} />
+              </Linha>
+              <Linha>
+                e <strong>não comprou</strong>
+                <SelectTipo name="ca_sem_tipo" valor={frase.ca_sem_tipo} onChange={campo("ca_sem_tipo")} vazio="—" rotulo="não comprou (tipo)" />
+                na mesma viagem.
+              </Linha>
             </div>
           )}
 
           {campanha === "recompra" && (
-            <div className="flex flex-wrap items-end gap-2 text-sm" data-testid="campanha-recompra">
-              <span className="pb-2">Comprou</span>
-              <SelectTipo name="cr_tipo" valor={filtros.cr_tipo} />
-              <span className="pb-2">para</span>
-              <DestinoComSugestoes name="cr_destino" valor={filtros.cr_destino} buscar={acoes.buscarSugestoesDestino} className="w-40" />
-              <span className="pb-2">entre</span>
-              <Input type="date" name="cr_a_de" defaultValue={filtros.cr_a_de ?? ""} className="w-38" aria-label="período A de" />
-              <span className="pb-2">e</span>
-              <Input type="date" name="cr_a_ate" defaultValue={filtros.cr_a_ate ?? ""} className="w-38" aria-label="período A até" />
-              <span className="pb-2">e não comprou</span>
-              <select name="cr_escopo" defaultValue={filtros.cr_escopo ?? "nada"} className={campoSelect} aria-label="escopo">
-                <option value="nada">nada</option>
-                <option value="mesmo">nada daquele tipo/destino</option>
-              </select>
-              <span className="pb-2">entre</span>
-              <Input type="date" name="cr_b_de" defaultValue={filtros.cr_b_de ?? ""} className="w-38" aria-label="período B de" />
-              <span className="pb-2">e</span>
-              <Input type="date" name="cr_b_ate" defaultValue={filtros.cr_b_ate ?? ""} className="w-38" aria-label="período B até" />
+            <div className="flex flex-col gap-2 text-sm" data-testid="campanha-recompra">
+              <Linha>
+                Comprou
+                <SelectTipo name="cr_tipo" valor={frase.cr_tipo} onChange={campo("cr_tipo")} rotulo="comprou (tipo)" />
+                para
+                <DestinoComSugestoes name="cr_destino" valor={frase.cr_destino} onChange={campo("cr_destino")} buscar={acoes.buscarSugestoesDestino} rotulo="destino" />
+                entre
+                <Data name="cr_a_de" valor={frase.cr_a_de} onChange={(v) => primeiroPeriodo(v, undefined)} rotulo="1º período de" />e
+                <Data name="cr_a_ate" valor={frase.cr_a_ate} onChange={(v) => primeiroPeriodo(undefined, v)} rotulo="1º período até" />
+                <Atalhos atalhos={atalhosRecompra(hoje)} aplicar={(a) => primeiroPeriodo(a.de, a.ate)} />
+              </Linha>
+              <Linha>
+                e <strong>não comprou</strong>
+                <SelectTipo name="cr_sem" valor={frase.cr_sem} onChange={campo("cr_sem")} vazio="—" nada rotulo="não comprou (tipo)" />
+                <select
+                  name="cr_mesmo_destino"
+                  value={frase.cr_mesmo_destino ?? ""}
+                  onChange={(e) => campo("cr_mesmo_destino")(e.target.value)}
+                  className={campoSelect}
+                  aria-label="destino do não comprou"
+                >
+                  <option value="">para qualquer destino</option>
+                  <option value="1">para o mesmo destino</option>
+                </select>
+              </Linha>
+              <Linha>
+                entre
+                <Data name="cr_b_de" valor={frase.cr_b_de} onChange={campo("cr_b_de")} rotulo="2º período de" />e
+                <Data name="cr_b_ate" valor={frase.cr_b_ate} onChange={campo("cr_b_ate")} rotulo="2º período até" />
+                <span className="text-muted-foreground text-xs">· padrão: do dia seguinte ao fim do 1º período até hoje</span>
+              </Linha>
             </div>
           )}
         </CardContent>
         <CardContent className="flex flex-col gap-3 py-4">
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-wrap items-end gap-3" data-testid="bloco-baixo">
             {lojas.length > 1 && (
               <Campo rotulo="Loja">
                 <select name="loja" defaultValue={filtros.loja ?? ""} className={`${campoSelect} w-44`} aria-label="loja">
@@ -207,34 +289,35 @@ export function FiltrosBaseClientes({
             <Campo rotulo="Vendedor">
               <VendedorCombobox opcoes={opcoesVendedor} valor={filtros.vendedor} />
             </Campo>
-            <Campo rotulo="Destino">
-              <DestinoComSugestoes name="destino" valor={filtros.destino} buscar={acoes.buscarSugestoesDestino} />
-            </Campo>
-            <Campo rotulo="Tipo de serviço">
-              <SelectTipo name="tipo" valor={filtros.tipo} vazio="Todos" />
-            </Campo>
-            <Campo rotulo="Valor da compra (R$)">
-              <div className="flex items-center gap-1">
-                <Input type="number" min="0" step="0.01" name="valor_de" defaultValue={filtros.valor_de ?? ""} placeholder="de" className="w-24" aria-label="valor de" />
-                <Input type="number" min="0" step="0.01" name="valor_ate" defaultValue={filtros.valor_ate ?? ""} placeholder="até" className="w-24" aria-label="valor até" />
-              </div>
-            </Campo>
             <Campo rotulo="Total do cliente (R$)">
               <div className="flex items-center gap-1">
                 <Input type="number" min="0" step="0.01" name="total_de" defaultValue={filtros.total_de ?? ""} placeholder="de" className="w-24" aria-label="total de" />
                 <Input type="number" min="0" step="0.01" name="total_ate" defaultValue={filtros.total_ate ?? ""} placeholder="até" className="w-24" aria-label="total até" />
               </div>
             </Campo>
-            <Periodo prefixo="embarque" filtros={filtros} rotulo="Embarque" />
-            <Periodo prefixo="compra" filtros={filtros} rotulo="Data da compra" />
-            <label className="flex h-9 items-center gap-2 text-sm">
-              <input type="checkbox" name="futura" value="1" defaultChecked={filtros.futura === "1"} />
-              Só com viagem futura
-            </label>
+            <Campo rotulo={estado === "vazia" ? "Valor da compra (R$)" : "Valor da compra do \"Comprou\" (R$)"}>
+              <div className="flex items-center gap-1">
+                <Input type="number" min="0" step="0.01" name="valor_de" defaultValue={filtros.valor_de ?? ""} placeholder="de" className="w-24" aria-label="valor de" />
+                <Input type="number" min="0" step="0.01" name="valor_ate" defaultValue={filtros.valor_ate ?? ""} placeholder="até" className="w-24" aria-label="valor até" />
+              </div>
+            </Campo>
+            {mostraViagemFutura(atual) && (
+              <label className="flex h-9 items-center gap-2 text-sm">
+                <input type="checkbox" name="futura" value="1" defaultChecked={filtros.futura === "1"} />
+                Só com viagem futura
+              </label>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="submit">Filtrar</Button>
+            <Button type="submit" disabled={estado === "incompleta"}>
+              Filtrar
+            </Button>
+            {estado === "incompleta" && (
+              <span className="text-muted-foreground text-sm" data-testid="dica-nao-comprou">
+                escolha o que o cliente não comprou
+              </span>
+            )}
             <Button asChild variant="ghost">
               <Link href="/clientes">Limpar</Link>
             </Button>

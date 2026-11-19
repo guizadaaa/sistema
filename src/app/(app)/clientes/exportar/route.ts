@@ -1,6 +1,6 @@
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { buscarClientesBase, LIMITE_EXPORTACAO } from "@/lib/clientes/base";
-import { dataBr, lerFiltros, montarCsv } from "@/lib/clientes/base-util";
+import { dataBr, estadoFrase, lerFiltros, montarCsv } from "@/lib/clientes/base-util";
 import { TIPO_SERVICO_LABELS, isTipoServico } from "@/lib/clientes/tipos-servico";
 
 const tipos = (lista: string[]) => lista.filter(isTipoServico).map((t) => TIPO_SERVICO_LABELS[t]).join(", ");
@@ -9,7 +9,8 @@ const tipos = (lista: string[]) => lista.filter(isTipoServico).map((t) => TIPO_S
 export async function GET(request: Request) {
   await requireCurrentUser();
   const filtros = lerFiltros(Object.fromEntries(new URL(request.url).searchParams));
-  const clientes = await buscarClientesBase(filtros, 1, LIMITE_EXPORTACAO);
+  // Frase incompleta (sem o "não comprou"): CSV só com o cabeçalho, como a tela (que não busca).
+  const clientes = estadoFrase(filtros) === "incompleta" ? [] : await buscarClientesBase(filtros, 1, LIMITE_EXPORTACAO);
 
   const csv = montarCsv(
     [

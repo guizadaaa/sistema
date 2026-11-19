@@ -9,7 +9,8 @@ import {
   listarOpcoesVendedor,
   POR_PAGINA,
 } from "@/lib/clientes/base";
-import { lerFiltros, type FiltrosBase } from "@/lib/clientes/base-util";
+import { estadoFrase, lerFiltros, type FiltrosBase } from "@/lib/clientes/base-util";
+import { hojeSaoPaulo } from "@/lib/linkly/mes";
 import type { FilialCvc } from "@/lib/supabase/types";
 import { FILIAIS } from "@/lib/validation/caso";
 
@@ -120,11 +121,20 @@ async function FiltrosBloco({ filtros, lojas }: { filtros: FiltrosBase; lojas: F
       opcoesVendedor={opcoesVendedor}
       salvos={salvos}
       acoes={{ buscarSugestoesDestino, salvarFiltroCliente, excluirFiltroCliente }}
+      hoje={hojeSaoPaulo()}
     />
   );
 }
 
 async function ListaBloco({ filtros, pagina }: { filtros: FiltrosBase; pagina: number }) {
+  // Frase com algum campo e sem o "não comprou" (ex.: filtro salvo antigo): não busca.
+  if (estadoFrase(filtros) === "incompleta") {
+    return (
+      <div className="text-muted-foreground rounded-xl border p-6 text-sm" data-testid="frase-incompleta">
+        Complete a frase da campanha: escolha o que o cliente não comprou e clique em Filtrar.
+      </div>
+    );
+  }
   const [clientes, modelos] = await Promise.all([buscarClientesBase(filtros, pagina), listarModelosMensagem()]);
   return (
     <ListaClientes
@@ -134,6 +144,7 @@ async function ListaBloco({ filtros, pagina }: { filtros: FiltrosBase; pagina: n
       porPagina={POR_PAGINA}
       modelos={modelos}
       acoes={{ buscarComprasCliente }}
+      hoje={hojeSaoPaulo()}
     />
   );
 }
