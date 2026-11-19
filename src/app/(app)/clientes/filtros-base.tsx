@@ -99,7 +99,6 @@ function DestinoComSugestoes({
         value={termo}
         onChange={(e) => setTermo(e.target.value)}
         list={`${id}-destinos`}
-        placeholder="Ex.: orlando"
         autoComplete="off"
         className={className}
         aria-label={name}
@@ -127,7 +126,7 @@ export function FiltrosBaseClientes({
   salvos: FiltroSalvo[];
   acoes: AcoesFiltros;
 }) {
-  const [campanha, setCampanha] = useState(filtros.camp ?? "");
+  const [campanha, setCampanha] = useState(filtros.camp === "recompra" ? "recompra" : "adicional");
   const [erro, setErro] = useState<string | undefined>();
   const [pendente, startTransition] = useTransition();
   const query = filtrosParaQuery(filtros);
@@ -141,7 +140,6 @@ export function FiltrosBaseClientes({
               <Megaphone className="size-4" /> Campanha
             </span>
             {[
-              ["", "Nenhuma"],
               ["adicional", "Venda adicional"],
               ["recompra", "Recompra"],
             ].map(([valor, rotulo]) => (

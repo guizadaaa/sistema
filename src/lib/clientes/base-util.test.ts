@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { filtrosParaQuery, lerFiltros, linkFastzap, linkWhatsapp, montarCsv, montarMensagem, telefoneNacional } from "./base-util";
+import { filtrosParaQuery, lerFiltros, linkFastzap, linkWhatsapp, montarCsv, montarMensagem, telefoneNacional, tempoDesde } from "./base-util";
 
 describe("lerFiltros", () => {
   it("aceita só chaves e valores válidos", () => {
@@ -17,7 +17,7 @@ describe("lerFiltros", () => {
         hack: "x",
         vendedor: "todos",
       })
-    ).toEqual({ loja: "1710", destino: "Orlando", tipo: "ingresso", valor_de: "1.000", valor_ate: "2500.50", embarque_de: "2026-12-01", futura: "1" });
+    ).toEqual({ loja: "1710", destino: "Orlando", tipo: "ingresso", valor_de: "1.000", valor_ate: "2500.50", embarque_de: "2026-12-01", futura: "1", camp: "adicional" });
   });
 
   it("campos de campanha só valem com a campanha certa; tipo inválido sai", () => {
@@ -26,7 +26,20 @@ describe("lerFiltros", () => {
       ca_tipo: "aereo",
       ca_sem_tipo: "ingresso",
     });
-    expect(lerFiltros({ ca_tipo: "aereo" })).toEqual({});
+    // Sem camp, abre em Venda adicional.
+    expect(lerFiltros({ ca_tipo: "aereo" })).toEqual({ camp: "adicional", ca_tipo: "aereo" });
+    expect(lerFiltros({ camp: "recompra", ca_tipo: "aereo", cr_tipo: "hotel" })).toEqual({ camp: "recompra", cr_tipo: "hotel" });
+  });
+
+  it("filtro salvo com a antiga campanha \"Nenhuma\" abre em Venda adicional e mantém loja, vendedor e valores", () => {
+    expect(lerFiltros({ camp: "", loja: "1714", vendedor: "u:abc", valor_de: "500", total_ate: "9000" })).toEqual({
+      camp: "adicional",
+      loja: "1714",
+      vendedor: "u:abc",
+      valor_de: "500",
+      total_ate: "9000",
+    });
+    expect(lerFiltros({ camp: "nenhuma" })).toEqual({ camp: "adicional" });
   });
 
   it("filtrosParaQuery monta a URL com página", () => {
@@ -73,5 +86,34 @@ describe("FastZap", () => {
     const json = JSON.parse(decodeURIComponent(escape(atob(b64))));
     expect(json).toEqual({ nome: "José Ávila", telefone: "41992801401" });
     expect(linkFastzap("X", "123")).toBeNull();
+  });
+});
+
+describe("tempoDesde", () => {
+  it("anos, meses e dias de calendário", () => {
+    expect(tempoDesde("2024-08-03", "2026-11-18")).toBe("2 anos, 3 meses, 15 dias");
+    expect(tempoDesde("2025-11-28", "2026-11-18")).toBe("11 meses, 21 dias");
+  });
+  it("partes zeradas não aparecem", () => {
+    expect(tempoDesde("2026-08-13", "2026-11-18")).toBe("3 meses, 5 dias");
+    expect(tempoDesde("2025-11-06", "2026-11-18")).toBe("1 ano, 12 dias");
+    expect(tempoDesde("2026-11-10", "2026-11-18")).toBe("8 dias");
+    expect(tempoDesde("2024-11-18", "2026-11-18")).toBe("2 anos");
+  });
+  it("singular", () => {
+    expect(tempoDesde("2025-10-17", "2026-11-18")).toBe("1 ano, 1 mês, 1 dia");
+  });
+  it("no mesmo dia: hoje; futura ou vazia: nada", () => {
+    expect(tempoDesde("2026-11-18", "2026-11-18")).toBe("hoje");
+    expect(tempoDesde("2026-11-19", "2026-11-18")).toBe("");
+    expect(tempoDesde(null, "2026-11-18")).toBe("");
+  });
+  it("fim de mês: 31/01 → 28/02 é 1 mês; em ano bissexto só em 29/02", () => {
+    expect(tempoDesde("2025-01-31", "2025-02-28")).toBe("1 mês");
+    expect(tempoDesde("2024-01-31", "2024-02-28")).toBe("28 dias");
+    expect(tempoDesde("2024-01-31", "2024-02-29")).toBe("1 mês");
+    expect(tempoDesde("2024-01-31", "2024-03-01")).toBe("1 mês, 1 dia");
+    expect(tempoDesde("2024-02-29", "2025-02-28")).toBe("1 ano");
+    expect(tempoDesde("2025-12-31", "2026-01-30")).toBe("30 dias");
   });
 });

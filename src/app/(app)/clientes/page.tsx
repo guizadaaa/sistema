@@ -10,6 +10,7 @@ import {
   POR_PAGINA,
 } from "@/lib/clientes/base";
 import { lerFiltros, type FiltrosBase } from "@/lib/clientes/base-util";
+import { hojeSaoPaulo } from "@/lib/linkly/mes";
 import type { FilialCvc } from "@/lib/supabase/types";
 import { FILIAIS } from "@/lib/validation/caso";
 
@@ -134,6 +135,7 @@ async function ListaBloco({ filtros, pagina }: { filtros: FiltrosBase; pagina: n
       porPagina={POR_PAGINA}
       modelos={modelos}
       acoes={{ buscarComprasCliente }}
+      hoje={hojeSaoPaulo()}
     />
   );
 }

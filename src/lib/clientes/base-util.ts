@@ -41,7 +41,12 @@ const CHAVES_DATA = new Set(["embarque_de", "embarque_ate", "compra_de", "compra
 const CHAVES_NUMERO = new Set(["valor_de", "valor_ate", "total_de", "total_ate"]);
 const CHAVES_TIPO = new Set(["tipo", "ca_tipo", "ca_sem_tipo", "cr_tipo"]);
 
-/** Só as chaves conhecidas, com valor válido (o resto é ignorado). */
+/**
+ * Só as chaves conhecidas, com valor válido (o resto é ignorado). Campanha é
+ * sempre "adicional" ou "recompra": sem camp (ou com o antigo "Nenhuma", que
+ * mandava camp vazio) abre em Venda adicional — filtros salvos antigos seguem
+ * abrindo com loja, vendedor e valores.
+ */
 export function lerFiltros(params: Record<string, string | string[] | undefined>): FiltrosBase {
   const filtros: FiltrosBase = {};
   for (const chave of CHAVES_FILTRO) {
@@ -60,6 +65,7 @@ export function lerFiltros(params: Record<string, string | string[] | undefined>
     if (chave === "futura" && valor !== "1") continue;
     filtros[chave] = valor.slice(0, 120);
   }
+  filtros.camp ??= "adicional";
   // Campos de campanha só valem com a campanha escolhida.
   for (const chave of Object.keys(filtros) as (keyof FiltrosBase)[]) {
     if (chave.startsWith("ca_") && filtros.camp !== "adicional") delete filtros[chave];
@@ -79,6 +85,44 @@ export function dataBr(iso: string | null | undefined): string {
   if (!iso) return "";
   const [a, m, d] = iso.slice(0, 10).split("-");
   return `${d}/${m}/${a}`;
+}
+
+const DIAS_NO_MES = (a: number, m: number) => new Date(Date.UTC(a, m, 0)).getUTCDate();
+
+/** aaaa-mm-dd + n meses, com o dia limitado ao fim do mês (31/01 + 1 = 28/02 ou 29/02). */
+function somarMeses(a: number, m: number, d: number, n: number): string {
+  const total = m - 1 + n;
+  const ano = a + Math.floor(total / 12);
+  const mes = (total % 12 + 12) % 12 + 1;
+  const dia = Math.min(d, DIAS_NO_MES(ano, mes));
+  return `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
+
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+
+/**
+ * Tempo de calendário de `data` até `hoje` (aaaa-mm-dd, hoje de São Paulo):
+ * anos e meses completos, depois os dias — "2 anos, 3 meses, 15 dias". Mês
+ * completo conta pelo mesmo dia do mês seguinte, limitado ao fim do mês
+ * (31/01 → 28/02 = 1 mês). Partes zeradas somem; no mesmo dia, "hoje".
+ * Data futura ou inválida: "".
+ */
+export function tempoDesde(data: string | null | undefined, hoje: string): string {
+  if (!data || !DATA.test(data.slice(0, 10)) || !DATA.test(hoje)) return "";
+  const [a, m, d] = data.slice(0, 10).split("-").map(Number);
+  const [ha, hm] = hoje.split("-").map(Number);
+  if (data.slice(0, 10) > hoje) return "";
+  let meses = (ha - a) * 12 + (hm - m);
+  if (somarMeses(a, m, d, meses) > hoje) meses -= 1;
+  const base = somarMeses(a, m, d, meses);
+  const dias = Math.round((Date.parse(`${hoje}T00:00:00Z`) - Date.parse(`${base}T00:00:00Z`)) / 86_400_000);
+  const anos = Math.floor(meses / 12);
+  const partes = [
+    anos > 0 && plural(anos, "ano", "anos"),
+    meses % 12 > 0 && plural(meses % 12, "mês", "meses"),
+    dias > 0 && plural(dias, "dia", "dias"),
+  ].filter(Boolean);
+  return partes.length ? partes.join(", ") : "hoje";
 }
 
 /** wa.me: só dígitos, com 55 quando o número for nacional (10–11 dígitos). */

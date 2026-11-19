@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight, Copy, Download, MessageCircle, MessageSquare
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { dataBr, filtrosParaQuery, linkFastzap, telefoneNacional, montarMensagem, type FiltrosBase } from "@/lib/clientes/base-util";
+import { dataBr, filtrosParaQuery, linkFastzap, telefoneNacional, montarMensagem, tempoDesde, type FiltrosBase } from "@/lib/clientes/base-util";
 import type { ClienteBase, CompraCliente, ModeloMensagem } from "@/lib/clientes/base";
 import { isTipoServico, TIPO_SERVICO_LABELS } from "@/lib/clientes/tipos-servico";
 import { formatarMoeda } from "@/lib/formatacao";
@@ -56,7 +56,7 @@ export function TiposBadges({ tipos }: { tipos: string[] }) {
   );
 }
 
-function BotaoCopiar({ texto, rotulo, children }: { texto: string; rotulo: string; children?: React.ReactNode }) {
+function BotaoCopiar({ texto, rotulo, children, testId }: { texto: string; rotulo: string; children?: React.ReactNode; testId?: string }) {
   const [copiado, setCopiado] = useState(false);
   return (
     <Button
@@ -66,7 +66,10 @@ function BotaoCopiar({ texto, rotulo, children }: { texto: string; rotulo: strin
       className="h-7 px-2"
       aria-label={rotulo}
       title={rotulo}
-      onClick={async () => {
+      data-testid={testId}
+      onClick={async (e) => {
+        // Dentro do cabeçalho do cartão: copiar não abre nem fecha.
+        e.stopPropagation();
         await navigator.clipboard.writeText(texto);
         setCopiado(true);
         setTimeout(() => setCopiado(false), 1500);
@@ -134,6 +137,7 @@ function ComprasCliente({ compras }: { compras: CompraCliente[] }) {
 
 function LinhaCliente({
   cliente,
+  hoje,
   mostrarCompraFiltro,
   modelo,
   acoes,
@@ -141,6 +145,8 @@ function LinhaCliente({
   comprasIniciais,
 }: {
   cliente: ClienteBase;
+  /** aaaa-mm-dd em São Paulo (vem do servidor, sem diferença de hidratação). */
+  hoje: string;
   mostrarCompraFiltro: boolean;
   modelo?: ModeloMensagem;
   acoes: AcoesLista;
@@ -183,9 +189,13 @@ function LinhaCliente({
         </button>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={alternar} className="font-medium hover:underline">
-              {cliente.nome}
-            </button>
+            <span className="inline-flex items-center gap-0.5">
+              <button type="button" onClick={alternar} className="font-medium hover:underline">
+                {cliente.nome}
+              </button>
+              {/* No FastZap o vendedor cola o nome em "Novo Atendimento" (o preenchimento pela extensão está desligado). */}
+              <BotaoCopiar texto={cliente.nome} rotulo={`Copiar nome ${cliente.nome}`} testId="copiar-nome" />
+            </span>
             {cliente.lojas.map((l) => (
               <Badge key={l} variant="outline">
                 {l}
@@ -239,7 +249,14 @@ function LinhaCliente({
                 </>
               )}
             </span>
-            <span>Última compra {dataBr(cliente.ultima_compra) || "—"}</span>
+            <span className="flex flex-col" data-testid="ultima-compra">
+              <span>Última compra {dataBr(cliente.ultima_compra) || "—"}</span>
+              {cliente.ultima_compra && tempoDesde(cliente.ultima_compra, hoje) && (
+                <span className="text-xs" data-testid="tempo-desde">
+                  {tempoDesde(cliente.ultima_compra, hoje)}
+                </span>
+              )}
+            </span>
             <span>
               Próxima viagem{" "}
               {cliente.proxima_viagem ? <strong className="text-foreground">{dataBr(cliente.proxima_viagem)}</strong> : "—"}
@@ -286,6 +303,7 @@ export function ListaClientes({
   modelos,
   acoes,
   expandido,
+  hoje,
 }: {
   clientes: ClienteBase[];
   filtros: FiltrosBase;
@@ -295,6 +313,8 @@ export function ListaClientes({
   acoes: AcoesLista;
   /** Só para teste/visualização: cliente que já abre expandido. */
   expandido?: { clienteId: string; compras: CompraCliente[] };
+  /** aaaa-mm-dd em São Paulo. */
+  hoje: string;
 }) {
   const [modeloId, setModeloId] = useState<string>(
     () => modelos.find((m) => m.chave === (filtros.camp === "recompra" ? "recompra" : "venda_adicional"))?.id ?? modelos[0]?.id ?? ""
@@ -302,7 +322,8 @@ export function ListaClientes({
   const total = Number(clientes[0]?.total_clientes ?? 0);
   const paginas = Math.max(1, Math.ceil(total / porPagina));
   const modelo = modelos.find((m) => m.id === modeloId);
-  const temFiltro = Object.keys(filtros).length > 0;
+  // A campanha está sempre escolhida; "filtro" é ter algo além dela.
+  const temFiltro = Object.keys(filtros).some((k) => k !== "camp");
 
   return (
     <Card>
@@ -342,6 +363,7 @@ export function ListaClientes({
               <LinhaCliente
                 key={c.cliente_id}
                 cliente={c}
+                hoje={hoje}
                 mostrarCompraFiltro={temFiltro}
                 modelo={modelo}
                 acoes={acoes}
