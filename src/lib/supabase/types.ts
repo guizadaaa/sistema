@@ -1013,6 +1013,10 @@ export interface Database {
         Args: { p_ids: string[] };
         Returns: number;
       };
+      vendedores_filtro_casos_lojas: {
+        Args: Record<string, never>;
+        Returns: { id: string; nome_completo: string; filial: FilialCvc | null; ativo: boolean; filiais_casos: FilialCvc[] }[];
+      };
       casos_contagem_status: {
         Args: {
           p_tipo?: TipoCaso | null;

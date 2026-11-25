@@ -1,6 +1,7 @@
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { contarCasosPorStatus, listarCasos } from "@/lib/casos/listar";
-import { listarOpcoesVendedorFiltro } from "@/lib/casos/nomes";
+import { listarCandidatosVendedor } from "@/lib/casos/nomes";
+import { vendedorNaFilial } from "@/lib/casos/opcoes-vendedor";
 import { createClient } from "@/lib/supabase/server";
 
 import { CasosLista, isFilialCvc, isStatusCaso, isTipoCaso } from "./casos-lista";
@@ -25,12 +26,13 @@ export default async function CasosPage({
 
   const mostrarFiltroFilial = usuario.perfil === "adm" || usuario.perfil === "adm_master";
 
-  // Opções já vêm limitadas pelo banco (vendedores_filtro_casos): própria
-  // filial para vendedor/gerente; para admin, a filial filtrada (ou todas).
-  // Um id na URL fora dessas opções é ignorado em vez de aplicado.
-  const opcoesVendedor = await listarOpcoesVendedorFiltro(await createClient(), mostrarFiltroFilial ? filial : undefined);
+  // Candidatos limitados pelo banco (vendedores_filtro_casos_lojas): admin
+  // todas as filiais; gerente/vendedor a própria. O vendedor da URL só vale se
+  // existir nas opções da Filial (link antigo incompatível → "Todos").
+  const candidatosVendedor = await listarCandidatosVendedor(await createClient());
+  const filialDoVendedor = mostrarFiltroFilial ? filial : (usuario.filial ?? undefined);
   const vendedor =
-    typeof sp.vendedor === "string" && opcoesVendedor.some((o) => o.id === sp.vendedor) ? sp.vendedor : undefined;
+    typeof sp.vendedor === "string" && vendedorNaFilial(candidatosVendedor, filialDoVendedor, sp.vendedor) ? sp.vendedor : undefined;
 
   const filtros = { status, tipo, filial, vendedor, busca, dataInicio, dataFim, mostrarTeste, prazo };
   // A barra conta com os mesmos filtros, menos o Status.
@@ -41,7 +43,8 @@ export default async function CasosPage({
       casos={casos}
       filtros={filtros}
       contagem={contagem}
-      opcoesVendedor={opcoesVendedor}
+      candidatosVendedor={candidatosVendedor}
+      filialUsuario={usuario.filial ?? undefined}
       mostrarFiltroFilial={mostrarFiltroFilial}
       ehAdmMaster={ehAdmMaster}
     />
