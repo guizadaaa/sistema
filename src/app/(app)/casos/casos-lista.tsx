@@ -10,15 +10,16 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FILIAL_LABELS, STATUS_LABELS, SUBTIPO_RECADASTRO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
+import { STATUS_LABELS, SUBTIPO_RECADASTRO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { STATUS_ORDEM } from "@/lib/casos/status";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 import { urlCasos, type FiltrosTelaCasos } from "@/lib/casos/barra-status";
 import type { CasoListado, ContagemStatus } from "@/lib/casos/listar";
-import type { OpcaoVendedor } from "@/lib/casos/nomes";
+import type { CandidatoVendedor } from "@/lib/casos/opcoes-vendedor";
 import { TIPOS_CASO } from "@/lib/validation/caso";
 
 import { BarraStatus } from "./barra-status";
+import { FiltroFilialVendedor } from "./filtro-filial-vendedor";
 import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
 
 export const STATUS_OPCOES: readonly StatusCaso[] = STATUS_ORDEM;
@@ -39,14 +40,17 @@ export function CasosLista({
   casos,
   filtros,
   contagem,
-  opcoesVendedor,
+  candidatosVendedor,
+  filialUsuario,
   mostrarFiltroFilial,
   ehAdmMaster,
 }: {
   casos: CasoListado[];
   filtros: FiltrosTelaCasos;
   contagem: ContagemStatus;
-  opcoesVendedor: OpcaoVendedor[];
+  candidatosVendedor: CandidatoVendedor[];
+  /** Filial do gerente/vendedor (o select de Filial só aparece para admin). */
+  filialUsuario?: FilialCvc;
   mostrarFiltroFilial: boolean;
   ehAdmMaster: boolean;
 }) {
@@ -126,41 +130,14 @@ export function CasosLista({
                 </Select>
               </div>
 
-              {mostrarFiltroFilial && (
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium">Filial</label>
-                  <Select name="filial" defaultValue={filtros.filial ?? "todas"}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todas">Todas</SelectItem>
-                      {FILIAL_OPCOES.map((f) => (
-                        <SelectItem key={f} value={f}>
-                          {FILIAL_LABELS[f]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">Vendedor</label>
-                <Select name="vendedor" defaultValue={filtros.vendedor ?? "todos"}>
-                  <SelectTrigger className="w-56">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    {opcoesVendedor.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <FiltroFilialVendedor
+                candidatos={candidatosVendedor}
+                filialInicial={filtros.filial}
+                vendedorInicial={filtros.vendedor}
+                mostrarFiltroFilial={mostrarFiltroFilial}
+                filialFixa={filialUsuario}
+                filiais={FILIAL_OPCOES}
+              />
 
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium">Aberto entre</label>
