@@ -95,6 +95,11 @@ begin
   perform perf.medir(p_usuario, 'mapeamento: sugestões (Vendedores Systur)', $q$select * from public.systur_sugestoes_usuarios(null)$q$);
   perform perf.medir(p_usuario, 'calendário: histórico do mês (sem cobrança retroativa)', format($q$select * from public.vendas_calendario_historico(%L, %L)$q$,
     date_trunc('month', current_date)::date, (date_trunc('month', current_date) + interval '1 month - 1 day')::date));
+  -- Acompanhar Casos: lista (o que listarCasos pede) e a barra por status.
+  perform perf.medir(p_usuario, 'casos: lista (sem filtro)', $q$select id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero, contrato_origem, subtipo_recadastro, caso_teste from public.casos where caso_teste = false order by criado_em desc$q$);
+  perform perf.medir(p_usuario, 'casos: barra por status (sem filtro)', $q$select * from public.casos_contagem_status(p_hoje => current_date)$q$);
+  perform perf.medir(p_usuario, 'casos: barra por status (filial 1714)', $q$select * from public.casos_contagem_status(p_filial => '1714', p_hoje => current_date)$q$);
+  perform perf.medir(p_usuario, 'casos: barra por status (só vencidos)', $q$select * from public.casos_contagem_status(p_prazo => 'vencido', p_hoje => current_date)$q$);
   perform perf.medir(p_usuario, 'exportar CSV (até 20 mil)', $q$select * from public.base_clientes_buscar('{}', 20000, 0)$q$);
 end;
 $$;
