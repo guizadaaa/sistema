@@ -12,6 +12,12 @@ export function diasAteVencimento(prazoVigencia: string, hoje: Date = new Date()
   return Math.floor((prazo.getTime() - hojeSemHora.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+/** "Hoje" (aaaa-mm-dd) na mesma régua de diasAteVencimento: data local de quem calcula. */
+export function hojeLocalIso(agora: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${agora.getFullYear()}-${p(agora.getMonth() + 1)}-${p(agora.getDate())}`;
+}
+
 export function situacaoPrazoVigencia(prazoVigencia: string, hoje: Date = new Date()): SituacaoPrazo {
   const diffDias = diasAteVencimento(prazoVigencia, hoje);
 

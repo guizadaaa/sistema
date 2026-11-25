@@ -13,9 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FILIAL_LABELS, STATUS_LABELS, SUBTIPO_RECADASTRO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import { STATUS_ORDEM } from "@/lib/casos/status";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
-import type { CasoListado } from "@/lib/casos/listar";
+import { urlCasos, type FiltrosTelaCasos } from "@/lib/casos/barra-status";
+import type { CasoListado, ContagemStatus } from "@/lib/casos/listar";
 import type { OpcaoVendedor } from "@/lib/casos/nomes";
 import { TIPOS_CASO } from "@/lib/validation/caso";
+
+import { BarraStatus } from "./barra-status";
 import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
 
 export const STATUS_OPCOES: readonly StatusCaso[] = STATUS_ORDEM;
@@ -35,21 +38,14 @@ export function isFilialCvc(v: string): v is FilialCvc {
 export function CasosLista({
   casos,
   filtros,
+  contagem,
   opcoesVendedor,
   mostrarFiltroFilial,
   ehAdmMaster,
 }: {
   casos: CasoListado[];
-  filtros: {
-    status?: StatusCaso;
-    tipo?: TipoCaso;
-    filial?: FilialCvc;
-    vendedor?: string;
-    busca?: string;
-    dataInicio?: string;
-    dataFim?: string;
-    mostrarTeste?: boolean;
-  };
+  filtros: FiltrosTelaCasos;
+  contagem: ContagemStatus;
   opcoesVendedor: OpcaoVendedor[];
   mostrarFiltroFilial: boolean;
   ehAdmMaster: boolean;
@@ -62,7 +58,8 @@ export function CasosLista({
       filtros.vendedor ||
       filtros.dataInicio ||
       filtros.dataFim ||
-      filtros.mostrarTeste
+      filtros.mostrarTeste ||
+      filtros.prazo
   );
 
   return (
@@ -78,7 +75,9 @@ export function CasosLista({
 
       <Card>
         <CardContent className="flex flex-col gap-3">
-          <form method="get" className="flex flex-col gap-3">
+          {/* key: navegar pela barra (status/vencidos) remonta o form, e o select Status acompanha a URL. */}
+          <form method="get" className="flex flex-col gap-3" key={urlCasos(filtros)}>
+            {filtros.prazo && <input type="hidden" name="prazo" value={filtros.prazo} />}
             <div className="flex flex-wrap items-end gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium" htmlFor="busca">
@@ -197,6 +196,8 @@ export function CasosLista({
           </form>
         </CardContent>
       </Card>
+
+      <BarraStatus contagem={contagem} filtros={filtros} />
 
       <Card>
         <CardContent className="overflow-x-auto">

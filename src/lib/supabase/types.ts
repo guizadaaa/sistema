@@ -1013,6 +1013,20 @@ export interface Database {
         Args: { p_ids: string[] };
         Returns: number;
       };
+      casos_contagem_status: {
+        Args: {
+          p_tipo?: TipoCaso | null;
+          p_filial?: FilialCvc | null;
+          p_vendedor?: string | null;
+          p_data_inicio?: string | null;
+          p_data_fim?: string | null;
+          p_teste?: boolean;
+          p_ids?: string[] | null;
+          p_prazo?: string | null;
+          p_hoje?: string | null;
+        };
+        Returns: { status: StatusCaso; total: number; vencidos: number; vencem_5: number }[];
+      };
       vendas_calendario_historico: {
         Args: { p_de: string; p_ate: string };
         Returns: {

@@ -1,5 +1,5 @@
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { listarCasos } from "@/lib/casos/listar";
+import { contarCasosPorStatus, listarCasos } from "@/lib/casos/listar";
 import { listarOpcoesVendedorFiltro } from "@/lib/casos/nomes";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,6 +21,7 @@ export default async function CasosPage({
   const dataFim = typeof sp.dataFim === "string" ? sp.dataFim : undefined;
   const ehAdmMaster = usuario.perfil === "adm_master";
   const mostrarTeste = ehAdmMaster && sp.mostrarTeste === "1";
+  const prazo = sp.prazo === "vencido" ? ("vencido" as const) : undefined;
 
   const mostrarFiltroFilial = usuario.perfil === "adm" || usuario.perfil === "adm_master";
 
@@ -31,12 +32,15 @@ export default async function CasosPage({
   const vendedor =
     typeof sp.vendedor === "string" && opcoesVendedor.some((o) => o.id === sp.vendedor) ? sp.vendedor : undefined;
 
-  const casos = await listarCasos({ status, tipo, filial, vendedor, busca, dataInicio, dataFim, mostrarTeste });
+  const filtros = { status, tipo, filial, vendedor, busca, dataInicio, dataFim, mostrarTeste, prazo };
+  // A barra conta com os mesmos filtros, menos o Status.
+  const [casos, contagem] = await Promise.all([listarCasos(filtros), contarCasosPorStatus({ ...filtros, status: undefined })]);
 
   return (
     <CasosLista
       casos={casos}
-      filtros={{ status, tipo, filial, vendedor, busca, dataInicio, dataFim, mostrarTeste }}
+      filtros={filtros}
+      contagem={contagem}
       opcoesVendedor={opcoesVendedor}
       mostrarFiltroFilial={mostrarFiltroFilial}
       ehAdmMaster={ehAdmMaster}

@@ -1,7 +1,9 @@
 import "server-only";
 
 import { carregarNomesUsuariosCasos } from "@/lib/casos/nomes";
+import { hojeLocalIso } from "@/lib/casos/prazo";
 import { carregarResolvidoEm } from "@/lib/casos/resolucao";
+import { STATUS_ORDEM } from "@/lib/casos/status";
 import { createClient } from "@/lib/supabase/server";
 import { somenteDigitos } from "@/lib/validation/cpf";
 import type { FilialCvc, StatusCaso, SubtipoRecadastro, TipoCaso } from "@/lib/supabase/types";
@@ -25,6 +27,8 @@ export type FiltrosCasos = {
    * só passa `true` quando o usuário é adm_master.
    */
   mostrarTeste?: boolean;
+  /** "vencido": só não resolvidos com prazo de vigência já passado (mesma regra da coluna). */
+  prazo?: "vencido";
 };
 
 export type CasoListado = {
@@ -180,6 +184,10 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
     query = query.lte("criado_em", `${filtros.dataFim}T23:59:59.999`);
   }
 
+  if (filtros.prazo === "vencido") {
+    query = query.neq("status_atual", "resolvido").lt("prazo_vigencia", hojeLocalIso());
+  }
+
   if (filtros.busca?.trim()) {
     const idsPermitidos = await idsCasosPorBusca(supabase, filtros.busca);
     if (idsPermitidos.length === 0) return [];
@@ -201,4 +209,56 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
     donoNome: nomesPorId.get(c.vendedor_dono) ?? "—",
     resolvidoEm: c.status_atual === "resolvido" ? (resolvidoEm.get(c.id) ?? null) : null,
   }));
+}
+
+export type ContagemStatus = {
+  porStatus: Record<StatusCaso, number>;
+  total: number;
+  /** Não resolvidos com prazo já passado. */
+  vencidos: number;
+  /** Não resolvidos que vencem de hoje até daqui a 5 dias. */
+  vencemEm5: number;
+};
+
+/**
+ * Barra "Casos por status": count por status no banco (casos_contagem_status,
+ * SECURITY INVOKER — mesma RLS da lista) com os filtros da lista MENOS o
+ * Status, que a barra ignora de propósito (escolher "Inicial" não zera os
+ * outros). A busca usa a mesma resolução de ids da lista.
+ */
+export async function contarCasosPorStatus(filtros: FiltrosCasos): Promise<ContagemStatus> {
+  const supabase = await createClient();
+  const vazio: ContagemStatus = {
+    porStatus: Object.fromEntries(STATUS_ORDEM.map((s) => [s, 0])) as Record<StatusCaso, number>,
+    total: 0,
+    vencidos: 0,
+    vencemEm5: 0,
+  };
+
+  let ids: string[] | null = null;
+  if (filtros.busca?.trim()) {
+    ids = await idsCasosPorBusca(supabase, filtros.busca);
+    if (ids.length === 0) return vazio;
+  }
+
+  const { data, error } = await supabase.rpc("casos_contagem_status", {
+    p_tipo: filtros.tipo ?? null,
+    p_filial: filtros.filial ?? null,
+    p_vendedor: filtros.vendedor ?? null,
+    p_data_inicio: filtros.dataInicio && DATA_FORMATO.test(filtros.dataInicio) ? filtros.dataInicio : null,
+    p_data_fim: filtros.dataFim && DATA_FORMATO.test(filtros.dataFim) ? filtros.dataFim : null,
+    p_teste: Boolean(filtros.mostrarTeste),
+    p_ids: ids,
+    p_prazo: filtros.prazo ?? null,
+    p_hoje: hojeLocalIso(),
+  });
+  if (error) throw error;
+
+  for (const linha of data ?? []) {
+    vazio.porStatus[linha.status] = Number(linha.total);
+    vazio.total += Number(linha.total);
+    vazio.vencidos += Number(linha.vencidos);
+    vazio.vencemEm5 += Number(linha.vencem_5);
+  }
+  return vazio;
 }
