@@ -40,6 +40,11 @@ export type TipoDocumentoAnexo =
   | "carta_cancelamento"
   | "atestado_saude"
   | "certidao_obito"
+  // Prints/arquivos dos sistemas (20261128000002) — nunca contam como documento exigido.
+  | "fastzap"
+  | "orbium"
+  | "systur"
+  | "atlas"
   | "outro"
   // Imagem colada na Descrição ao criar o caso — mostrada abaixo da
   // Descrição, fora da lista de Anexos (20261006000001).

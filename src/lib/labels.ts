@@ -54,6 +54,10 @@ export const ANEXO_TIPO_LABELS: Record<TipoDocumentoAnexo, string> = {
   carta_cancelamento: "Carta de cancelamento",
   atestado_saude: "Atestado de saúde",
   certidao_obito: "Certidão de óbito",
+  fastzap: "FastZap",
+  orbium: "Orbium",
+  systur: "Systur",
+  atlas: "Atlas",
   outro: "Outro",
   imagem_descricao: "Imagem da descrição",
 };

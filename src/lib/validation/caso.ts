@@ -113,10 +113,16 @@ export const casoSchema = z.discriminatedUnion("tipoCaso", [
 
 export type CasoFormValues = z.infer<typeof casoSchema>;
 
+/** Ordem do select de categoria do anexo — "outro" sempre por último (e é o padrão). */
 export const ANEXO_TIPOS_DOCUMENTO = [
   "carta_cancelamento",
   "atestado_saude",
   "certidao_obito",
+  // Prints/arquivos tirados dos sistemas (20261128000002).
+  "fastzap",
+  "orbium",
+  "systur",
+  "atlas",
   "outro",
 ] as const;
 
