@@ -122,7 +122,15 @@ export const ANEXO_TIPOS_DOCUMENTO = [
 
 // image/webp: imagens são comprimidas no navegador antes do envio
 // (lib/comprimir-imagem.ts) e costumam virar WebP.
-export const ANEXO_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
+// text/html: página salva (ex.: tela de erro do Systur). É limpa no
+// servidor antes de gravar e só abre em visualizador isolado (sandbox) —
+// ver lib/casos/html-anexo.ts e casos/[id]/anexos/[anexoId].
+export const ANEXO_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp", "text/html"] as const;
+/** Extensões aceitas como HTML (navegador pode mandar MIME vazio ou application/octet-stream). */
+export const ANEXO_EXTENSOES_HTML = [".html", ".htm"] as const;
+/** accept do input de anexo. */
+export const ANEXO_ACCEPT = [...ANEXO_MIME_TYPES, ...ANEXO_EXTENSOES_HTML].join(",");
+export const ANEXO_FORMATOS_TEXTO = "PDF, JPG, PNG, WebP ou HTML";
 /** Imagens que podem ser coladas (Ctrl+V) como anexo — os tipos de imagem de ANEXO_MIME_TYPES. */
 export const ANEXO_IMAGEM_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 /** Cache-Control dos arquivos no bucket "anexos": 1 ano (o path é único por envio, com randomUUID). */

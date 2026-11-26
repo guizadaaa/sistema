@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
-import { ANEXO_MIME_TYPES, ANEXO_TAMANHO_MAXIMO_BYTES } from "@/lib/validation/caso";
+import { mimeDoAnexo } from "@/lib/casos/anexo-tipo";
+import { ANEXO_ACCEPT, ANEXO_FORMATOS_TEXTO, ANEXO_TAMANHO_MAXIMO_BYTES } from "@/lib/validation/caso";
 
 export function validarArquivoAnexo(arquivo: File): string | undefined {
-  if (!(ANEXO_MIME_TYPES as readonly string[]).includes(arquivo.type)) {
-    return "Formato não permitido (só PDF, JPG, PNG ou WebP)";
+  if (!mimeDoAnexo(arquivo.name, arquivo.type)) {
+    return `Formato não permitido (só ${ANEXO_FORMATOS_TEXTO})`;
   }
   if (arquivo.size > ANEXO_TAMANHO_MAXIMO_BYTES) {
     return "Arquivo maior que 10 MB";
@@ -39,7 +40,8 @@ export function PreviaAnexo({ arquivo }: { arquivo: File | undefined }) {
 /**
  * "Escolher arquivo" de anexo (nome anexoArquivo): imagem escolhida é
  * comprimida no navegador (WebP, lado maior até 2000 px — só se ficar menor)
- * e substitui o arquivo do próprio input; PDF vai como está.
+ * e substitui o arquivo do próprio input; PDF e HTML vão como estão (o HTML é
+ * limpo no servidor).
  */
 export function CampoArquivoAnexo({ onErro }: { onErro: (erro: string | undefined) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,7 +64,8 @@ export function CampoArquivoAnexo({ onErro }: { onErro: (erro: string | undefine
 
   return (
     <div className="flex flex-col gap-1">
-      <Input ref={inputRef} type="file" name="anexoArquivo" accept={ANEXO_MIME_TYPES.join(",")} onChange={aoEscolher} />
+      <Input ref={inputRef} type="file" name="anexoArquivo" accept={ANEXO_ACCEPT} onChange={aoEscolher} />
+      <span className="text-muted-foreground text-xs">{ANEXO_FORMATOS_TEXTO}, até 10 MB.</span>
       {comprimindo && <span className="text-muted-foreground text-xs">Otimizando imagem...</span>}
       <PreviaAnexo arquivo={arquivo} />
     </div>

@@ -1,11 +1,13 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { ClipboardPaste, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { ClipboardPaste, File as FileIcon, FileCode, FileText, Image as ImageIcon, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { tipoVisualAnexo } from "@/lib/casos/anexo-tipo";
 import { ANEXO_TIPO_LABELS } from "@/lib/labels";
 import { imagensDaAreaDeTransferencia } from "@/lib/colar-imagem";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
@@ -42,6 +44,23 @@ function BotaoDownload({ anexo, gerarUrl }: { anexo: AnexoRow; gerarUrl: AcoesAn
       </Button>
       {erro && <span className="text-destructive text-xs">{erro}</span>}
     </div>
+  );
+}
+
+const ICONE_ANEXO = { html: FileCode, pdf: FileText, imagem: ImageIcon, outro: FileIcon } as const;
+const ROTULO_ICONE = { html: "Página HTML", pdf: "PDF", imagem: "Imagem", outro: "Arquivo" } as const;
+
+/**
+ * HTML nunca abre pela URL do Storage: "Abrir" leva ao visualizador da Aura
+ * (iframe com sandbox, sem scripts — casos/[id]/anexos/[anexoId]).
+ */
+function BotaoAbrirHtml({ casoId, anexo }: { casoId: string; anexo: AnexoRow }) {
+  return (
+    <Button asChild variant="outline" size="sm">
+      <Link href={`/casos/${casoId}/anexos/${anexo.id}`} target="_blank" rel="noopener noreferrer">
+        Abrir
+      </Link>
+    </Button>
   );
 }
 
@@ -123,17 +142,24 @@ export function AnexosSecao({
           <p className="text-muted-foreground text-sm">Nenhum anexo enviado ainda.</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {anexos.map((a) => (
-              <li key={a.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium">{a.nome_arquivo}</span>
-                  <span className="text-muted-foreground text-xs">
-                    {ANEXO_TIPO_LABELS[a.tipo_documento]} · {new Date(a.enviado_em).toLocaleDateString("pt-BR")}
-                  </span>
-                </div>
-                <BotaoDownload anexo={a} gerarUrl={acoes.gerarUrl} />
-              </li>
-            ))}
+            {anexos.map((a) => {
+              const tipo = tipoVisualAnexo(a.nome_arquivo);
+              const Icone = ICONE_ANEXO[tipo];
+              return (
+                <li key={a.id} className="flex items-center justify-between gap-2 rounded-md border p-2" data-testid="anexo" data-tipo={tipo}>
+                  <div className="flex items-center gap-2">
+                    <Icone className="text-muted-foreground size-5 shrink-0" aria-label={ROTULO_ICONE[tipo]} role="img" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{a.nome_arquivo}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {ANEXO_TIPO_LABELS[a.tipo_documento]} · {new Date(a.enviado_em).toLocaleDateString("pt-BR")}
+                      </span>
+                    </div>
+                  </div>
+                  {tipo === "html" ? <BotaoAbrirHtml casoId={casoId} anexo={a} /> : <BotaoDownload anexo={a} gerarUrl={acoes.gerarUrl} />}
+                </li>
+              );
+            })}
           </ul>
         )}
 
