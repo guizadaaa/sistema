@@ -1170,6 +1170,8 @@ export interface Database {
           compras_sem_valor: number;
           /** Alguma compra que casou no filtro está sem valor. */
           soma_parcial: boolean;
+          produtos: number[];
+          compra_produto: number | null;
         }[];
       };
       base_clientes_compras: {

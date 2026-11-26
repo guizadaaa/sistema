@@ -1,6 +1,7 @@
 // Utilitários puros da tela "Base de clientes" (sem server-only: usados no
 // navegador e na exportação).
 
+import { isCodigoProduto } from "./produtos";
 import { isTipoServico } from "./tipos-servico";
 
 /** Chaves aceitas na URL / no filtro salvo (as que base_clientes_buscar usa). */
@@ -11,21 +12,19 @@ export const CHAVES_FILTRO = [
   "valor_ate",
   "total_de",
   "total_ate",
-  "futura",
   "camp",
-  "ca_tipo",
+  // "Comprou" / "Voltou de": produto (1º dígito do Roteiro Systur) e serviço.
+  "produto",
+  "servico",
   "ca_destino",
   "ca_de",
   "ca_ate",
   "ca_sem_tipo",
-  "cr_tipo",
   "cr_destino",
   "cr_a_de",
   "cr_a_ate",
   "cr_sem",
   "cr_mesmo_destino",
-  "cr_b_de",
-  "cr_b_ate",
 ] as const;
 
 export type ChaveFiltro = (typeof CHAVES_FILTRO)[number];
@@ -34,15 +33,15 @@ export type Campanha = "adicional" | "recompra";
 
 /** Campos da frase de cada campanha (o bloco de baixo é o resto). */
 export const CAMPOS_FRASE: Record<Campanha, ChaveFiltro[]> = {
-  adicional: ["ca_tipo", "ca_destino", "ca_de", "ca_ate", "ca_sem_tipo"],
-  recompra: ["cr_tipo", "cr_destino", "cr_a_de", "cr_a_ate", "cr_sem", "cr_mesmo_destino", "cr_b_de", "cr_b_ate"],
+  adicional: ["produto", "servico", "ca_destino", "ca_de", "ca_ate", "ca_sem_tipo"],
+  recompra: ["produto", "servico", "cr_destino", "cr_a_de", "cr_a_ate", "cr_sem", "cr_mesmo_destino"],
 };
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 const NUMERO = /^\d+([.,]\d+)?$/;
-const CHAVES_DATA = new Set(["embarque_de", "embarque_ate", "compra_de", "compra_ate", "ca_de", "ca_ate", "cr_a_de", "cr_a_ate", "cr_b_de", "cr_b_ate"]);
+const CHAVES_DATA = new Set(["embarque_de", "embarque_ate", "compra_de", "compra_ate", "ca_de", "ca_ate", "cr_a_de", "cr_a_ate"]);
 const CHAVES_NUMERO = new Set(["valor_de", "valor_ate", "total_de", "total_ate"]);
-const CHAVES_TIPO = new Set(["tipo", "ca_tipo", "ca_sem_tipo", "cr_tipo"]);
+const CHAVES_TIPO = new Set(["servico", "tipo", "ca_tipo", "ca_sem_tipo", "cr_tipo"]);
 
 /** Valor válido de uma chave (atual ou antiga) ou undefined. */
 function lerValor(chave: string, bruto: string | string[] | undefined): string | undefined {
@@ -51,36 +50,40 @@ function lerValor(chave: string, bruto: string | string[] | undefined): string |
   if (CHAVES_DATA.has(chave)) return DATA.test(valor) ? valor : undefined;
   if (CHAVES_NUMERO.has(chave)) return NUMERO.test(valor) ? valor.replace(",", ".") : undefined;
   if (CHAVES_TIPO.has(chave)) return isTipoServico(valor) ? valor : undefined;
+  if (chave === "produto") return /^\d$/.test(valor) && isCodigoProduto(Number(valor)) ? valor : undefined;
   if (chave === "cr_sem") return valor === "nada" || isTipoServico(valor) ? valor : undefined;
   if (chave === "camp") return valor === "adicional" || valor === "recompra" ? valor : undefined;
   if (chave === "cr_escopo") return valor === "nada" || valor === "mesmo" ? valor : undefined;
-  if (chave === "futura" || chave === "cr_mesmo_destino") return valor === "1" ? valor : undefined;
+  if (chave === "cr_mesmo_destino") return valor === "1" ? valor : undefined;
   return valor.slice(0, 120);
 }
 
-/** "vazia" (base geral), "incompleta" (falta o "não comprou": não busca) ou "completa". */
+/**
+ * "vazia" (Venda adicional: todos com viagem futura; Recompra: clientes
+ * parados), "incompleta" (falta o "não comprou": não busca) ou "completa".
+ */
 export function estadoFrase(filtros: FiltrosBase): "vazia" | "incompleta" | "completa" {
   const camp: Campanha = filtros.camp === "recompra" ? "recompra" : "adicional";
   if (!CAMPOS_FRASE[camp].some((c) => filtros[c])) return "vazia";
   return (camp === "adicional" ? filtros.ca_sem_tipo : filtros.cr_sem) ? "completa" : "incompleta";
 }
 
-/** "Só com viagem futura" vale com a frase vazia e na Recompra (na Venda adicional preenchida o período já é a viagem). */
-export function mostraViagemFutura(filtros: FiltrosBase): boolean {
-  return filtros.camp === "recompra" || estadoFrase(filtros) === "vazia";
-}
-
 /**
  * Só as chaves conhecidas, com valor válido (o resto é ignorado). Campanha é
- * sempre "adicional" ou "recompra": sem camp (ou com o antigo "Nenhuma", que
- * mandava camp vazio) abre em Venda adicional.
+ * sempre "adicional" ou "recompra" (sem camp / antiga "Nenhuma" → Venda
+ * adicional).
  *
- * Filtros salvos antigos: o que saiu do bloco de baixo vai para a frase
- * quando cabe — destino → destino da frase; tipo → tipo do "Comprou";
- * embarque → período de embarque (Venda adicional); data da compra → 1º
- * período (Recompra); cr_escopo → "não comprou" (nada / mesmo tipo e mesmo
- * destino). O que não cabe é descartado. Frase incompleta (sem "não
- * comprou") abre com a dica e o Filtrar desligado.
+ * Filtros salvos antigos — o que cabe vai para a frase, o resto é descartado:
+ *   ca_tipo / cr_tipo / tipo → serviço do "Comprou / Voltou de";
+ *   destino → destino da frase;
+ *   embarque → período de embarque (Venda adicional);
+ *   1º período da Recompra (cr_a_*, antes data da COMPRA) → vale como
+ *     período de RETORNO; data da compra antiga (compra_*) idem;
+ *   2º período da Recompra (cr_b_*) → descartado: agora é "depois de voltar";
+ *   cr_escopo → "não comprou" (nada / mesmo serviço e mesmo destino);
+ *   "Só com viagem futura" (futura) → descartado (as campanhas já fixam a
+ *     situação da viagem).
+ * Frase incompleta (sem "não comprou") abre com a dica e o Filtrar desligado.
  */
 export function lerFiltros(params: Record<string, string | string[] | undefined>): FiltrosBase {
   const filtros: FiltrosBase = {};
@@ -92,19 +95,19 @@ export function lerFiltros(params: Record<string, string | string[] | undefined>
   const antigo = (chave: string) => lerValor(chave, params[chave]);
 
   if (filtros.camp === "adicional") {
+    filtros.servico ??= antigo("ca_tipo") ?? antigo("tipo");
     filtros.ca_destino ??= antigo("destino");
-    filtros.ca_tipo ??= antigo("tipo");
     filtros.ca_de ??= antigo("embarque_de");
     filtros.ca_ate ??= antigo("embarque_ate");
   } else {
+    filtros.servico ??= antigo("cr_tipo") ?? antigo("tipo");
     filtros.cr_destino ??= antigo("destino");
-    filtros.cr_tipo ??= antigo("tipo");
     filtros.cr_a_de ??= antigo("compra_de");
     filtros.cr_a_ate ??= antigo("compra_ate");
     const escopo = antigo("cr_escopo");
     if (escopo && !filtros.cr_sem && CAMPOS_FRASE.recompra.some((c) => filtros[c])) {
-      // "nada daquele tipo/destino" vira "não comprou <o mesmo tipo> para o mesmo destino".
-      filtros.cr_sem = escopo === "mesmo" ? (filtros.cr_tipo ?? "nada") : "nada";
+      // "nada daquele tipo/destino" vira "não comprou <o mesmo serviço> para o mesmo destino".
+      filtros.cr_sem = escopo === "mesmo" ? (filtros.servico ?? "nada") : "nada";
       if (escopo === "mesmo") filtros.cr_mesmo_destino = "1";
     }
   }
@@ -115,7 +118,6 @@ export function lerFiltros(params: Record<string, string | string[] | undefined>
     else if (chave.startsWith("ca_") && filtros.camp !== "adicional") delete filtros[chave];
     else if (chave.startsWith("cr_") && filtros.camp !== "recompra") delete filtros[chave];
   }
-  if (!mostraViagemFutura(filtros)) delete filtros.futura;
   return filtros;
 }
 
@@ -156,34 +158,32 @@ export function somarDiasIso(iso: string, n: number): string {
 
 export type Atalho = { rotulo: string; de: string; ate: string };
 
-/** Venda adicional: embarque de hoje até daqui a 30/60/90 dias ou 6 meses. */
+/** Venda adicional: embarque de amanhã (nunca data passada) até daqui a 30/60/90 dias ou 6 meses. */
 export function atalhosEmbarque(hoje: string): Atalho[] {
+  const amanha = somarDiasIso(hoje, 1);
   return [
-    { rotulo: "próx. 30 dias", de: hoje, ate: somarDiasIso(hoje, 30) },
-    { rotulo: "60 dias", de: hoje, ate: somarDiasIso(hoje, 60) },
-    { rotulo: "90 dias", de: hoje, ate: somarDiasIso(hoje, 90) },
-    { rotulo: "6 meses", de: hoje, ate: somarMesesIso(hoje, 6) },
+    { rotulo: "próx. 30 dias", de: amanha, ate: somarDiasIso(hoje, 30) },
+    { rotulo: "60 dias", de: amanha, ate: somarDiasIso(hoje, 60) },
+    { rotulo: "90 dias", de: amanha, ate: somarDiasIso(hoje, 90) },
+    { rotulo: "6 meses", de: amanha, ate: somarMesesIso(hoje, 6) },
   ];
 }
 
 /**
- * Recompra (1º período, data da compra): "ano passado" = 01/01 a 31/12 do ano
- * anterior; "mesmo período do ano passado" = os 3 meses que começam em hoje
- * há um ano (quem comprou nesta época no ano passado).
+ * Recompra (período de RETORNO, até ontem — só viagem encerrada): últimos
+ * 30/90 dias, 6 meses, 1 ano; "mesmo período do ano passado" = os 3 meses que
+ * começam em hoje há um ano.
  */
 export function atalhosRecompra(hoje: string): Atalho[] {
-  const ano = Number(hoje.slice(0, 4)) - 1;
+  const ontem = somarDiasIso(hoje, -1);
   const inicio = somarMesesIso(hoje, -12);
   return [
-    { rotulo: "ano passado", de: `${ano}-01-01`, ate: `${ano}-12-31` },
+    { rotulo: "últimos 30 dias", de: somarDiasIso(hoje, -30), ate: ontem },
+    { rotulo: "90 dias", de: somarDiasIso(hoje, -90), ate: ontem },
+    { rotulo: "6 meses", de: somarMesesIso(hoje, -6), ate: ontem },
+    { rotulo: "1 ano", de: somarMesesIso(hoje, -12), ate: ontem },
     { rotulo: "mesmo período do ano passado", de: inicio, ate: somarDiasIso(somarMesesIso(inicio, 3), -1) },
   ];
-}
-
-/** 2º período padrão da Recompra: do dia seguinte ao fim do 1º até hoje (null se o 1º não terminou antes de hoje). */
-export function segundoPeriodo(fimPrimeiro: string | undefined, hoje: string): { de: string; ate: string } | null {
-  if (!fimPrimeiro || !DATA.test(fimPrimeiro) || fimPrimeiro >= hoje) return null;
-  return { de: somarDiasIso(fimPrimeiro, 1), ate: hoje };
 }
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;

@@ -52,20 +52,15 @@ declare
 begin
   perform perf.medir(p_usuario, 'buscar (sem filtro, página 1)', $q$select * from public.base_clientes_buscar('{}', 50, 0)$q$);
   perform perf.medir(p_usuario, 'buscar (página 50)', $q$select * from public.base_clientes_buscar('{}', 50, 2450)$q$);
-  perform perf.medir(p_usuario, 'buscar (frase vazia + futura)', $q$select * from public.base_clientes_buscar('{"camp":"adicional","futura":"1"}', 50, 0)$q$);
+  perform perf.medir(p_usuario, 'buscar (adicional: frase vazia = viagens futuras)', $q$select * from public.base_clientes_buscar('{"camp":"adicional"}', 50, 0)$q$);
   perform perf.medir(p_usuario, 'buscar (vendedor: ex todos)', $q$select * from public.base_clientes_buscar('{"vendedor":"grupo:ex"}', 50, 0)$q$);
-  perform perf.medir(p_usuario, 'buscar (campanha aéreo s/ ingresso)', $q$select * from public.base_clientes_buscar('{"camp":"adicional","ca_tipo":"aereo","ca_destino":"orlando","ca_de":"2026-11-01","ca_sem_tipo":"ingresso"}', 50, 0)$q$);
   perform perf.medir(p_usuario, 'buscar (adicional: aéreo orlando 6 meses s/ ingresso)', format($q$select * from public.base_clientes_buscar(%L, 50, 0)$q$,
-    jsonb_build_object('camp', 'adicional', 'ca_tipo', 'aereo', 'ca_destino', 'orlando', 'ca_de', current_date, 'ca_ate', current_date + interval '6 months', 'ca_sem_tipo', 'ingresso')));
-  perform perf.medir(p_usuario, 'buscar (recompra: ano passado, nada, qualquer destino)', format($q$select * from public.base_clientes_buscar(%L, 50, 0)$q$,
-    jsonb_build_object('camp', 'recompra', 'cr_a_de', make_date(extract(year from current_date)::int - 1, 1, 1), 'cr_a_ate', make_date(extract(year from current_date)::int - 1, 12, 31),
-      'cr_sem', 'nada', 'cr_b_de', make_date(extract(year from current_date)::int, 1, 1), 'cr_b_ate', current_date)));
-  perform perf.medir(p_usuario, 'buscar (recompra: ano passado, nada, mesmo destino)', format($q$select * from public.base_clientes_buscar(%L, 50, 0)$q$,
-    jsonb_build_object('camp', 'recompra', 'cr_a_de', make_date(extract(year from current_date)::int - 1, 1, 1), 'cr_a_ate', make_date(extract(year from current_date)::int - 1, 12, 31),
-      'cr_sem', 'nada', 'cr_mesmo_destino', '1', 'cr_b_de', make_date(extract(year from current_date)::int, 1, 1), 'cr_b_ate', current_date)));
-  perform perf.medir(p_usuario, 'buscar (recompra: aéreo orlando, não comprou aéreo, mesmo destino)', format($q$select * from public.base_clientes_buscar(%L, 50, 0)$q$,
-    jsonb_build_object('camp', 'recompra', 'cr_tipo', 'aereo', 'cr_destino', 'orlando', 'cr_a_de', current_date - 730, 'cr_a_ate', current_date - 366,
-      'cr_sem', 'aereo', 'cr_mesmo_destino', '1', 'cr_b_de', current_date - 365, 'cr_b_ate', current_date)));
+    jsonb_build_object('camp', 'adicional', 'servico', 'aereo', 'ca_destino', 'orlando', 'ca_de', current_date + 1, 'ca_ate', current_date + interval '6 months', 'ca_sem_tipo', 'ingresso')));
+  perform perf.medir(p_usuario, 'buscar (adicional: pacote exclusivo + passeio)', $q$select * from public.base_clientes_buscar('{"camp":"adicional","produto":"4","servico":"passeio","ca_sem_tipo":"seguro"}', 50, 0)$q$);
+  perform perf.medir(p_usuario, 'buscar (recompra: frase vazia = clientes parados)', $q$select * from public.base_clientes_buscar('{"camp":"recompra"}', 50, 0)$q$);
+  perform perf.medir(p_usuario, 'buscar (recompra: voltou em 1 ano, nada, mesmo destino)', format($q$select * from public.base_clientes_buscar(%L, 50, 0)$q$,
+    jsonb_build_object('camp', 'recompra', 'cr_a_de', current_date - 365, 'cr_a_ate', current_date - 1, 'cr_sem', 'nada', 'cr_mesmo_destino', '1')));
+  perform perf.medir(p_usuario, 'buscar (recompra: internacional + aéreo, não comprou aéreo)', $q$select * from public.base_clientes_buscar('{"camp":"recompra","produto":"9","servico":"aereo","cr_sem":"aereo"}', 50, 0)$q$);
   select cliente_id into v_cliente from public.base_clientes_buscar('{}', 1, 0);
   perform perf.medir(p_usuario, 'compras do cliente (expandir)', format($q$select * from public.base_clientes_compras(%L)$q$, v_cliente));
   perform perf.medir(p_usuario, 'opções de vendedor', $q$select * from public.base_clientes_vendedores_opcoes()$q$);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Copy, Download, MessageCircle, MessageSquareText } from "lucide-react";
 
@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { dataBr, filtrosParaQuery, linkFastzap, telefoneNacional, montarMensagem, tempoDesde, type FiltrosBase } from "@/lib/clientes/base-util";
 import type { ClienteBase, CompraCliente, ModeloMensagem } from "@/lib/clientes/base";
-import { isTipoServico, TIPO_SERVICO_LABELS } from "@/lib/clientes/tipos-servico";
 import { formatarMoeda } from "@/lib/formatacao";
 import type { CategoriaVendedor } from "@/lib/supabase/types";
+
+import { EVENTO_CAMPANHA } from "./filtros-base";
+import { ProdutosIcones, ServicosIcones } from "./icones-viagem";
 
 export type AcoesLista = {
   buscarComprasCliente: (id: string) => Promise<{ compras?: CompraCliente[]; error?: string }>;
@@ -42,18 +44,6 @@ export function Vendedor({ nome, categoria }: { nome: string | null; categoria: 
 
 function Valor({ valor }: { valor: number | string | null | undefined }) {
   return valor === null || valor === undefined ? <NaoColetado oque="valor" /> : <>{formatarMoeda(Number(valor))}</>;
-}
-
-export function TiposBadges({ tipos }: { tipos: string[] }) {
-  return (
-    <span className="flex flex-wrap gap-1">
-      {tipos.filter(isTipoServico).map((t) => (
-        <Badge key={t} variant="secondary" data-testid="tipo">
-          {TIPO_SERVICO_LABELS[t]}
-        </Badge>
-      ))}
-    </span>
-  );
 }
 
 function BotaoCopiar({ texto, rotulo, children, testId }: { texto: string; rotulo: string; children?: React.ReactNode; testId?: string }) {
@@ -117,7 +107,7 @@ function ComprasCliente({ compras }: { compras: CompraCliente[] }) {
                 {c.data_retorno && c.data_retorno !== c.data_viagem ? ` → ${dataBr(c.data_retorno)}` : ""}
               </td>
               <td className="py-1.5 pr-3">
-                <TiposBadges tipos={c.tipos_servico} />
+                <ServicosIcones tipos={c.tipos_servico} />
               </td>
               <td className="py-1.5 pr-3 text-right whitespace-nowrap">
                 <Valor valor={c.valor} />
@@ -262,7 +252,10 @@ function LinhaCliente({
               {cliente.proxima_viagem ? <strong className="text-foreground">{dataBr(cliente.proxima_viagem)}</strong> : "—"}
             </span>
           </div>
-          <TiposBadges tipos={cliente.tipos} />
+          <span className="flex flex-wrap items-center gap-2">
+            <ProdutosIcones produtos={cliente.produtos ?? []} />
+            <ServicosIcones tipos={cliente.tipos} />
+          </span>
           {mostrarCompraFiltro && (
             <p className="bg-muted/60 rounded-md px-2 py-1 text-sm" data-testid="compra-filtro">
               Compra do filtro: {cliente.compra_destino ? <strong>{cliente.compra_destino}</strong> : <NaoColetado oque="destino" />} ·
@@ -295,6 +288,12 @@ function LinhaCliente({
   );
 }
 
+/** Modelo de mensagem da campanha (chave "recompra" ou "venda_adicional"). */
+function modeloDaCampanha(modelos: ModeloMensagem[], camp: string | undefined): string | undefined {
+  const chave = camp === "recompra" ? "recompra" : "venda_adicional";
+  return modelos.find((m) => m.chave === chave)?.id;
+}
+
 export function ListaClientes({
   clientes,
   filtros,
@@ -316,14 +315,22 @@ export function ListaClientes({
   /** aaaa-mm-dd em São Paulo. */
   hoje: string;
 }) {
-  const [modeloId, setModeloId] = useState<string>(
-    () => modelos.find((m) => m.chave === (filtros.camp === "recompra" ? "recompra" : "venda_adicional"))?.id ?? modelos[0]?.id ?? ""
-  );
+  const [modeloId, setModeloId] = useState<string>(() => modeloDaCampanha(modelos, filtros.camp) ?? modelos[0]?.id ?? "");
+  // Trocar a campanha na frase (antes do Filtrar) troca o modelo de Mensagem junto.
+  useEffect(() => {
+    const aoTrocar = (e: Event) => {
+      const id = modeloDaCampanha(modelos, (e as CustomEvent<string>).detail);
+      if (id) setModeloId(id);
+    };
+    window.addEventListener(EVENTO_CAMPANHA, aoTrocar);
+    return () => window.removeEventListener(EVENTO_CAMPANHA, aoTrocar);
+  }, [modelos]);
   const total = Number(clientes[0]?.total_clientes ?? 0);
   const paginas = Math.max(1, Math.ceil(total / porPagina));
   const modelo = modelos.find((m) => m.id === modeloId);
-  // A campanha está sempre escolhida; "filtro" é ter algo além dela.
-  const temFiltro = Object.keys(filtros).some((k) => k !== "camp");
+  // As duas campanhas sempre recortam a viagem (futura / encerrada): a
+  // compra que casou é mostrada sempre.
+  const temFiltro = true;
 
   return (
     <Card>

@@ -13,13 +13,13 @@ import {
   CAMPOS_FRASE,
   estadoFrase,
   filtrosParaQuery,
-  mostraViagemFutura,
-  segundoPeriodo,
+  somarDiasIso,
   type Atalho,
   type Campanha,
   type ChaveFiltro,
   type FiltrosBase,
 } from "@/lib/clientes/base-util";
+import { PRODUTOS } from "@/lib/clientes/produtos";
 import { TIPO_SERVICO_LABELS, TIPOS_SERVICO } from "@/lib/clientes/tipos-servico";
 import { FILIAL_LABELS } from "@/lib/labels";
 import type { OpcaoVendedorBase } from "@/lib/clientes/vendedor-opcoes";
@@ -28,6 +28,9 @@ import type { FilialCvc } from "@/lib/supabase/types";
 import type { FiltroSalvo } from "@/lib/clientes/base";
 
 import { VendedorCombobox } from "./vendedor-combobox";
+
+/** Evento da troca de campanha (o seletor de Mensagem da lista acompanha). */
+export const EVENTO_CAMPANHA = "aura:campanha";
 
 export type AcoesFiltros = {
   buscarSugestoesDestino: (termo: string) => Promise<string[]>;
@@ -56,6 +59,7 @@ function SelectTipo({
   vazio = "Qualquer",
   nada = false,
   rotulo,
+  largura = "w-32",
 }: {
   name: string;
   valor?: string;
@@ -64,9 +68,10 @@ function SelectTipo({
   /** Opção "nada" (Recompra: não comprou nada). */
   nada?: boolean;
   rotulo: string;
+  largura?: string;
 }) {
   return (
-    <select name={name} value={valor ?? ""} onChange={(e) => onChange(e.target.value)} className={`${campoSelect} w-32`} aria-label={rotulo}>
+    <select name={name} value={valor ?? ""} onChange={(e) => onChange(e.target.value)} className={`${campoSelect} ${largura}`} aria-label={rotulo}>
       <option value="">{vazio}</option>
       {nada && <option value="nada">nada</option>}
       {TIPOS_SERVICO.map((t) => (
@@ -78,8 +83,38 @@ function SelectTipo({
   );
 }
 
-function Data({ name, valor, onChange, rotulo }: { name: string; valor?: string; onChange: (v: string) => void; rotulo: string }) {
-  return <Input type="date" name={name} value={valor ?? ""} onChange={(e) => onChange(e.target.value)} className="w-36" aria-label={rotulo} />;
+function Data({
+  name,
+  valor,
+  onChange,
+  rotulo,
+  min,
+  max,
+}: {
+  name: string;
+  valor?: string;
+  onChange: (v: string) => void;
+  rotulo: string;
+  min?: string;
+  max?: string;
+}) {
+  return (
+    <Input type="date" name={name} value={valor ?? ""} min={min} max={max} onChange={(e) => onChange(e.target.value)} className="w-36" aria-label={rotulo} />
+  );
+}
+
+/** Produto pelo 1º dígito do Roteiro Systur ("Outros" não entra no filtro). */
+function SelectProduto({ valor, onChange }: { valor?: string; onChange: (v: string) => void }) {
+  return (
+    <select name="produto" value={valor ?? ""} onChange={(e) => onChange(e.target.value)} className={`${campoSelect} w-40`} aria-label="produto">
+      <option value="">Qualquer produto</option>
+      {PRODUTOS.map((p) => (
+        <option key={p.codigo} value={String(p.codigo)}>
+          {p.rotulo}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 function Atalhos({ atalhos, aplicar, rotulo = "atalhos" }: { atalhos: Atalho[]; aplicar: (a: Atalho) => void; rotulo?: string }) {
@@ -173,11 +208,11 @@ export function FiltrosBaseClientes({
   opcoesVendedor: OpcaoVendedorBase[];
   salvos: FiltroSalvo[];
   acoes: AcoesFiltros;
-  /** aaaa-mm-dd em São Paulo (atalhos e 2º período da Recompra). */
+  /** aaaa-mm-dd em São Paulo (atalhos e limites de data). */
   hoje: string;
 }) {
   const [campanha, setCampanha] = useState<Campanha>(filtros.camp === "recompra" ? "recompra" : "adicional");
-  // A frase é controlada: o Filtrar e o "Só com viagem futura" dependem dela.
+  // A frase é controlada: o Filtrar depende dela.
   const [frase, setFrase] = useState<FiltrosBase>(() =>
     Object.fromEntries([...CAMPOS_FRASE.adicional, ...CAMPOS_FRASE.recompra].map((c) => [c, filtros[c] ?? ""]))
   );
@@ -187,12 +222,15 @@ export function FiltrosBaseClientes({
   const atual: FiltrosBase = { camp: campanha, ...Object.fromEntries(Object.entries(frase).filter(([, v]) => v)) };
   const estado = estadoFrase(atual);
   const campo = (chave: ChaveFiltro) => (v: string) => setFrase((f) => ({ ...f, [chave]: v }));
-  // 1º período da Recompra escolhido: o 2º vai do dia seguinte até hoje (dá para trocar depois).
-  const primeiroPeriodo = (de: string | undefined, ate: string | undefined) =>
-    setFrase((f) => {
-      const b = segundoPeriodo(ate, hoje);
-      return { ...f, cr_a_de: de ?? f.cr_a_de, cr_a_ate: ate ?? f.cr_a_ate, ...(b ? { cr_b_de: b.de, cr_b_ate: b.ate } : {}) };
-    });
+  const amanha = somarDiasIso(hoje, 1);
+  const ontem = somarDiasIso(hoje, -1);
+  // "Comprou / Voltou de": produto e serviço lado a lado (um, outro ou os dois).
+  const produtoServico = (
+    <>
+      <SelectProduto valor={frase.produto} onChange={campo("produto")} />
+      <SelectTipo name="servico" valor={frase.servico} onChange={campo("servico")} vazio="Qualquer serviço" rotulo="serviço" largura="w-40" />
+    </>
+  );
 
   return (
     <form method="get" data-testid="filtros-base">
@@ -209,7 +247,17 @@ export function FiltrosBaseClientes({
               ] as const
             ).map(([valor, rotulo]) => (
               <label key={valor} className="flex items-center gap-1.5">
-                <input type="radio" name="camp" value={valor} checked={campanha === valor} onChange={() => setCampanha(valor)} />
+                <input
+                  type="radio"
+                  name="camp"
+                  value={valor}
+                  checked={campanha === valor}
+                  onChange={() => {
+                    setCampanha(valor);
+                    // A lista troca o modelo de Mensagem junto (lista-clientes.tsx).
+                    window.dispatchEvent(new CustomEvent(EVENTO_CAMPANHA, { detail: valor }));
+                  }}
+                />
                 {rotulo}
               </label>
             ))}
@@ -219,20 +267,21 @@ export function FiltrosBaseClientes({
             <div className="flex flex-col gap-2 text-sm" data-testid="campanha-adicional">
               <Linha>
                 Comprou
-                <SelectTipo name="ca_tipo" valor={frase.ca_tipo} onChange={campo("ca_tipo")} rotulo="comprou (tipo)" />
+                {produtoServico}
                 para
                 <DestinoComSugestoes name="ca_destino" valor={frase.ca_destino} onChange={campo("ca_destino")} buscar={acoes.buscarSugestoesDestino} rotulo="destino" />
               </Linha>
               <Linha>
                 com embarque entre
-                <Data name="ca_de" valor={frase.ca_de} onChange={campo("ca_de")} rotulo="embarque de" />e
-                <Data name="ca_ate" valor={frase.ca_ate} onChange={campo("ca_ate")} rotulo="embarque até" />
+                <Data name="ca_de" valor={frase.ca_de} onChange={campo("ca_de")} rotulo="embarque de" min={amanha} />e
+                <Data name="ca_ate" valor={frase.ca_ate} onChange={campo("ca_ate")} rotulo="embarque até" min={amanha} />
                 <Atalhos atalhos={atalhosEmbarque(hoje)} aplicar={(a) => setFrase((f) => ({ ...f, ca_de: a.de, ca_ate: a.ate }))} />
               </Linha>
               <Linha>
                 e <strong>não comprou</strong>
-                <SelectTipo name="ca_sem_tipo" valor={frase.ca_sem_tipo} onChange={campo("ca_sem_tipo")} vazio="—" rotulo="não comprou (tipo)" />
+                <SelectTipo name="ca_sem_tipo" valor={frase.ca_sem_tipo} onChange={campo("ca_sem_tipo")} vazio="—" rotulo="não comprou (serviço)" />
                 na mesma viagem.
+                <span className="text-muted-foreground text-xs">· só viagens que ainda não embarcaram</span>
               </Linha>
             </div>
           )}
@@ -240,18 +289,20 @@ export function FiltrosBaseClientes({
           {campanha === "recompra" && (
             <div className="flex flex-col gap-2 text-sm" data-testid="campanha-recompra">
               <Linha>
-                Comprou
-                <SelectTipo name="cr_tipo" valor={frase.cr_tipo} onChange={campo("cr_tipo")} rotulo="comprou (tipo)" />
+                <strong>Voltou de</strong>
+                {produtoServico}
                 para
                 <DestinoComSugestoes name="cr_destino" valor={frase.cr_destino} onChange={campo("cr_destino")} buscar={acoes.buscarSugestoesDestino} rotulo="destino" />
                 entre
-                <Data name="cr_a_de" valor={frase.cr_a_de} onChange={(v) => primeiroPeriodo(v, undefined)} rotulo="1º período de" />e
-                <Data name="cr_a_ate" valor={frase.cr_a_ate} onChange={(v) => primeiroPeriodo(undefined, v)} rotulo="1º período até" />
-                <Atalhos atalhos={atalhosRecompra(hoje)} aplicar={(a) => primeiroPeriodo(a.de, a.ate)} />
+                <Data name="cr_a_de" valor={frase.cr_a_de} onChange={campo("cr_a_de")} rotulo="retorno de" max={ontem} />e
+                <Data name="cr_a_ate" valor={frase.cr_a_ate} onChange={campo("cr_a_ate")} rotulo="retorno até" max={ontem} />
+              </Linha>
+              <Linha>
+                <Atalhos atalhos={atalhosRecompra(hoje)} aplicar={(a) => setFrase((f) => ({ ...f, cr_a_de: a.de, cr_a_ate: a.ate }))} />
               </Linha>
               <Linha>
                 e <strong>não comprou</strong>
-                <SelectTipo name="cr_sem" valor={frase.cr_sem} onChange={campo("cr_sem")} vazio="—" nada rotulo="não comprou (tipo)" />
+                <SelectTipo name="cr_sem" valor={frase.cr_sem} onChange={campo("cr_sem")} vazio="—" nada rotulo="não comprou (serviço)" />
                 <select
                   name="cr_mesmo_destino"
                   value={frase.cr_mesmo_destino ?? ""}
@@ -262,12 +313,9 @@ export function FiltrosBaseClientes({
                   <option value="">para qualquer destino</option>
                   <option value="1">para o mesmo destino</option>
                 </select>
-              </Linha>
-              <Linha>
-                entre
-                <Data name="cr_b_de" valor={frase.cr_b_de} onChange={campo("cr_b_de")} rotulo="2º período de" />e
-                <Data name="cr_b_ate" valor={frase.cr_b_ate} onChange={campo("cr_b_ate")} rotulo="2º período até" />
-                <span className="text-muted-foreground text-xs">· padrão: do dia seguinte ao fim do 1º período até hoje</span>
+                <span>
+                  <strong>depois de voltar</strong>.
+                </span>
               </Linha>
             </div>
           )}
@@ -301,12 +349,6 @@ export function FiltrosBaseClientes({
                 <Input type="number" min="0" step="0.01" name="valor_ate" defaultValue={filtros.valor_ate ?? ""} placeholder="até" className="w-24" aria-label="valor até" />
               </div>
             </Campo>
-            {mostraViagemFutura(atual) && (
-              <label className="flex h-9 items-center gap-2 text-sm">
-                <input type="checkbox" name="futura" value="1" defaultChecked={filtros.futura === "1"} />
-                Só com viagem futura
-              </label>
-            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

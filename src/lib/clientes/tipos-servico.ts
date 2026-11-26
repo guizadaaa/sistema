@@ -3,6 +3,32 @@
 // cliente_excursoes.tipos_servico ao receber os dados, e
 // `npm run recalcular-tipos` reaplica em toda a base quando a regra mudar.
 
+/**
+ * Termos de TRANSFER no serviço do receptivo (sem acento, maiúsculas). Lista
+ * única para completar depois: qualquer um deles marca transfer.
+ */
+export const TERMOS_TRANSFER = [
+  "TRANSFER",
+  "TRASLADO",
+  "IN E OUT",
+  "IN/OUT",
+  "CHEGADA E SAIDA",
+  "TRANSPORTE COMPARTILHADO",
+  "TRANSPORTE PRIVATIVO",
+  "TRANSPORTE INDIVIDUAL",
+  "TRANSPORTE REGULAR",
+];
+
+/** "AEROPORTO" junto com "HOTEL" no serviço também é transfer. */
+export const TERMOS_TRANSFER_PAR: [string, string][] = [["AEROPORTO", "HOTEL"]];
+
+/** Transfer individual (comum em pacote exclusivo): um destes + TRANSPORTE/TRANSFER/TRASLADO. */
+export const TERMOS_TRANSFER_INDIVIDUAL = ["PRIVATIVO", "INDIVIDUAL", "EXCLUSIVO"];
+const TERMOS_TRANSPORTE = ["TRANSPORTE", "TRANSFER", "TRASLADO"];
+
+/** Categoria aérea (o grupo "Transporte Aéreo" nunca vira transfer). */
+const TERMOS_AEREO = ["AERE", "VOO", "PASSAGEM"];
+
 export const TIPOS_SERVICO = ["aereo", "hotel", "ingresso", "passeio", "transfer", "seguro", "cruzeiro", "carro"] as const;
 export type TipoServico = (typeof TIPOS_SERVICO)[number];
 
@@ -51,6 +77,19 @@ function normalizar(texto: string | null | undefined): string {
 
 const contem = (texto: string, termos: string[]) => termos.some((t) => texto.includes(t));
 
+/**
+ * Transfer: categoria de TRANSPORTE que não é aérea (ex.: "TRANSPORTES
+ * COMPARTILHADOS") ou serviço com algum termo de TERMOS_TRANSFER, "AEROPORTO"
+ * + "HOTEL", ou transfer individual (PRIVATIVO/INDIVIDUAL/EXCLUSIVO +
+ * TRANSPORTE/TRANSFER/TRASLADO). Quem chama já descartou categoria aérea.
+ */
+function ehTransfer(categoria: string, servico: string): boolean {
+  if (contem(categoria, ["TRANSPORTE", "TRANSFER", "TRASLADO"])) return true;
+  if (contem(servico, TERMOS_TRANSFER)) return true;
+  if (TERMOS_TRANSFER_PAR.some(([a, b]) => servico.includes(a) && servico.includes(b))) return true;
+  return contem(servico, TERMOS_TRANSFER_INDIVIDUAL) && contem(servico, TERMOS_TRANSPORTE);
+}
+
 /** "DISNEY - PARIS - 1 Dias 0 Noites" -> 0; "... 7 NOITES" -> 7; sem menção -> null. */
 export function noitesDaDescricao(descricao: string | null | undefined): number | null {
   const m = normalizar(descricao).match(/(\d+)\s*NOITES?\b/);
@@ -73,7 +112,8 @@ export function calcularTiposServico(dados: DadosTipoServico): TipoServico[] {
     const servico = normalizar(f.servico);
     const receptivo = normalizar(f.receptivo);
 
-    if (contem(categoria, ["AERE", "VOO", "PASSAGEM"])) tipos.add("aereo");
+    const aereo = contem(categoria, TERMOS_AEREO);
+    if (aereo) tipos.add("aereo");
     if (contem(categoria, ["HOTEL", "HOSPEDAGEM"])) tipos.add("hotel");
 
     const ingresso = contem(servico, ["INGRESSO", "PARQUE"]);
@@ -82,7 +122,8 @@ export function calcularTiposServico(dados: DadosTipoServico): TipoServico[] {
       tipos.add("passeio");
     }
 
-    if (contem(categoria, ["TRANSFER", "TRASLADO"]) || contem(servico, ["TRANSFER", "TRASLADO"])) tipos.add("transfer");
+    // Um mesmo receptivo pode dar transfer + passeio ("In e Out ... + City Tour").
+    if (!aereo && ehTransfer(categoria, servico)) tipos.add("transfer");
     if (contem(categoria, ["SEGURO"])) tipos.add("seguro");
     if (contem(categoria, ["CRUZEIRO"]) || contem(receptivo, ["CRUZEIRO"]) || contem(servico, ["CRUZEIRO"])) {
       tipos.add("cruzeiro");
