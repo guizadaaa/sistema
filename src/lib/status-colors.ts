@@ -33,3 +33,13 @@ export const STATUS_DOT_PASSADO: Record<StatusCaso, string> = {
   resolvido: "bg-status-resolvido/35",
   ouvidoria: "bg-status-ouvidoria/35",
 };
+
+// Número da tabela "Casos por status" (página inicial): só o texto na cor do status.
+export const STATUS_TEXTO_CLASSES: Record<StatusCaso, string> = {
+  inicial: "text-status-inicial-ink",
+  recepcionado: "text-status-recepcionado-ink",
+  em_andamento_interno: "text-status-em-andamento-interno-ink",
+  reavaliacao: "text-status-reavaliacao-ink",
+  resolvido: "text-status-resolvido-ink",
+  ouvidoria: "text-status-ouvidoria-ink",
+};
