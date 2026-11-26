@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { enviarImagensDescricao } from "./anexos";
+import { ANEXO_TIPO_LABELS } from "@/lib/labels";
+import { anexoObrigatorioFaltando } from "@/lib/validation/desfecho";
+import { ANEXO_TIPOS_DOCUMENTO } from "@/lib/validation/caso";
+
+import { enviarImagensDescricao, isTipoDocumentoAnexo, validarEEnviarAnexos } from "./anexos";
 
 function criarSupabaseFake() {
   const uploads: string[] = [];
@@ -74,5 +78,43 @@ describe("enviarImagensDescricao", () => {
     const { supabase, uploads } = criarSupabaseFake();
     expect(await enviarImagensDescricao(supabase, "caso-1", new FormData())).toEqual([]);
     expect(uploads).toEqual([]);
+  });
+});
+
+describe("categorias de anexo dos sistemas (FastZap, Orbium, Systur, Atlas)", () => {
+  it("ordem do select: as 3 documentais, os 4 sistemas e Outro por último", () => {
+    expect(ANEXO_TIPOS_DOCUMENTO.map((t) => ANEXO_TIPO_LABELS[t])).toEqual([
+      "Carta de cancelamento",
+      "Atestado de saúde",
+      "Certidão de óbito",
+      "FastZap",
+      "Orbium",
+      "Systur",
+      "Atlas",
+      "Outro",
+    ]);
+  });
+
+  it("aceitas no envio (mesma função da criação do caso e do protocolo já criado)", async () => {
+    const { supabase, uploads, inserts } = criarSupabaseFake();
+    const fd = new FormData();
+    for (const tipo of ["fastzap", "orbium", "systur", "atlas"]) {
+      fd.append("anexoArquivo", new File(["%PDF-1.4"], `${tipo}.pdf`, { type: "application/pdf" }));
+      fd.append("anexoTipo", tipo);
+    }
+    const avisos = await validarEEnviarAnexos(supabase as unknown as Parameters<typeof validarEEnviarAnexos>[0], "caso-1", fd);
+    expect(avisos).toEqual([]);
+    expect(uploads).toHaveLength(4);
+    expect(inserts.map((i) => i.tipo_documento)).toEqual(["fastzap", "orbium", "systur", "atlas"]);
+    expect(["fastzap", "orbium", "systur", "atlas"].every(isTipoDocumentoAnexo)).toBe(true);
+    expect(isTipoDocumentoAnexo("whatsapp")).toBe(false);
+  });
+
+  it("não contam como documento exigido do desfecho de saúde/óbito", () => {
+    const reembolsoSaude = { tipo: "reembolso", subtipoReembolso: "integral", origemReembolsoIntegral: "saude" } as Parameters<typeof anexoObrigatorioFaltando>[0];
+    const remarcacaoSaude = { tipo: "remarcacao", subtipoRemarcacao: "com_custo", origemRemarcacaoComCusto: "saude" } as Parameters<typeof anexoObrigatorioFaltando>[0];
+    expect(anexoObrigatorioFaltando(reembolsoSaude, ["systur", "fastzap", "orbium", "atlas"])).toEqual(["atestado_saude", "certidao_obito"]);
+    expect(anexoObrigatorioFaltando(remarcacaoSaude, ["systur"])).toEqual(["atestado_saude"]);
+    expect(anexoObrigatorioFaltando(reembolsoSaude, ["systur", "certidao_obito"])).toBeNull();
   });
 });
