@@ -3,9 +3,11 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import type { createClient } from "@/lib/supabase/server";
+import { mimeDoAnexo } from "@/lib/casos/anexo-tipo";
+import { decodificarHtml, limparHtmlAnexo } from "@/lib/casos/html-anexo";
 import {
   ANEXO_CACHE_CONTROL_S,
-  ANEXO_MIME_TYPES,
+  ANEXO_FORMATOS_TEXTO,
   ANEXO_TAMANHO_MAXIMO_BYTES,
   ANEXO_TIPOS_DOCUMENTO,
   DESCRICAO_IMAGEM_MIME_TYPES,
@@ -49,8 +51,11 @@ export async function validarEEnviarAnexos(
       continue;
     }
 
-    if (!(ANEXO_MIME_TYPES as readonly string[]).includes(arquivo.type)) {
-      avisos.push(`${arquivo.name}: formato não permitido (só PDF, JPG, PNG ou WebP).`);
+    // Validação que vale (a do navegador é só conveniência): .html/.htm com
+    // MIME vazio ou octet-stream é aceito pela extensão e gravado como text/html.
+    const mime = mimeDoAnexo(arquivo.name, arquivo.type);
+    if (!mime) {
+      avisos.push(`${arquivo.name}: formato não permitido (só ${ANEXO_FORMATOS_TEXTO}).`);
       continue;
     }
 
@@ -61,9 +66,16 @@ export async function validarEEnviarAnexos(
 
     const storagePath = `${casoId}/${randomUUID()}-${arquivo.name}`;
 
+    // HTML: limpo antes de gravar (sem script/iframe/on*/javascript: e sem
+    // cookie/sessão/token) e gravado em UTF-8.
+    const conteudo: File | Blob =
+      mime === "text/html"
+        ? new Blob([limparHtmlAnexo(decodificarHtml(new Uint8Array(await arquivo.arrayBuffer())))], { type: "text/html" })
+        : arquivo;
+
     // Path único por envio (randomUUID): pode ficar em cache por 1 ano.
-    const { error: uploadError } = await supabase.storage.from("anexos").upload(storagePath, arquivo, {
-      contentType: arquivo.type,
+    const { error: uploadError } = await supabase.storage.from("anexos").upload(storagePath, conteudo, {
+      contentType: mime,
       cacheControl: ANEXO_CACHE_CONTROL_S,
     });
 
