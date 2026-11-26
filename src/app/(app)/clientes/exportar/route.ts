@@ -1,6 +1,7 @@
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { buscarClientesBase, LIMITE_EXPORTACAO } from "@/lib/clientes/base";
 import { dataBr, estadoFrase, lerFiltros, montarCsv } from "@/lib/clientes/base-util";
+import { rotuloProduto } from "@/lib/clientes/produtos";
 import { TIPO_SERVICO_LABELS, isTipoServico } from "@/lib/clientes/tipos-servico";
 
 const tipos = (lista: string[]) => lista.filter(isTipoServico).map((t) => TIPO_SERVICO_LABELS[t]).join(", ");
@@ -14,8 +15,8 @@ export async function GET(request: Request) {
 
   const csv = montarCsv(
     [
-      "Cliente", "Telefones", "Lojas", "Viagens", "Total comprado (valores coletados)", "Total parcial", "Última compra", "Próxima viagem", "Tipos já comprados",
-      "Reserva (compra do filtro)", "Destino", "Embarque", "Retorno", "Valor", "Tipos da compra", "Vendedor", "Loja da compra",
+      "Cliente", "Telefones", "Lojas", "Viagens", "Total comprado (valores coletados)", "Total parcial", "Última compra", "Próxima viagem", "Produtos já comprados", "Tipos já comprados",
+      "Reserva (compra do filtro)", "Destino", "Embarque", "Retorno", "Valor", "Produto da compra", "Tipos da compra", "Vendedor", "Loja da compra",
     ],
     clientes.map((c) => [
       c.nome,
@@ -26,12 +27,14 @@ export async function GET(request: Request) {
       c.compras_sem_valor > 0 ? `sim (${c.compras_sem_valor} sem valor)` : "",
       dataBr(c.ultima_compra),
       dataBr(c.proxima_viagem),
+      (c.produtos ?? []).map(rotuloProduto).join(", "),
       tipos(c.tipos),
       c.compra_reserva,
       c.compra_destino,
       dataBr(c.compra_embarque),
       dataBr(c.compra_retorno),
       c.compra_valor === null ? null : Number(c.compra_valor),
+      c.compra_produto === null ? "" : rotuloProduto(c.compra_produto),
       tipos(c.compra_tipos),
       c.compra_vendedor && c.compra_vendedor_categoria !== "atual"
         ? `${c.compra_vendedor} (${c.compra_vendedor_categoria === "ex" ? "ex-vendedor" : "site"})`

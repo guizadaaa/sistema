@@ -80,3 +80,60 @@ describe("noitesDaDescricao", () => {
     expect(noitesDaDescricao("Ingresso")).toBeNull();
   });
 });
+
+describe("transfer (Consulta de Roteiro e Reserva)", () => {
+  const aereo = { categoria: "TRANSPORTE AÉREO", receptivo: "Gol", servico: "Voo GOL Curitiba/Fortaleza - Aeroporto Pinto Martins" };
+  const hotel = { categoria: "HOTEL", receptivo: "Hotel Praia Mar", servico: "Apartamento Standard" };
+
+  it("caso real: pacote exclusivo Fortaleza (4.00018321.26111122, reserva 306400304) -> aéreo, hotel, passeio, transfer", () => {
+    expect(
+      calcularTiposServico({
+        categoria_codigo: 4,
+        tem_voo: true,
+        descricao_roteiro: "FORTALEZA - 8 Dias 7 Noites",
+        fornecedores: [
+          aereo,
+          hotel,
+          {
+            categoria: "TRANSPORTES COMPARTILHADOS",
+            receptivo: "Receptivo Fortaleza",
+            servico:
+              "(In E Out) - Transporte Compartilhado De Chegada E Saída Do Aeroporto De Fortaleza Para Hotel Em Fortaleza + City Tour Em Fortaleza",
+          },
+        ],
+      })
+    ).toEqual(["aereo", "hotel", "passeio", "transfer"]); // ordem fixa de TIPOS_SERVICO
+  });
+
+  it("variações de pacote exclusivo", () => {
+    expect(calcularTiposServico({ categoria_codigo: 4, fornecedores: [aereo] })).toEqual(["aereo"]);
+    expect(
+      calcularTiposServico({
+        categoria_codigo: 4,
+        fornecedores: [aereo, hotel, { categoria: "RECEPTIVO", servico: "Traslado Aeroporto/Hotel/Aeroporto" }],
+      })
+    ).toEqual(["aereo", "hotel", "transfer"]);
+    expect(
+      calcularTiposServico({
+        categoria_codigo: 4,
+        fornecedores: [
+          aereo,
+          hotel,
+          { categoria: "RECEPTIVO", servico: "In/Out Regular Aeroporto - Hotel" },
+          { categoria: "ATIVIDADE", servico: "Passeio De Buggy Pelas Dunas" },
+        ],
+      })
+    ).toEqual(["aereo", "hotel", "passeio", "transfer"]); // ordem fixa de TIPOS_SERVICO
+  });
+
+  it("transfer individual/privativo", () => {
+    expect(calcularTiposServico({ fornecedores: [{ categoria: "RECEPTIVO", servico: "Transfer Privativo Aeroporto/Hotel/Aeroporto" }] })).toEqual(["transfer"]);
+    expect(calcularTiposServico({ fornecedores: [{ categoria: "RECEPTIVO", servico: "Transporte Exclusivo Do Aeroporto Ao Resort" }] })).toEqual(["transfer"]);
+    expect(calcularTiposServico({ fornecedores: [{ categoria: "SERVICOS", servico: "Chegada E Saída - Serviço Individual" }] })).toEqual(["transfer"]);
+  });
+
+  it('"Transporte Aéreo" sozinho não vira transfer', () => {
+    expect(calcularTiposServico({ fornecedores: [aereo] })).toEqual(["aereo"]);
+    expect(calcularTiposServico({ fornecedores: [{ categoria: "TRANSPORTE AEREO", servico: "Voo Regular In/Out Aeroporto Hotel" }] })).toEqual(["aereo"]);
+  });
+});

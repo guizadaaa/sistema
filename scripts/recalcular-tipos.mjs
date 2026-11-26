@@ -29,6 +29,12 @@ const mesmaLista = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? n
 let lidas = 0;
 let mudariam = 0;
 let gravadas = 0;
+// Saldo por tipo nas reservas que mudam: { transfer: { mais: 3120, menos: 0 }, ... }
+const porTipo = {};
+const contar = (tipo, campo) => {
+  porTipo[tipo] ??= { mais: 0, menos: 0 };
+  porTipo[tipo][campo] += 1;
+};
 
 for (let inicio = 0; ; inicio += LOTE) {
   const { data, error } = await supabase
@@ -56,6 +62,12 @@ for (let inicio = 0; ; inicio += LOTE) {
     }))
     .filter((i) => !mesmaLista(i.atual, i.tipos));
   mudariam += itens.length;
+  for (const i of itens) {
+    const antes = new Set(i.atual ?? []);
+    const depois = new Set(i.tipos);
+    for (const t of depois) if (!antes.has(t)) contar(t, "mais");
+    for (const t of antes) if (!depois.has(t)) contar(t, "menos");
+  }
 
   if (!simular && itens.length > 0) {
     const { data: n, error: erroGravar } = await supabase.rpc("clientes_gravar_tipos_servico", {
@@ -68,8 +80,13 @@ for (let inicio = 0; ; inicio += LOTE) {
   if (data.length < LOTE) break;
 }
 
+const saldo = Object.entries(porTipo)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([tipo, { mais, menos }]) => [mais && `+${mais.toLocaleString("pt-BR")} ${tipo}`, menos && `-${menos.toLocaleString("pt-BR")} ${tipo}`].filter(Boolean).join(" / "))
+  .join("; ");
 console.log(
   simular
     ? `${lidas} reserva(s) lidas; ${mudariam} mudariam de tipo (nada gravado, --dry-run).`
     : `${lidas} reserva(s) lidas; ${gravadas} com tipos recalculados.`
 );
+console.log(saldo ? `Por tipo: ${saldo}.` : "Nenhum tipo mudou.");

@@ -10,8 +10,6 @@ import {
   linkWhatsapp,
   montarCsv,
   montarMensagem,
-  mostraViagemFutura,
-  segundoPeriodo,
   telefoneNacional,
   tempoDesde,
 } from "./base-util";
@@ -28,25 +26,24 @@ describe("lerFiltros", () => {
         embarque_de: "2026-12-01",
         embarque_ate: "ontem",
         futura: "1",
+        produto: "4",
         hack: "x",
         vendedor: "todos",
       })
     ).toEqual({
-      // destino/tipo/embarque (antigos) migram para a frase da Venda adicional; com a
-      // frase preenchida, "Só com viagem futura" não vale.
-      loja: "1710", ca_destino: "Orlando", ca_tipo: "ingresso", valor_de: "1.000", valor_ate: "2500.50", ca_de: "2026-12-01", camp: "adicional",
+      // destino/tipo/embarque antigos migram para a frase da Venda adicional; futura sai.
+      loja: "1710", ca_destino: "Orlando", servico: "ingresso", valor_de: "1.000", valor_ate: "2500.50", ca_de: "2026-12-01", produto: "4", camp: "adicional",
     });
   });
 
-  it("campos de campanha só valem com a campanha certa; tipo inválido sai", () => {
-    expect(lerFiltros({ camp: "adicional", ca_tipo: "aereo", ca_sem_tipo: "ingresso", cr_tipo: "hotel", tipo: "xpto" })).toEqual({
+  it("campos de campanha só valem com a campanha certa; serviço/produto inválidos saem", () => {
+    expect(lerFiltros({ camp: "adicional", servico: "aereo", ca_sem_tipo: "ingresso", cr_sem: "nada", produto: "6" })).toEqual({
       camp: "adicional",
-      ca_tipo: "aereo",
+      servico: "aereo",
       ca_sem_tipo: "ingresso",
     });
-    // Sem camp, abre em Venda adicional.
-    expect(lerFiltros({ ca_tipo: "aereo" })).toEqual({ camp: "adicional", ca_tipo: "aereo" });
-    expect(lerFiltros({ camp: "recompra", ca_tipo: "aereo", cr_tipo: "hotel" })).toEqual({ camp: "recompra", cr_tipo: "hotel" });
+    expect(lerFiltros({ servico: "xpto", produto: "12" })).toEqual({ camp: "adicional" });
+    expect(lerFiltros({ camp: "recompra", ca_destino: "Natal", produto: "9", servico: "hotel" })).toEqual({ camp: "recompra", produto: "9", servico: "hotel" });
   });
 
   it("filtro salvo com a antiga campanha \"Nenhuma\" abre em Venda adicional e mantém loja, vendedor e valores", () => {
@@ -61,7 +58,7 @@ describe("lerFiltros", () => {
   });
 
   it("filtrosParaQuery monta a URL com página", () => {
-    expect(filtrosParaQuery({ camp: "adicional", ca_tipo: "aereo" }, { pagina: "2" })).toBe("camp=adicional&ca_tipo=aereo&pagina=2");
+    expect(filtrosParaQuery({ camp: "adicional", servico: "aereo" }, { pagina: "2" })).toBe("camp=adicional&servico=aereo&pagina=2");
   });
 });
 
@@ -137,70 +134,62 @@ describe("tempoDesde", () => {
 });
 
 describe("frase da campanha", () => {
-  it("vazia = base geral; parcial sem 'não comprou' = incompleta; com ele = completa", () => {
+  it("vazia (viagens futuras / clientes parados); parcial sem 'não comprou' = incompleta; com ele = completa", () => {
     expect(estadoFrase({ camp: "adicional" })).toBe("vazia");
-    expect(estadoFrase({ camp: "adicional", ca_tipo: "aereo", ca_destino: "orlando" })).toBe("incompleta");
-    expect(estadoFrase({ camp: "adicional", ca_tipo: "aereo", ca_sem_tipo: "ingresso" })).toBe("completa");
+    expect(estadoFrase({ camp: "adicional", produto: "4", ca_destino: "orlando" })).toBe("incompleta");
+    expect(estadoFrase({ camp: "adicional", servico: "aereo", ca_sem_tipo: "ingresso" })).toBe("completa");
     expect(estadoFrase({ camp: "recompra" })).toBe("vazia");
     expect(estadoFrase({ camp: "recompra", cr_a_de: "2025-01-01", cr_a_ate: "2025-12-31" })).toBe("incompleta");
     expect(estadoFrase({ camp: "recompra", cr_a_de: "2025-01-01", cr_sem: "nada" })).toBe("completa");
   });
 
-  it("'Só com viagem futura': frase vazia e Recompra sim; Venda adicional preenchida não", () => {
-    expect(mostraViagemFutura({ camp: "adicional" })).toBe(true);
-    expect(mostraViagemFutura({ camp: "recompra", cr_tipo: "aereo", cr_sem: "nada" })).toBe(true);
-    expect(mostraViagemFutura({ camp: "adicional", ca_tipo: "aereo" })).toBe(false);
-    expect(lerFiltros({ camp: "adicional", ca_tipo: "aereo", ca_sem_tipo: "ingresso", futura: "1" }).futura).toBeUndefined();
-    expect(lerFiltros({ camp: "recompra", cr_tipo: "aereo", cr_sem: "nada", futura: "1" }).futura).toBe("1");
-    expect(lerFiltros({ futura: "1" }).futura).toBe("1");
-  });
-
-  it("Recompra: 'não comprou' aceita tipo ou nada; mesmo destino é 1", () => {
+  it("Recompra: 'não comprou' aceita serviço ou nada; mesmo destino é 1", () => {
     expect(lerFiltros({ camp: "recompra", cr_sem: "nada", cr_mesmo_destino: "1" })).toEqual({ camp: "recompra", cr_sem: "nada", cr_mesmo_destino: "1" });
     expect(lerFiltros({ camp: "recompra", cr_sem: "xpto", cr_mesmo_destino: "sim" })).toEqual({ camp: "recompra" });
   });
 });
 
 describe("filtros salvos antigos", () => {
-  it("Venda adicional: destino, tipo e embarque vão para a frase; data da compra é descartada; fica incompleta", () => {
+  it("Venda adicional: destino, tipo (→ serviço) e embarque vão para a frase; data da compra é descartada; fica incompleta", () => {
     const f = lerFiltros({ camp: "adicional", destino: "Orlando", tipo: "aereo", embarque_de: "2026-12-01", embarque_ate: "2027-01-31", compra_de: "2026-01-01", loja: "1710" });
-    expect(f).toEqual({ camp: "adicional", ca_destino: "Orlando", ca_tipo: "aereo", ca_de: "2026-12-01", ca_ate: "2027-01-31", loja: "1710" });
+    expect(f).toEqual({ camp: "adicional", ca_destino: "Orlando", servico: "aereo", ca_de: "2026-12-01", ca_ate: "2027-01-31", loja: "1710" });
     expect(estadoFrase(f)).toBe("incompleta");
+    expect(lerFiltros({ camp: "adicional", ca_tipo: "aereo", ca_sem_tipo: "ingresso" })).toEqual({ camp: "adicional", servico: "aereo", ca_sem_tipo: "ingresso" });
   });
   it("antiga 'Nenhuma' com destino: abre em Venda adicional com o destino na frase", () => {
     expect(lerFiltros({ camp: "", destino: "Natal", vendedor: "grupo:ex" })).toEqual({ camp: "adicional", ca_destino: "Natal", vendedor: "grupo:ex" });
   });
-  it("Recompra: data da compra → 1º período; embarque descartado; escopo → 'não comprou'", () => {
-    expect(lerFiltros({ camp: "recompra", compra_de: "2025-01-01", compra_ate: "2025-12-31", embarque_de: "2026-01-01", cr_escopo: "nada", cr_b_de: "2026-01-01" })).toEqual({
-      camp: "recompra", cr_a_de: "2025-01-01", cr_a_ate: "2025-12-31", cr_sem: "nada", cr_b_de: "2026-01-01",
+  it("Recompra: 1º período antigo vale como período de retorno; 2º período (datas) descartado → 'depois de voltar'", () => {
+    expect(lerFiltros({ camp: "recompra", cr_tipo: "aereo", cr_a_de: "2025-01-01", cr_a_ate: "2025-12-31", cr_sem: "nada", cr_b_de: "2026-01-01", cr_b_ate: "2026-11-19", futura: "1" })).toEqual({
+      camp: "recompra", servico: "aereo", cr_a_de: "2025-01-01", cr_a_ate: "2025-12-31", cr_sem: "nada",
+    });
+    expect(lerFiltros({ camp: "recompra", compra_de: "2025-01-01", compra_ate: "2025-12-31", embarque_de: "2026-01-01", cr_escopo: "nada" })).toEqual({
+      camp: "recompra", cr_a_de: "2025-01-01", cr_a_ate: "2025-12-31", cr_sem: "nada",
     });
     expect(lerFiltros({ camp: "recompra", cr_tipo: "cruzeiro", cr_destino: "Caribe", cr_escopo: "mesmo" })).toEqual({
-      camp: "recompra", cr_tipo: "cruzeiro", cr_destino: "Caribe", cr_sem: "cruzeiro", cr_mesmo_destino: "1",
+      camp: "recompra", servico: "cruzeiro", cr_destino: "Caribe", cr_sem: "cruzeiro", cr_mesmo_destino: "1",
     });
-    // Escopo sozinho (frase vazia) não preenche a frase.
     expect(lerFiltros({ camp: "recompra", cr_escopo: "nada" })).toEqual({ camp: "recompra" });
   });
 });
 
-describe("atalhos e 2º período", () => {
-  const HOJE = "2026-11-19";
-  it("Venda adicional: próx. 30, 60, 90 dias e 6 meses a partir de hoje", () => {
+describe("atalhos", () => {
+  const HOJE = "2026-11-26";
+  it("Venda adicional: de amanhã (nunca data passada) até 30, 60, 90 dias ou 6 meses", () => {
     expect(atalhosEmbarque(HOJE).map((a) => [a.rotulo, a.de, a.ate])).toEqual([
-      ["próx. 30 dias", HOJE, "2026-12-19"],
-      ["60 dias", HOJE, "2027-01-18"],
-      ["90 dias", HOJE, "2027-02-17"],
-      ["6 meses", HOJE, "2027-05-19"],
+      ["próx. 30 dias", "2026-11-27", "2026-12-26"],
+      ["60 dias", "2026-11-27", "2027-01-25"],
+      ["90 dias", "2026-11-27", "2027-02-24"],
+      ["6 meses", "2026-11-27", "2027-05-26"],
     ]);
   });
-  it("Recompra: ano passado e mesmo período do ano passado (3 meses)", () => {
+  it("Recompra (data de retorno, até ontem): últimos 30/90 dias, 6 meses, 1 ano, mesmo período do ano passado", () => {
     expect(atalhosRecompra(HOJE).map((a) => [a.rotulo, a.de, a.ate])).toEqual([
-      ["ano passado", "2025-01-01", "2025-12-31"],
-      ["mesmo período do ano passado", "2025-11-19", "2026-02-18"],
+      ["últimos 30 dias", "2026-10-27", "2026-11-25"],
+      ["90 dias", "2026-08-28", "2026-11-25"],
+      ["6 meses", "2026-05-26", "2026-11-25"],
+      ["1 ano", "2025-11-26", "2026-11-25"],
+      ["mesmo período do ano passado", "2025-11-26", "2026-02-25"],
     ]);
-  });
-  it("2º período: do dia seguinte ao fim do 1º até hoje", () => {
-    expect(segundoPeriodo("2025-12-31", HOJE)).toEqual({ de: "2026-01-01", ate: HOJE });
-    expect(segundoPeriodo(HOJE, HOJE)).toBeNull();
-    expect(segundoPeriodo(undefined, HOJE)).toBeNull();
   });
 });
