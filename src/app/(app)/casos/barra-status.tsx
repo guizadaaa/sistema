@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 export function BarraStatus({ contagem, filtros }: { contagem: ContagemStatus; filtros: FiltrosTelaCasos }) {
   const segmentos = segmentosStatus(contagem.porStatus);
   const vencidosAtivo = filtros.prazo === "vencido";
+  const vence5Ativo = filtros.prazo === "vence5";
 
   return (
     <section className="flex flex-col gap-2 px-1" data-testid="barra-status" aria-label="Casos por status">
@@ -46,7 +47,7 @@ export function BarraStatus({ contagem, filtros }: { contagem: ContagemStatus; f
             </Link>
           );
         })}
-        {(contagem.vencidos > 0 || contagem.vencemEm5 > 0 || vencidosAtivo) && (
+        {(contagem.vencidos > 0 || contagem.vencemEm5 > 0 || filtros.prazo) && (
           <span className="text-muted-foreground ml-auto flex items-center gap-1.5 text-xs" data-testid="prazos">
             <Link
               href={urlCasos(filtros, { prazo: vencidosAtivo ? undefined : "vencido" })}
@@ -62,9 +63,19 @@ export function BarraStatus({ contagem, filtros }: { contagem: ContagemStatus; f
               {vencidosAtivo && " ×"}
             </Link>
             ·
-            <span data-testid="vencem-5">
+            <Link
+              href={urlCasos(filtros, { prazo: vence5Ativo ? undefined : "vence5" })}
+              scroll={false}
+              data-testid="vencem-5"
+              title={vence5Ativo ? "Mostrar todos os prazos" : "Filtrar: só os que vencem em até 5 dias"}
+              className={cn(
+                "font-medium text-orange-700 hover:underline dark:text-orange-400",
+                vence5Ativo && "rounded bg-orange-500/10 px-1.5 py-0.5 ring-1 ring-orange-500/40"
+              )}
+            >
               {contagem.vencemEm5} {contagem.vencemEm5 === 1 ? "vence" : "vencem"} em até 5 dias
-            </span>
+              {vence5Ativo && " ×"}
+            </Link>
           </span>
         )}
       </div>

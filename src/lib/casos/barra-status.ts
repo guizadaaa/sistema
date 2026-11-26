@@ -13,8 +13,19 @@ export type FiltrosTelaCasos = {
   dataInicio?: string;
   dataFim?: string;
   mostrarTeste?: boolean;
-  prazo?: "vencido";
+  /** "vencido": não resolvidos com prazo passado; "vence5": não resolvidos que vencem de hoje a hoje+5. */
+  prazo?: PrazoFiltro;
+  /** Só não resolvidos (aberto=1). */
+  aberto?: boolean;
+  /** "parado": mais tempo na etapa atual primeiro. */
+  ordem?: "parado";
 };
+
+export type PrazoFiltro = "vencido" | "vence5";
+
+export function lerPrazoFiltro(valor: unknown): PrazoFiltro | undefined {
+  return valor === "vencido" || valor === "vence5" ? valor : undefined;
+}
 
 /** URL da lista com os filtros atuais e a mudança pedida (undefined remove o filtro). */
 export function urlCasos(filtros: FiltrosTelaCasos, mudanca: Partial<FiltrosTelaCasos> = {}): string {
@@ -29,6 +40,8 @@ export function urlCasos(filtros: FiltrosTelaCasos, mudanca: Partial<FiltrosTela
   if (f.dataFim) q.set("dataFim", f.dataFim);
   if (f.mostrarTeste) q.set("mostrarTeste", "1");
   if (f.prazo) q.set("prazo", f.prazo);
+  if (f.aberto) q.set("aberto", "1");
+  if (f.ordem) q.set("ordem", f.ordem);
   const s = q.toString();
   return s ? `/casos?${s}` : "/casos";
 }

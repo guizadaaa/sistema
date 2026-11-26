@@ -27,8 +27,15 @@ export type FiltrosCasos = {
    * só passa `true` quando o usuário é adm_master.
    */
   mostrarTeste?: boolean;
-  /** "vencido": só não resolvidos com prazo de vigência já passado (mesma regra da coluna). */
-  prazo?: "vencido";
+  /**
+   * Só não resolvidos, pela régua da coluna "Prazo de vigência":
+   * "vencido" = prazo antes de hoje; "vence5" = de hoje a hoje+5.
+   */
+  prazo?: "vencido" | "vence5";
+  /** Só não resolvidos (aberto=1). */
+  aberto?: boolean;
+  /** "parado": ordena pelo tempo na etapa atual (mais parado primeiro). */
+  ordem?: "parado";
 };
 
 export type CasoListado = {
@@ -155,6 +162,19 @@ async function idsCasosPorBusca(supabase: SupabaseClient, termoBruto: string): P
   return [...ids];
 }
 
+/** aaaa-mm-dd + n dias (data civil, sem fuso). */
+function somarDiasLocal(iso: string, n: number): string {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Mais tempo na etapa atual primeiro (casos_tempo_etapa: última entrada em status_historico). */
+async function ordenarPorTempoNaEtapa(supabase: SupabaseClient, casos: { id: string; protocolo: number }[]): Promise<void> {
+  const { data, error } = await supabase.rpc("casos_tempo_etapa", { p_ids: casos.map((c) => c.id) });
+  if (error) throw error;
+  const desde = new Map((data ?? []).map((d) => [d.id, d.entrou_em]));
+  casos.sort((a, b) => (desde.get(a.id) ?? "9").localeCompare(desde.get(b.id) ?? "9") || a.protocolo - b.protocolo);
+}
+
 /**
  * RLS já escopa as linhas por perfil (vendedor só vê as próprias, gerente só
  * da filial, admin vê tudo) — os filtros aqui são só refinamento em cima do
@@ -187,6 +207,11 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   if (filtros.prazo === "vencido") {
     query = query.neq("status_atual", "resolvido").lt("prazo_vigencia", hojeLocalIso());
   }
+  if (filtros.prazo === "vence5") {
+    const hoje = hojeLocalIso();
+    query = query.neq("status_atual", "resolvido").gte("prazo_vigencia", hoje).lte("prazo_vigencia", somarDiasLocal(hoje, 5));
+  }
+  if (filtros.aberto) query = query.neq("status_atual", "resolvido");
 
   if (filtros.busca?.trim()) {
     const idsPermitidos = await idsCasosPorBusca(supabase, filtros.busca);
@@ -197,6 +222,8 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   const { data: casos, error } = await query;
   if (error) throw error;
   if (!casos || casos.length === 0) return [];
+
+  if (filtros.ordem === "parado") await ordenarPorTempoNaEtapa(supabase, casos);
 
   const nomesPorId = await carregarNomesUsuariosCasos(supabase, casos.map((c) => c.id));
   const resolvidoEm = await carregarResolvidoEm(
@@ -249,7 +276,7 @@ export async function contarCasosPorStatus(filtros: FiltrosCasos): Promise<Conta
     p_data_fim: filtros.dataFim && DATA_FORMATO.test(filtros.dataFim) ? filtros.dataFim : null,
     p_teste: Boolean(filtros.mostrarTeste),
     p_ids: ids,
-    p_prazo: filtros.prazo ?? null,
+    p_prazo: filtros.prazo ?? (filtros.aberto ? "aberto" : null),
     p_hoje: hojeLocalIso(),
   });
   if (error) throw error;

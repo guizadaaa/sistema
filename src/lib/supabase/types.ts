@@ -1017,6 +1017,14 @@ export interface Database {
         Args: Record<string, never>;
         Returns: { id: string; nome_completo: string; filial: FilialCvc | null; ativo: boolean; filiais_casos: FilialCvc[] }[];
       };
+      dashboard_casos_contagem: {
+        Args: { p_hoje?: string | null };
+        Returns: { filial: FilialCvc; vendedor_dono: string; status: StatusCaso; total: number; vencidos: number; vencem_5: number }[];
+      };
+      casos_tempo_etapa: {
+        Args: { p_ids?: string[] | null; p_limite?: number | null };
+        Returns: { id: string; protocolo: number; cliente_nome: string; status_atual: StatusCaso; filial: FilialCvc; entrou_em: string }[];
+      };
       casos_contagem_status: {
         Args: {
           p_tipo?: TipoCaso | null;

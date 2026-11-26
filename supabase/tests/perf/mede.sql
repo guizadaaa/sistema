@@ -92,6 +92,8 @@ begin
     date_trunc('month', current_date)::date, (date_trunc('month', current_date) + interval '1 month - 1 day')::date));
   -- Acompanhar Casos: lista (o que listarCasos pede) e a barra por status.
   perform perf.medir(p_usuario, 'casos: lista (sem filtro)', $q$select id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero, contrato_origem, subtipo_recadastro, caso_teste from public.casos where caso_teste = false order by criado_em desc$q$);
+  perform perf.medir(p_usuario, 'início: contagem filial × dono × status', $q$select * from public.dashboard_casos_contagem(current_date)$q$);
+  perform perf.medir(p_usuario, 'início: parados há mais tempo (8)', $q$select * from public.casos_tempo_etapa(null, 8)$q$);
   perform perf.medir(p_usuario, 'casos: opções do filtro Vendedor', $q$select * from public.vendedores_filtro_casos_lojas()$q$);
   perform perf.medir(p_usuario, 'casos: barra por status (sem filtro)', $q$select * from public.casos_contagem_status(p_hoje => current_date)$q$);
   perform perf.medir(p_usuario, 'casos: barra por status (filial 1714)', $q$select * from public.casos_contagem_status(p_filial => '1714', p_hoje => current_date)$q$);

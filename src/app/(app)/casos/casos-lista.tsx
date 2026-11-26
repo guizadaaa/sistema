@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 
 import { PrazoVigencia } from "@/components/prazo-vigencia";
 import { Badge } from "@/components/ui/badge";
@@ -63,8 +63,19 @@ export function CasosLista({
       filtros.dataInicio ||
       filtros.dataFim ||
       filtros.mostrarTeste ||
-      filtros.prazo
+      filtros.prazo ||
+      filtros.aberto ||
+      filtros.ordem
   );
+  // Filtros que chegam por link (página inicial, barra de status): aparecem
+  // no card para a pessoa ver o que está aplicado e poder tirar.
+  type Extra = { rotulo: string; tirar: Partial<FiltrosTelaCasos> };
+  const extras = ([
+    filtros.prazo === "vencido" && { rotulo: "Prazo: vencidos (não resolvidos)", tirar: { prazo: undefined } },
+    filtros.prazo === "vence5" && { rotulo: "Prazo: vencem em até 5 dias (não resolvidos)", tirar: { prazo: undefined } },
+    filtros.aberto && { rotulo: "Só em aberto (não resolvidos)", tirar: { aberto: undefined } },
+    filtros.ordem === "parado" && { rotulo: "Ordem: mais tempo na etapa", tirar: { ordem: undefined } },
+  ] as (Extra | false | undefined)[]).filter((x): x is Extra => Boolean(x));
 
   return (
     <div className="flex flex-col gap-4">
@@ -82,6 +93,8 @@ export function CasosLista({
           {/* key: navegar pela barra (status/vencidos) remonta o form, e o select Status acompanha a URL. */}
           <form method="get" className="flex flex-col gap-3" key={urlCasos(filtros)}>
             {filtros.prazo && <input type="hidden" name="prazo" value={filtros.prazo} />}
+            {filtros.aberto && <input type="hidden" name="aberto" value="1" />}
+            {filtros.ordem && <input type="hidden" name="ordem" value={filtros.ordem} />}
             <div className="flex flex-wrap items-end gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium" htmlFor="busca">
@@ -170,6 +183,19 @@ export function CasosLista({
                 </Button>
               )}
             </div>
+            {extras.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="filtros-extras">
+                <span className="text-muted-foreground">Aplicado também:</span>
+                {extras.map((x) => (
+                  <span key={x.rotulo} className="bg-muted inline-flex items-center gap-1 rounded-md px-2 py-0.5">
+                    {x.rotulo}
+                    <Link href={urlCasos(filtros, x.tirar)} aria-label={`Tirar filtro: ${x.rotulo}`} className="text-muted-foreground hover:text-foreground">
+                      <X className="size-3.5" />
+                    </Link>
+                  </span>
+                ))}
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>
