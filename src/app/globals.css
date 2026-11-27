@@ -46,6 +46,19 @@
   --status-resolvido-ink: #005500;
   --status-ouvidoria: #e34948;
   --status-ouvidoria-ink: #c53030;
+
+  /* Grau de prioridade — escala de risco verde-lima → amarelo → laranja →
+     vermelho-rosado, no mesmo padrão dos status (fundo /15 + texto "-ink",
+     ≥ 4,5:1 sobre o card e o hover). Lima e rosado de propósito: não
+     confundem com Inicial/Resolvido (verdes) nem com Ouvidoria (vermelho). */
+  --prioridade-baixa: #65a30d;
+  --prioridade-baixa-ink: #3f6212;
+  --prioridade-media: #eab308;
+  --prioridade-media-ink: #854d0e;
+  --prioridade-alta: #f97316;
+  --prioridade-alta-ink: #b43c0b;
+  --prioridade-urgente: #e11d48;
+  --prioridade-urgente-ink: #be123c;
 }
 
 .dark {
@@ -87,6 +100,15 @@
   --status-resolvido-ink: #3ddc3d;
   --status-ouvidoria: #e66767;
   --status-ouvidoria-ink: #f39191;
+
+  --prioridade-baixa: #84cc16;
+  --prioridade-baixa-ink: #a3e635;
+  --prioridade-media: #eab308;
+  --prioridade-media-ink: #facc15;
+  --prioridade-alta: #f97316;
+  --prioridade-alta-ink: #fb923c;
+  --prioridade-urgente: #f43f5e;
+  --prioridade-urgente-ink: #fb7185;
 }
 
 @theme inline {
@@ -128,6 +150,14 @@
   --color-status-resolvido-ink: var(--status-resolvido-ink);
   --color-status-ouvidoria: var(--status-ouvidoria);
   --color-status-ouvidoria-ink: var(--status-ouvidoria-ink);
+  --color-prioridade-baixa: var(--prioridade-baixa);
+  --color-prioridade-baixa-ink: var(--prioridade-baixa-ink);
+  --color-prioridade-media: var(--prioridade-media);
+  --color-prioridade-media-ink: var(--prioridade-media-ink);
+  --color-prioridade-alta: var(--prioridade-alta);
+  --color-prioridade-alta-ink: var(--prioridade-alta-ink);
+  --color-prioridade-urgente: var(--prioridade-urgente);
+  --color-prioridade-urgente-ink: var(--prioridade-urgente-ink);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

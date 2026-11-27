@@ -3,6 +3,7 @@
 import { useActionState, useId, useState, type FocusEvent, type FormEvent } from "react";
 import { Flag, FileText, Paperclip, Plus, Trash2, User } from "lucide-react";
 
+import { BadgePrioridade } from "@/components/badge-prioridade";
 import { CampoNumeros14Digitos } from "@/components/campo-numeros-14-digitos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ANEXO_TIPO_LABELS, MOTIVO_LABELS, SUBTIPO_RECADASTRO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import type { DonoElegivel } from "@/lib/casos/dono-elegivel";
 import { PRIORIDADES } from "@/lib/casos/prioridade";
-import { PRIORIDADE_BADGE_CLASSES } from "@/lib/status-colors";
+import { PRIORIDADE_CARTAO_SELECIONADO_CLASSES } from "@/lib/status-colors";
 import { cn } from "@/lib/utils";
 import { cpfValido, formatarCpf, somenteDigitos } from "@/lib/validation/cpf";
 import {
@@ -628,7 +629,11 @@ function CasoFormCampos({
             {PRIORIDADES.map((p) => (
               <label
                 key={p.grau}
-                className="hover:bg-accent/50 has-[:checked]:border-primary has-[:checked]:bg-accent has-[:focus-visible]:ring-ring flex cursor-pointer items-start gap-2 rounded-md border p-2.5 has-[:focus-visible]:ring-2"
+                className={cn(
+                  "hover:bg-accent/50 has-[:focus-visible]:ring-ring flex cursor-pointer items-start gap-2 rounded-md border p-2.5 has-[:focus-visible]:ring-2",
+                  PRIORIDADE_CARTAO_SELECIONADO_CLASSES[p.grau]
+                )}
+                data-testid="cartao-prioridade"
               >
                 <input
                   type="radio"
@@ -640,9 +645,7 @@ function CasoFormCampos({
                 />
                 <span className="flex flex-col gap-0.5">
                   <span className="flex items-center gap-2">
-                    <span className={cn("rounded-md border px-1.5 py-0 text-xs font-medium", PRIORIDADE_BADGE_CLASSES[p.grau])}>
-                      {p.nome}
-                    </span>
+                    <BadgePrioridade grau={p.grau} />
                     <span className="text-muted-foreground text-xs">{p.quem}</span>
                   </span>
                   <span className="text-sm">{p.ajuda}</span>

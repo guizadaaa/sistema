@@ -8,7 +8,7 @@ import { BadgePrioridade } from "@/components/badge-prioridade";
 import { Badge } from "@/components/ui/badge";
 import { gruposPorGrau, hrefVerTodos, lerModoEmAberto, MODO_EM_ABERTO_PADRAO, type CasoEmAberto, type ModoEmAberto } from "@/lib/dashboard/em-aberto";
 import { STATUS_LABELS } from "@/lib/labels";
-import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
+import { PRIORIDADE_TEXTO_CLASSES, STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 import { cn } from "@/lib/utils";
 
 const CHAVE_MODO = "aura:inicio:em-aberto";
@@ -104,7 +104,14 @@ export function CasosEmAberto({ grau, parado }: { grau: CasoEmAbertoTela[]; para
           {modo === "grau" ? (
             gruposPorGrau(grau).map((g) => (
               <section key={g.chave} aria-label={g.rotulo} data-testid="grupo-grau" data-grau={g.chave}>
-                <h3 className="text-muted-foreground pt-2 text-[11px] font-semibold tracking-wide uppercase">{g.rotulo}</h3>
+                <h3
+                  className={cn(
+                    "pt-2 text-[11px] font-semibold tracking-wide uppercase",
+                    g.chave === "sem" ? "text-muted-foreground" : PRIORIDADE_TEXTO_CLASSES[g.chave]
+                  )}
+                >
+                  {g.rotulo}
+                </h3>
                 <ul>
                   {g.casos.map((c) => (
                     <Linha key={c.id} caso={c} />
