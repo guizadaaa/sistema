@@ -44,15 +44,31 @@ export const STATUS_TEXTO_CLASSES: Record<StatusCaso, string> = {
   ouvidoria: "text-status-ouvidoria-ink",
 };
 
-// Grau de prioridade: preenchimento sólido (os badges de status são suaves)
-// e claridades bem distintas — Baixa clara, Alta média-clara, Média escura,
-// Urgente a mais escura —, para não depender só da matiz. O nome do grau
-// sempre acompanha o badge.
+// Grau de prioridade: mesmo padrão dos status (fundo /15 + texto "-ink"),
+// numa escala de risco verde-lima → amarelo → laranja → vermelho-rosado
+// (tokens --prioridade-* em globals.css). O badge leva também a bandeira e o
+// nome do grau — a cor nunca é o único sinal, nem para separar de status.
 export const PRIORIDADE_BADGE_CLASSES: Record<GrauPrioridade, string> = {
-  1: "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100",
-  2: "border-transparent bg-blue-600 text-white dark:bg-blue-500",
-  3: "border-transparent bg-orange-400 text-orange-950",
-  4: "border-transparent bg-red-700 text-white dark:bg-red-600",
+  1: "border-transparent bg-prioridade-baixa/15 text-prioridade-baixa-ink",
+  2: "border-transparent bg-prioridade-media/15 text-prioridade-media-ink",
+  3: "border-transparent bg-prioridade-alta/15 text-prioridade-alta-ink",
+  4: "border-transparent bg-prioridade-urgente/15 text-prioridade-urgente-ink",
+};
+
+// Texto na cor do grau (subtítulos "Urgente · 2" da página inicial).
+export const PRIORIDADE_TEXTO_CLASSES: Record<GrauPrioridade, string> = {
+  1: "text-prioridade-baixa-ink",
+  2: "text-prioridade-media-ink",
+  3: "text-prioridade-alta-ink",
+  4: "text-prioridade-urgente-ink",
+};
+
+// Cartão de escolha da criação: só o selecionado ganha a borda na cor do grau e o fundo /10.
+export const PRIORIDADE_CARTAO_SELECIONADO_CLASSES: Record<GrauPrioridade, string> = {
+  1: "has-[:checked]:border-prioridade-baixa has-[:checked]:bg-prioridade-baixa/10",
+  2: "has-[:checked]:border-prioridade-media has-[:checked]:bg-prioridade-media/10",
+  3: "has-[:checked]:border-prioridade-alta has-[:checked]:bg-prioridade-alta/10",
+  4: "has-[:checked]:border-prioridade-urgente has-[:checked]:bg-prioridade-urgente/10",
 };
 
 export const SEM_GRAU_BADGE_CLASSES = "border-dashed border-muted-foreground/40 bg-transparent text-muted-foreground";
