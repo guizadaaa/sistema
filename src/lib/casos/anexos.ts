@@ -7,11 +7,13 @@ import { mimeDoAnexo } from "@/lib/casos/anexo-tipo";
 import { decodificarHtml, limparHtmlAnexo } from "@/lib/casos/html-anexo";
 import {
   ANEXO_CACHE_CONTROL_S,
+  ANEXO_COMENTARIO_MAXIMO,
   ANEXO_FORMATOS_TEXTO,
   ANEXO_TAMANHO_MAXIMO_BYTES,
   ANEXO_TIPOS_DOCUMENTO,
   DESCRICAO_IMAGEM_MIME_TYPES,
   DESCRICAO_IMAGENS_MAXIMO,
+  comentarioAnexoSchema,
 } from "@/lib/validation/caso";
 import type { TipoDocumentoAnexo } from "@/lib/supabase/types";
 
@@ -37,14 +39,16 @@ export async function validarEEnviarAnexos(
   // Pareia arquivo e tipo pela posição ANTES de descartar as linhas vazias —
   // uma linha sem arquivo no meio não pode deslocar o tipo das seguintes.
   const tipos = formData.getAll("anexoTipo").map(String);
+  // Comentário (opcional) pareado pela mesma posição — cada linha tem um campo.
+  const comentarios = formData.getAll("anexoComentario").map(String);
   const pares = formData
     .getAll("anexoArquivo")
-    .map((v, i) => ({ arquivo: v, tipoBruto: tipos[i] }))
-    .filter((p): p is { arquivo: File; tipoBruto: string } => p.arquivo instanceof File && p.arquivo.size > 0);
+    .map((v, i) => ({ arquivo: v, tipoBruto: tipos[i], comentarioBruto: comentarios[i] ?? "" }))
+    .filter((p): p is { arquivo: File; tipoBruto: string; comentarioBruto: string } => p.arquivo instanceof File && p.arquivo.size > 0);
 
   const avisos: string[] = [];
 
-  for (const { arquivo, tipoBruto } of pares) {
+  for (const { arquivo, tipoBruto, comentarioBruto } of pares) {
 
     if (!tipoBruto || !isTipoDocumentoAnexo(tipoBruto)) {
       avisos.push(`${arquivo.name}: tipo de documento inválido, não enviado.`);
@@ -61,6 +65,12 @@ export async function validarEEnviarAnexos(
 
     if (arquivo.size > ANEXO_TAMANHO_MAXIMO_BYTES) {
       avisos.push(`${arquivo.name}: maior que 10 MB, não enviado.`);
+      continue;
+    }
+
+    const comentario = comentarioAnexoSchema.safeParse(comentarioBruto);
+    if (!comentario.success) {
+      avisos.push(`${arquivo.name}: comentário com mais de ${ANEXO_COMENTARIO_MAXIMO} caracteres, não enviado.`);
       continue;
     }
 
@@ -90,6 +100,7 @@ export async function validarEEnviarAnexos(
       tipo_documento: tipoBruto,
       storage_path: storagePath,
       nome_arquivo: arquivo.name,
+      comentario: comentario.data,
     });
 
     if (insertError) {

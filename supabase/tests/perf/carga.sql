@@ -172,12 +172,14 @@ from unnest(array['1710', '1714', '1730']) l, generate_series(current_date - 365
 where extract(isodow from d) < 6 and random() > 0.05;
 
 -- 20 mil casos (Acompanhar Casos): donos entre os vendedores de carga (e o
--- vendedor 1710 da semente), status e prazos variados, 2% de teste.
+-- vendedor 1710 da semente), status e prazos variados, 2% de teste,
+-- prioridade 1..4 e 20% "Sem grau".
 insert into public.casos (tipo_caso, motivo, descricao, vendedor_dono, vendedor_original_nome, criado_por, prazo_vigencia,
-  contrato_numero, cliente_nome, cliente_cpf, filial, status_atual, caso_teste, criado_em)
+  contrato_numero, cliente_nome, cliente_cpf, filial, status_atual, caso_teste, criado_em, prioridade)
 select 'alteracao_data', 'pedido_cliente', 'carga',
   d.id, 'Carga', d.id, current_date + (g % 120) - 40, '17' || lpad(g::text, 12, '0'), 'Cliente Caso ' || g, '11144477735',
-  d.filial, (enum_range(null::status_caso))[1 + g % 6], g % 50 = 0, now() - (g % 700) * interval '1 day'
+  d.filial, (enum_range(null::status_caso))[1 + g % 6], g % 50 = 0, now() - (g % 700) * interval '1 day',
+  nullif(g % 5, 0)
 from generate_series(1, 20000) g
 cross join lateral (
   select u.id, u.filial from public.usuarios u

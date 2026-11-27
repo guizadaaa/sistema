@@ -1,16 +1,16 @@
 import Link from "next/link";
-import { ArrowRight, Download, Plus } from "lucide-react";
+import { Download, Plus } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireCurrentUser } from "@/lib/auth/current-user";
+import type { CasoEmAberto } from "@/lib/dashboard/em-aberto";
 import { carregarPaginaInicial } from "@/lib/dashboard/metricas";
 import { gruposPorVendedor, LOJAS_INICIO, linhasPorFilial, somar, tempoNaEtapa } from "@/lib/dashboard/tabela-status";
-import { FILIAL_LABELS, STATUS_LABELS } from "@/lib/labels";
-import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
+import { FILIAL_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
+import { CasosEmAberto } from "./casos-em-aberto";
 import { TabelaStatus } from "./tabela-status";
 
 /** Pílula da linha do título: número + texto, clicável (abre Acompanhar Casos filtrado). */
@@ -39,7 +39,9 @@ function Pilula({ href, n, texto, tom, testId }: { href: string; n: number; text
  */
 export default async function HomePage() {
   const usuario = await requireCurrentUser();
-  const { contagens, candidatos, parados } = await carregarPaginaInicial(8);
+  const { contagens, candidatos, emAberto } = await carregarPaginaInicial(8);
+  const agora = new Date();
+  const comTempo = (casos: CasoEmAberto[]) => casos.map((c) => ({ ...c, naEtapa: tempoNaEtapa(c.entrouEm, agora) }));
 
   const ehAdmin = usuario.perfil === "adm" || usuario.perfil === "adm_master";
   const ehGerente = usuario.perfil === "gerente";
@@ -100,46 +102,12 @@ export default async function HomePage() {
           </CardContent>
         </Card>
 
-        <Card className="gap-3 py-4 lg:min-h-0" data-testid="card-parados">
+        <Card className="relative gap-3 py-4 lg:min-h-0" data-testid="card-em-aberto">
           <CardHeader className="px-4">
-            <CardTitle>Parados há mais tempo</CardTitle>
+            <CardTitle>Casos em aberto</CardTitle>
           </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-2 px-4">
-            {parados.length === 0 ? (
-              <p className="text-muted-foreground text-sm">Nenhum caso em aberto.</p>
-            ) : (
-              <div className="min-h-0 flex-1 overflow-auto">
-                <div className="text-muted-foreground grid grid-cols-[4.5rem_1fr_auto] gap-2 border-b pb-1 text-xs font-medium">
-                  <span>Protocolo</span>
-                  <span>Cliente</span>
-                  <span className="text-right">Na etapa</span>
-                </div>
-                <ul>
-                  {parados.map((c) => (
-                    <li key={c.id} className="border-b last:border-0">
-                      <Link
-                        href={`/casos/${c.id}`}
-                        className="hover:bg-accent/50 grid grid-cols-[4.5rem_1fr_auto] items-start gap-2 py-1.5 text-sm"
-                        data-testid="parado"
-                      >
-                        <span className="font-medium">#{c.protocolo}</span>
-                        <span className="min-w-0">
-                          <span className="block truncate">{c.clienteNome}</span>
-                          <span className="text-muted-foreground flex items-center gap-1 text-xs">
-                            <Badge className={cn("px-1.5 py-0 text-[10px]", STATUS_BADGE_CLASSES[c.statusAtual])}>{STATUS_LABELS[c.statusAtual]}</Badge>
-                            {c.filial}
-                          </span>
-                        </span>
-                        <span className="text-right text-xs whitespace-nowrap">{tempoNaEtapa(c.entrouEm)}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <Link href="/casos?aberto=1&ordem=parado" className="text-primary mt-auto flex items-center gap-1 self-end text-sm hover:underline" data-testid="ver-todos-parados">
-              Ver todos <ArrowRight className="size-3.5" />
-            </Link>
+          <CardContent className="flex min-h-0 flex-1 flex-col px-4">
+            <CasosEmAberto grau={comTempo(emAberto.grau)} parado={comTempo(emAberto.parado)} />
           </CardContent>
         </Card>
       </div>

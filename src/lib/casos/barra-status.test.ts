@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { segmentosStatus, statusAoClicar, urlCasos } from "./barra-status";
+import { lerOrdemFiltro, segmentosStatus, statusAoClicar, urlCasos } from "./barra-status";
 
 describe("barra de status", () => {
   it("segmentos na ordem da lista, zerados inclusive, com percentual", () => {
@@ -26,5 +26,18 @@ describe("barra de status", () => {
     expect(urlCasos(f, { status: undefined })).toBe("/casos?busca=maria&filial=1714&mostrarTeste=1");
     expect(urlCasos({}, { prazo: "vencido" })).toBe("/casos?prazo=vencido");
     expect(urlCasos({})).toBe("/casos");
+  });
+});
+
+describe("urlCasos — prioridade e ordem", () => {
+  it("prioridade= e ordem=prioridade entram na URL e saem com undefined", () => {
+    const f = { aberto: true, prioridade: "urgente" as const, ordem: "prioridade" as const };
+    expect(urlCasos(f)).toBe("/casos?prioridade=urgente&aberto=1&ordem=prioridade");
+    expect(urlCasos(f, { prioridade: undefined })).toBe("/casos?aberto=1&ordem=prioridade");
+    expect(urlCasos({}, { prioridade: "sem" })).toBe("/casos?prioridade=sem");
+  });
+
+  it("lerOrdemFiltro só aceita parado e prioridade", () => {
+    expect([lerOrdemFiltro("parado"), lerOrdemFiltro("prioridade"), lerOrdemFiltro("x")]).toEqual(["parado", "prioridade", undefined]);
   });
 });

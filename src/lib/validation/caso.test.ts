@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { casoSchema } from "./caso";
+import { ANEXO_COMENTARIO_MAXIMO, casoSchema, comentarioAnexoSchema } from "./caso";
 
 const COMUNS = {
   vendedorDono: "00000000-0000-4000-8000-000000000001",
@@ -8,6 +8,7 @@ const COMUNS = {
   clienteNome: "Cliente",
   clienteCpf: "111.444.777-35",
   prazoVigencia: "2026-12-31",
+  prioridade: "2",
 };
 
 describe("casoSchema — contrato de origem", () => {
@@ -65,5 +66,41 @@ describe("casoSchema — subtipo do Recadastro", () => {
       subtipoRecadastro: "troca_passageiro",
     });
     expect("subtipoRecadastro" in resultado).toBe(false);
+  });
+});
+
+describe("casoSchema — prioridade", () => {
+  const base = { ...COMUNS, tipoCaso: "alteracao_data", motivo: "pedido_cliente", descricao: "x" };
+
+  it("é obrigatória na criação (sem escolha = recusa com a mensagem do campo)", () => {
+    for (const valor of [undefined, "", "0", "5", "alta"]) {
+      const r = casoSchema.safeParse({ ...base, prioridade: valor });
+      expect(r.success).toBe(false);
+      expect(r.error?.issues.find((i) => i.path[0] === "prioridade")?.message).toBe("Escolha a prioridade do caso");
+    }
+  });
+
+  it("grava o grau como número, em todos os tipos de caso", () => {
+    for (const grau of ["1", "2", "3", "4"]) {
+      const r = casoSchema.parse({ ...base, prioridade: grau });
+      expect(r.prioridade).toBe(Number(grau));
+    }
+    const inad = casoSchema.parse({ ...COMUNS, tipoCaso: "inadimplencia", parcelasEmAberto: "1", dataCancelamento: "2026-10-01", prioridade: "4" });
+    expect(inad.prioridade).toBe(4);
+  });
+});
+
+describe("comentarioAnexoSchema", () => {
+  it("opcional: vazio ou só espaços vira null; texto é aparado", () => {
+    expect(comentarioAnexoSchema.parse("")).toBeNull();
+    expect(comentarioAnexoSchema.parse("   ")).toBeNull();
+    expect(comentarioAnexoSchema.parse("  Print do Orbium com a multa da Azul ")).toBe("Print do Orbium com a multa da Azul");
+  });
+
+  it(`até ${ANEXO_COMENTARIO_MAXIMO} caracteres`, () => {
+    expect(comentarioAnexoSchema.safeParse("a".repeat(300)).success).toBe(true);
+    const longo = comentarioAnexoSchema.safeParse("a".repeat(301));
+    expect(longo.success).toBe(false);
+    expect(longo.error?.issues[0]?.message).toBe("Comentário com no máximo 300 caracteres");
   });
 });

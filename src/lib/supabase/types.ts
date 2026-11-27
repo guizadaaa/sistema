@@ -50,7 +50,10 @@ export type TipoDocumentoAnexo =
   // Descrição, fora da lista de Anexos (20261006000001).
   | "imagem_descricao";
 export type AcaoAuditoria = "insert" | "update" | "delete" | "download_signed_url";
-export type TipoNotificacao = "prazo_vencendo" | "caso_novo" | "delegacao_expirando" | "vendas_importadas";
+export type TipoNotificacao = "prazo_vencendo" | "caso_novo" | "delegacao_expirando" | "vendas_importadas" | "prioridade_alta";
+
+/** Grau de prioridade do caso: 1 Baixa, 2 Média, 3 Alta, 4 Urgente (20261130000002). */
+export type GrauPrioridade = 1 | 2 | 3 | 4;
 export type StatusAvisoImportacao = "confirmado" | "pendente" | "substituido";
 export type TipoMaterialApoio = "pdf" | "imagem" | "docx" | "xlsx" | "link";
 
@@ -109,6 +112,8 @@ export interface Database {
           contrato_origem: string | null;
           /** Só Recadastro; obrigatório na criação, NULL nos casos antigos (20261006000008). */
           subtipo_recadastro: SubtipoRecadastro | null;
+          /** Grau de prioridade; NULL = "Sem grau" (casos antigos) (20261130000002). */
+          prioridade: GrauPrioridade | null;
         };
         Insert: {
           tipo_caso: TipoCaso;
@@ -124,6 +129,7 @@ export interface Database {
           data_cancelamento?: string | null;
           contrato_origem?: string | null;
           subtipo_recadastro?: SubtipoRecadastro | null;
+          prioridade?: GrauPrioridade | null;
         };
         Update: Partial<{
           prazo_vigencia: string;
@@ -254,16 +260,19 @@ export interface Database {
           nome_arquivo: string;
           enviado_por: string;
           enviado_em: string;
+          /** Comentário opcional, até 300 caracteres (20261130000002). */
+          comentario: string | null;
         };
         Insert: {
           caso_id: string;
           tipo_documento: TipoDocumentoAnexo;
           storage_path: string;
           nome_arquivo: string;
+          comentario?: string | null;
         };
-        // Sem UPDATE previsto — ver nota em status_historico.Update.
+        // Só o comentário é editável (grant de coluna, 20261130000002).
         Update: Partial<{
-          nome_arquivo: string;
+          comentario: string | null;
         }>;
         Relationships: [];
       };
@@ -307,6 +316,20 @@ export interface Database {
         Update: Partial<{
           contrato_numero: string;
         }>;
+        Relationships: [];
+      };
+      casos_prioridade_historico: {
+        Row: {
+          id: string;
+          caso_id: string;
+          de: GrauPrioridade | null;
+          para: GrauPrioridade | null;
+          alterado_por: string;
+          alterado_em: string;
+        };
+        // Só escrito por trigger de casos.
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
       casos_complementos: {
@@ -1030,7 +1053,7 @@ export interface Database {
         Args: { p_ids?: string[] | null; p_limite?: number | null };
         Returns: { id: string; protocolo: number; cliente_nome: string; status_atual: StatusCaso; filial: FilialCvc; entrou_em: string }[];
       };
-      casos_contagem_status: {
+      casos_contagem_barra: {
         Args: {
           p_tipo?: TipoCaso | null;
           p_filial?: FilialCvc | null;
@@ -1041,8 +1064,28 @@ export interface Database {
           p_ids?: string[] | null;
           p_prazo?: string | null;
           p_hoje?: string | null;
+          /** 1..4 = o grau; 0 = sem grau; null = todas. */
+          p_prioridade?: number | null;
         };
         Returns: { status: StatusCaso; total: number; vencidos: number; vencem_5: number }[];
+      };
+      casos_em_aberto_inicio: {
+        Args: { p_limite?: number };
+        Returns: {
+          lista: "grau" | "parado";
+          id: string;
+          protocolo: number;
+          cliente_nome: string;
+          status_atual: StatusCaso;
+          filial: FilialCvc;
+          prioridade: GrauPrioridade | null;
+          entrou_em: string;
+          total_grau: number;
+        }[];
+      };
+      alterar_prioridade_caso: {
+        Args: { p_caso_id: string; p_prioridade: number };
+        Returns: undefined;
       };
       vendas_calendario_historico: {
         Args: { p_de: string; p_ate: string };

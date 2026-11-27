@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useId, useState, type FocusEvent, type FormEvent } from "react";
-import { FileText, Paperclip, Plus, Trash2, User } from "lucide-react";
+import { Flag, FileText, Paperclip, Plus, Trash2, User } from "lucide-react";
 
 import { CampoNumeros14Digitos } from "@/components/campo-numeros-14-digitos";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ANEXO_TIPO_LABELS, MOTIVO_LABELS, SUBTIPO_RECADASTRO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
 import type { DonoElegivel } from "@/lib/casos/dono-elegivel";
+import { PRIORIDADES } from "@/lib/casos/prioridade";
+import { PRIORIDADE_BADGE_CLASSES } from "@/lib/status-colors";
+import { cn } from "@/lib/utils";
 import { cpfValido, formatarCpf, somenteDigitos } from "@/lib/validation/cpf";
 import {
   ANEXO_TIPOS_DOCUMENTO,
@@ -22,7 +25,7 @@ import {
 } from "@/lib/validation/caso";
 import type { PerfilUsuario, TipoCaso } from "@/lib/supabase/types";
 
-import { CampoArquivoAnexo } from "../campo-arquivo-anexo";
+import { CampoArquivoAnexo, CampoComentarioAnexo, CLASSE_LINHA_ANEXO } from "../campo-arquivo-anexo";
 import { criarCaso, type CasoFormValores, type CriarCasoState } from "./actions";
 import { DescricaoComImagens } from "./descricao-com-imagens";
 
@@ -612,9 +615,48 @@ function CasoFormCampos({
       )}
       </div>
 
+      <div className="border-t pt-4">
+        <fieldset className="flex min-w-0 flex-col gap-3" data-testid="campo-prioridade">
+          <legend className="text-muted-foreground mb-3 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
+            <Flag className="size-3.5" />
+            Prioridade
+          </legend>
+          <p className="text-muted-foreground -mt-1 text-sm">
+            Escolha o grau do caso. Depois de criado, só o gerente ou o adm alteram.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {PRIORIDADES.map((p) => (
+              <label
+                key={p.grau}
+                className="hover:bg-accent/50 has-[:checked]:border-primary has-[:checked]:bg-accent has-[:focus-visible]:ring-ring flex cursor-pointer items-start gap-2 rounded-md border p-2.5 has-[:focus-visible]:ring-2"
+              >
+                <input
+                  type="radio"
+                  name="prioridade"
+                  value={p.grau}
+                  required
+                  defaultChecked={state.valores?.prioridade === String(p.grau)}
+                  className="accent-primary mt-1"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="flex items-center gap-2">
+                    <span className={cn("rounded-md border px-1.5 py-0 text-xs font-medium", PRIORIDADE_BADGE_CLASSES[p.grau])}>
+                      {p.nome}
+                    </span>
+                    <span className="text-muted-foreground text-xs">{p.quem}</span>
+                  </span>
+                  <span className="text-sm">{p.ajuda}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <FieldError mensagem={state.fieldErrors?.prioridade} />
+        </fieldset>
+      </div>
+
       <div className="flex flex-col gap-4 border-t pt-4">
         <SectionTitle icon={Paperclip}>Anexos</SectionTitle>
-        <div className="flex flex-col gap-3">
+        <div className="@container flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <Label>Anexos (opcional)</Label>
           <Button type="button" variant="outline" size="sm" onClick={adicionarAnexoRow}>
@@ -623,7 +665,7 @@ function CasoFormCampos({
         </div>
 
         {anexoRows.map((rowId) => (
-          <div key={rowId} className="grid grid-cols-[1fr_1fr_auto] items-start gap-2">
+          <div key={rowId} className={CLASSE_LINHA_ANEXO}>
             <div className="flex flex-col gap-1">
               <CampoArquivoAnexo onErro={(erro) => setAnexoErros((prev) => ({ ...prev, [rowId]: erro }))} />
               {anexoErros[rowId] && <p className="text-destructive text-sm">{anexoErros[rowId]}</p>}
@@ -640,6 +682,7 @@ function CasoFormCampos({
                 ))}
               </SelectContent>
             </Select>
+            <CampoComentarioAnexo />
             <Button
               type="button"
               variant="ghost"
