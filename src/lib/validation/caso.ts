@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { cpfValido, somenteDigitos } from "./cpf";
-import type { FilialCvc, MotivoCaso, PerfilUsuario, SubtipoRecadastro, TipoCaso } from "@/lib/supabase/types";
+import type { FilialCvc, GrauPrioridade, MotivoCaso, PerfilUsuario, SubtipoRecadastro, TipoCaso } from "@/lib/supabase/types";
 
 export const TIPOS_CASO: readonly TipoCaso[] = [
   "alteracao_data",
@@ -66,6 +66,11 @@ const camposComuns = {
     .refine((v) => v.length === 11, "CPF deve ter 11 dígitos")
     .refine(cpfValido, "CPF inválido"),
   prazoVigencia: z.string().refine((v) => !Number.isNaN(Date.parse(v)), "Data inválida"),
+  // Obrigatória na criação (nada pré-selecionado na tela). No banco é
+  // nullable só pelos casos antigos ("Sem grau") — 20261130000002.
+  prioridade: z
+    .enum(["1", "2", "3", "4"], { message: "Escolha a prioridade do caso" })
+    .transform((v) => Number(v) as GrauPrioridade),
 };
 
 // As quatro variantes espelham exatamente a constraint casos_campos_por_tipo
@@ -112,6 +117,16 @@ export const casoSchema = z.discriminatedUnion("tipoCaso", [
 ]);
 
 export type CasoFormValues = z.infer<typeof casoSchema>;
+
+/** Comentário opcional de cada anexo (anexos_comentario_tamanho). */
+export const ANEXO_COMENTARIO_MAXIMO = 300;
+
+/** Comentário do anexo: texto aparado; vazio vira null; acima do limite é recusado. */
+export const comentarioAnexoSchema = z
+  .string()
+  .transform((v) => v.trim())
+  .refine((v) => v.length <= ANEXO_COMENTARIO_MAXIMO, `Comentário com no máximo ${ANEXO_COMENTARIO_MAXIMO} caracteres`)
+  .transform((v) => (v === "" ? null : v));
 
 /** Ordem do select de categoria do anexo — "outro" sempre por último (e é o padrão). */
 export const ANEXO_TIPOS_DOCUMENTO = [

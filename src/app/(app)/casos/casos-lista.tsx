@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, Plus, Trash2, X } from "lucide-react";
 
+import { BadgePrioridade } from "@/components/badge-prioridade";
 import { PrazoVigencia } from "@/components/prazo-vigencia";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { STATUS_LABELS, SUBTIPO_RECADASTRO_LABELS, TIPO_CASO_LABELS } from "@/lib/labels";
+import { PRIORIDADES_DESC, rotuloFiltroPrioridade, SEM_GRAU } from "@/lib/casos/prioridade";
 import { STATUS_ORDEM } from "@/lib/casos/status";
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 import { urlCasos, type FiltrosTelaCasos } from "@/lib/casos/barra-status";
@@ -65,6 +67,7 @@ export function CasosLista({
       filtros.mostrarTeste ||
       filtros.prazo ||
       filtros.aberto ||
+      filtros.prioridade ||
       filtros.ordem
   );
   // Filtros que chegam por link (página inicial, barra de status): aparecem
@@ -74,7 +77,9 @@ export function CasosLista({
     filtros.prazo === "vencido" && { rotulo: "Prazo: vencidos (não resolvidos)", tirar: { prazo: undefined } },
     filtros.prazo === "vence5" && { rotulo: "Prazo: vencem em até 5 dias (não resolvidos)", tirar: { prazo: undefined } },
     filtros.aberto && { rotulo: "Só em aberto (não resolvidos)", tirar: { aberto: undefined } },
+    filtros.prioridade && { rotulo: `Prioridade: ${rotuloFiltroPrioridade(filtros.prioridade)}`, tirar: { prioridade: undefined } },
     filtros.ordem === "parado" && { rotulo: "Ordem: mais tempo na etapa", tirar: { ordem: undefined } },
+    filtros.ordem === "prioridade" && { rotulo: "Ordem: prioridade (Urgente primeiro)", tirar: { ordem: undefined } },
   ] as (Extra | false | undefined)[]).filter((x): x is Extra => Boolean(x));
 
   return (
@@ -139,6 +144,24 @@ export function CasosLista({
                         {TIPO_CASO_LABELS[t]}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Prioridade</label>
+                <Select name="prioridade" defaultValue={filtros.prioridade ?? "todas"}>
+                  <SelectTrigger className="w-36" data-testid="filtro-prioridade">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas</SelectItem>
+                    {PRIORIDADES_DESC.map((p) => (
+                      <SelectItem key={p.slug} value={p.slug}>
+                        {p.nome}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="sem">{SEM_GRAU}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -218,6 +241,17 @@ export function CasosLista({
                   <th className="py-2 pr-4 font-medium">Dono</th>
                   <th className="py-2 pr-4 font-medium">Contrato de origem</th>
                   <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2 pr-4 font-medium" aria-sort={filtros.ordem === "prioridade" ? "descending" : "none"}>
+                    <Link
+                      href={urlCasos(filtros, { ordem: filtros.ordem === "prioridade" ? undefined : "prioridade" })}
+                      className="hover:text-foreground inline-flex items-center gap-1"
+                      data-testid="ordenar-prioridade"
+                      title={filtros.ordem === "prioridade" ? "Voltar à ordem padrão" : "Ordenar por prioridade (Urgente primeiro)"}
+                    >
+                      Prioridade
+                      <ArrowDown className={filtros.ordem === "prioridade" ? "size-3.5" : "size-3.5 opacity-30"} />
+                    </Link>
+                  </th>
                   <th className="py-2 pr-4 font-medium">Prazo de vigência</th>
                 </tr>
               </thead>
@@ -247,6 +281,9 @@ export function CasosLista({
                     <td className="py-2 pr-4">{c.contrato_origem ?? "—"}</td>
                     <td className="py-2 pr-4">
                       <Badge className={STATUS_BADGE_CLASSES[c.status_atual]}>{STATUS_LABELS[c.status_atual]}</Badge>
+                    </td>
+                    <td className="py-2 pr-4">
+                      <BadgePrioridade grau={c.prioridade} />
                     </td>
                     <td className="py-2 pr-4">
                       <PrazoVigencia

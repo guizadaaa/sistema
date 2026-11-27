@@ -11,6 +11,8 @@ import { bancoPorCodigo, CODIGO_BANCO_OUTRO } from "@/lib/validation/bancos";
 import { anexoObrigatorioFaltando, desfechoSchema } from "@/lib/validation/desfecho";
 import { implicacaoSchema } from "@/lib/validation/implicacao";
 import { ANEXO_TIPO_LABELS } from "@/lib/labels";
+import { isGrauPrioridade } from "@/lib/casos/prioridade";
+import { comentarioAnexoSchema } from "@/lib/validation/caso";
 import type {
   OrigemReembolsoIntegral,
   OrigemRemarcacaoComCusto,
@@ -177,6 +179,57 @@ export async function avancarStatus(casoId: string, novoStatus: StatusCaso): Pro
     console.error("Erro ao avançar status:", error);
     return { error: mensagemErroAvancarStatus(error.message) };
   }
+
+  revalidatePath(`/casos/${casoId}`);
+  return {};
+}
+
+/**
+ * Grau de prioridade depois de criado: alterar_prioridade_caso (banco) só
+ * aceita admin ou gerente da filial do caso — a tela só esconde o select de
+ * quem não pode. Histórico, auditoria e notificação vêm dos triggers.
+ */
+export async function alterarPrioridade(casoId: string, grau: number): Promise<{ error?: string }> {
+  await requireCurrentUser();
+  if (!isGrauPrioridade(grau)) return { error: "Grau de prioridade inválido." };
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("alterar_prioridade_caso", { p_caso_id: casoId, p_prioridade: grau });
+  if (error) {
+    console.error("Erro ao alterar prioridade:", error);
+    return {
+      error: error.code === "42501" ? error.message : "Não foi possível alterar a prioridade. Verifique se você tem permissão para esta ação.",
+    };
+  }
+
+  revalidatePath(`/casos/${casoId}`);
+  revalidatePath("/casos");
+  revalidatePath("/");
+  return {};
+}
+
+/**
+ * Comentário do anexo (vazio apaga). Quem pode: quem enviou, gerente da
+ * filial e admin — a policy anexos_update_comentario impõe; sem permissão o
+ * update simplesmente não acha a linha.
+ */
+export async function editarComentarioAnexo(casoId: string, anexoId: string, comentario: string): Promise<{ error?: string }> {
+  await requireCurrentUser();
+  const parsed = comentarioAnexoSchema.safeParse(comentario);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Comentário inválido." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("anexos")
+    .update({ comentario: parsed.data })
+    .eq("id", anexoId)
+    .eq("caso_id", casoId)
+    .select("id");
+  if (error) {
+    console.error("Erro ao editar comentário do anexo:", error);
+    return { error: "Não foi possível salvar o comentário." };
+  }
+  if (!data || data.length === 0) return { error: "Você não pode editar o comentário deste anexo." };
 
   revalidatePath(`/casos/${casoId}`);
   return {};

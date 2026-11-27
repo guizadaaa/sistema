@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
 import { mimeDoAnexo } from "@/lib/casos/anexo-tipo";
-import { ANEXO_ACCEPT, ANEXO_FORMATOS_TEXTO, ANEXO_TAMANHO_MAXIMO_BYTES } from "@/lib/validation/caso";
+import { ANEXO_ACCEPT, ANEXO_COMENTARIO_MAXIMO, ANEXO_FORMATOS_TEXTO, ANEXO_TAMANHO_MAXIMO_BYTES } from "@/lib/validation/caso";
 
 export function validarArquivoAnexo(arquivo: File): string | undefined {
   if (!mimeDoAnexo(arquivo.name, arquivo.type)) {
@@ -15,6 +15,32 @@ export function validarArquivoAnexo(arquivo: File): string | undefined {
     return "Arquivo maior que 10 MB";
   }
   return undefined;
+}
+
+/**
+ * Linha de anexo (arquivo · categoria · comentário · remover). Num container
+ * largo fica tudo lado a lado; estreito, o comentário desce para a linha de
+ * baixo. O pai precisa ter a classe `@container`.
+ */
+export const CLASSE_LINHA_ANEXO =
+  "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-start gap-2 @xl:grid-cols-[minmax(0,1fr)_10rem_minmax(0,1fr)_auto]";
+
+/**
+ * Comentário opcional do anexo — enviado como "anexoComentario", na mesma
+ * posição do "anexoArquivo"/"anexoTipo" da linha (lib/casos/anexos.ts).
+ */
+export function CampoComentarioAnexo() {
+  return (
+    <div className="order-last col-span-2 @xl:order-none @xl:col-span-1">
+      <Input
+        name="anexoComentario"
+        maxLength={ANEXO_COMENTARIO_MAXIMO}
+        placeholder="Comentário (opcional)"
+        aria-label="Comentário do anexo (opcional)"
+        data-testid="anexo-comentario"
+      />
+    </div>
+  );
 }
 
 /** Coloca `arquivo` dentro do <input type="file"> (o envio continua sendo o FormData do form). */

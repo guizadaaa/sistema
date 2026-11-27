@@ -1,4 +1,4 @@
-import type { StatusCaso } from "@/lib/supabase/types";
+import type { GrauPrioridade, StatusCaso } from "@/lib/supabase/types";
 
 // Fundo suave (mesma matiz, baixa opacidade) + texto na variante "-ink"
 // (ver globals.css) — cada status sempre com a mesma cor em toda a UI, para
@@ -43,3 +43,16 @@ export const STATUS_TEXTO_CLASSES: Record<StatusCaso, string> = {
   resolvido: "text-status-resolvido-ink",
   ouvidoria: "text-status-ouvidoria-ink",
 };
+
+// Grau de prioridade: preenchimento sólido (os badges de status são suaves)
+// e claridades bem distintas — Baixa clara, Alta média-clara, Média escura,
+// Urgente a mais escura —, para não depender só da matiz. O nome do grau
+// sempre acompanha o badge.
+export const PRIORIDADE_BADGE_CLASSES: Record<GrauPrioridade, string> = {
+  1: "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100",
+  2: "border-transparent bg-blue-600 text-white dark:bg-blue-500",
+  3: "border-transparent bg-orange-400 text-orange-950",
+  4: "border-transparent bg-red-700 text-white dark:bg-red-600",
+};
+
+export const SEM_GRAU_BADGE_CLASSES = "border-dashed border-muted-foreground/40 bg-transparent text-muted-foreground";

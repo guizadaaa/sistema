@@ -13,6 +13,9 @@ type ComplementoRow = Database["public"]["Tables"]["casos_complementos"]["Row"];
 type StatusHistoricoComDuracaoRow = Database["public"]["Views"]["status_historico_com_duracao"]["Row"];
 export type DesfechoVisivelRow = Database["public"]["Views"]["desfechos_visivel"]["Row"];
 type ImplicacaoRow = Database["public"]["Tables"]["implicacoes"]["Row"];
+type PrioridadeHistoricoRow = Database["public"]["Tables"]["casos_prioridade_historico"]["Row"];
+
+export type PrioridadeHistoricoComNome = PrioridadeHistoricoRow & { alteradoPorNome: string };
 
 export type HistoricoComNome = StatusHistoricoComDuracaoRow & { alteradoPorNome: string };
 export type ComplementoComNome = ComplementoRow & { criadoPorNome: string };
@@ -26,6 +29,8 @@ export type DetalheCaso = {
   donoNome: string;
   criadoPorNome: string;
   historico: HistoricoComNome[];
+  /** Definição e mudanças do grau de prioridade, da mais antiga à mais recente. */
+  historicoPrioridade: PrioridadeHistoricoComNome[];
   anexos: AnexoRow[];
   contratosAdicionais: ContratoAdicionalRow[];
   /** Só em casos de Recadastro (vazio nos demais tipos). */
@@ -58,6 +63,7 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
     { data: complementos, error: complementosError },
     { data: desfechos, error: desfechosError },
     { data: implicacao, error: implicacaoError },
+    { data: historicoPrioridade, error: historicoPrioridadeError },
   ] = await Promise.all([
     supabase
       .from("status_historico_com_duracao")
@@ -78,6 +84,7 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
     supabase.from("casos_complementos").select("*").eq("caso_id", id).order("criado_em", { ascending: true }),
     supabase.from("desfechos_visivel").select("*").eq("caso_id", id).order("criado_em", { ascending: false }),
     supabase.from("implicacoes").select("*").eq("caso_id", id).maybeSingle(),
+    supabase.from("casos_prioridade_historico").select("*").eq("caso_id", id).order("alterado_em", { ascending: true }),
   ]);
 
   if (historicoError) throw historicoError;
@@ -87,6 +94,7 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
   if (complementosError) throw complementosError;
   if (desfechosError) throw desfechosError;
   if (implicacaoError) throw implicacaoError;
+  if (historicoPrioridadeError) throw historicoPrioridadeError;
 
   const nomesPorId = await carregarNomesUsuariosCasos(supabase, [caso.id]);
 
@@ -106,6 +114,7 @@ export async function buscarDetalheCaso(id: string): Promise<DetalheCaso | null>
     donoNome: nomesPorId.get(caso.vendedor_dono) ?? "—",
     criadoPorNome: nomesPorId.get(caso.criado_por) ?? "—",
     historico: (historico ?? []).map((h) => ({ ...h, alteradoPorNome: nomesPorId.get(h.alterado_por) ?? "—" })),
+    historicoPrioridade: (historicoPrioridade ?? []).map((h) => ({ ...h, alteradoPorNome: nomesPorId.get(h.alterado_por) ?? "—" })),
     anexos: anexosDocumentos,
     contratosAdicionais: contratosAdicionais ?? [],
     recibosRecadastrados: recibosRecadastrados ?? [],

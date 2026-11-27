@@ -1,5 +1,6 @@
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { lerPrazoFiltro } from "@/lib/casos/barra-status";
+import { lerOrdemFiltro, lerPrazoFiltro } from "@/lib/casos/barra-status";
+import { lerPrioridadeFiltro } from "@/lib/casos/prioridade";
 import { contarCasosPorStatus, listarCasos } from "@/lib/casos/listar";
 import { listarCandidatosVendedor } from "@/lib/casos/nomes";
 import { vendedorNaFilial } from "@/lib/casos/opcoes-vendedor";
@@ -25,7 +26,8 @@ export default async function CasosPage({
   const mostrarTeste = ehAdmMaster && sp.mostrarTeste === "1";
   const prazo = lerPrazoFiltro(sp.prazo);
   const aberto = sp.aberto === "1" || undefined;
-  const ordem = sp.ordem === "parado" ? ("parado" as const) : undefined;
+  const ordem = lerOrdemFiltro(sp.ordem);
+  const prioridade = lerPrioridadeFiltro(sp.prioridade);
 
   const mostrarFiltroFilial = usuario.perfil === "adm" || usuario.perfil === "adm_master";
 
@@ -37,7 +39,7 @@ export default async function CasosPage({
   const vendedor =
     typeof sp.vendedor === "string" && vendedorNaFilial(candidatosVendedor, filialDoVendedor, sp.vendedor) ? sp.vendedor : undefined;
 
-  const filtros = { status, tipo, filial, vendedor, busca, dataInicio, dataFim, mostrarTeste, prazo, aberto, ordem };
+  const filtros = { status, tipo, filial, vendedor, busca, dataInicio, dataFim, mostrarTeste, prazo, aberto, prioridade, ordem };
   // A barra conta com os mesmos filtros, menos o Status.
   const [casos, contagem] = await Promise.all([listarCasos(filtros), contarCasosPorStatus({ ...filtros, status: undefined })]);
 

@@ -1,3 +1,4 @@
+import { BadgePrioridade } from "@/components/badge-prioridade";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DetalheCaso } from "@/lib/casos/detalhe";
@@ -12,6 +13,8 @@ import {
 import { STATUS_BADGE_CLASSES } from "@/lib/status-colors";
 
 import { AnexosSecao } from "./anexos-secao";
+import { HistoricoPrioridade } from "./historico-prioridade";
+import { PrioridadeAcoes } from "./prioridade-acoes";
 import { RecibosRecadastradosSecao } from "./recibos-recadastrados-secao";
 import { CasoTesteAcoes } from "./caso-teste-acoes";
 import { ComplementosSecao } from "./complementos-secao";
@@ -36,6 +39,8 @@ export function CasoDetalhe({
   podeAvancarStatus,
   ehAdmin,
   ehAdmMaster,
+  usuarioId,
+  podeGerenciarCaso,
 }: {
   detalhe: DetalheCaso;
   /** Desfecho e implicações: admin ou gerente com delegação. */
@@ -44,6 +49,9 @@ export function CasoDetalhe({
   podeAvancarStatus: boolean;
   ehAdmin: boolean;
   ehAdmMaster: boolean;
+  usuarioId: string;
+  /** Admin ou gerente da filial do caso: altera a prioridade e edita comentário de qualquer anexo. */
+  podeGerenciarCaso: boolean;
 }) {
   const {
     caso,
@@ -51,6 +59,7 @@ export function CasoDetalhe({
     donoNome,
     criadoPorNome,
     historico,
+    historicoPrioridade,
     anexos,
     contratosAdicionais,
     recibosRecadastrados,
@@ -61,9 +70,14 @@ export function CasoDetalhe({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold">Protocolo #{caso.protocolo}</h1>
         <Badge className={STATUS_BADGE_CLASSES[caso.status_atual]}>{STATUS_LABELS[caso.status_atual]}</Badge>
+        <span className="flex items-center gap-2" data-testid="prioridade-caso">
+          <span className="text-muted-foreground text-sm">Prioridade</span>
+          <BadgePrioridade grau={caso.prioridade} />
+          {podeGerenciarCaso && <PrioridadeAcoes casoId={caso.id} grau={caso.prioridade} />}
+        </span>
         {caso.caso_teste && <Badge variant="outline">Caso de teste</Badge>}
         {ehAdmMaster && <CasoTesteAcoes casoId={caso.id} casoTeste={caso.caso_teste} />}
       </div>
@@ -168,6 +182,7 @@ export function CasoDetalhe({
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <Timeline historico={historico} />
+            <HistoricoPrioridade historico={historicoPrioridade} />
             <ComplementosSecao casoId={caso.id} complementos={complementos} />
             <StatusAcoes
               casoId={caso.id}
@@ -186,7 +201,7 @@ export function CasoDetalhe({
         <RecibosRecadastradosSecao casoId={caso.id} recibos={recibosRecadastrados} />
       )}
 
-      <AnexosSecao casoId={caso.id} anexos={anexos} />
+      <AnexosSecao casoId={caso.id} anexos={anexos} usuarioId={usuarioId} podeGerenciarCaso={podeGerenciarCaso} />
 
       {podeConduzirFluxo && (
         <DesfechoForm casoId={caso.id} tiposAnexosExistentes={anexos.map((a) => a.tipo_documento)} />

@@ -22,6 +22,7 @@ export type CasoFormValores = {
   dataCancelamento?: string;
   contratoOrigem?: string;
   subtipoRecadastro?: string;
+  prioridade?: string;
 };
 
 export type CriarCasoState = {
@@ -126,6 +127,7 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     dataCancelamento: comoTexto(formData.get("dataCancelamento")),
     contratoOrigem: comoTexto(formData.get("contratoOrigem")),
     subtipoRecadastro: comoTexto(formData.get("subtipoRecadastro")),
+    prioridade: comoTexto(formData.get("prioridade")),
   };
 
   // Campos obrigatórios vão para o zod como string (mesmo vazia — a própria
@@ -144,6 +146,8 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
     dataCancelamento: formData.get("dataCancelamento") || undefined,
     contratoOrigem: formData.get("contratoOrigem") || undefined,
     subtipoRecadastro: formData.get("subtipoRecadastro") || undefined,
+    // Sem escolha chega como null — o zod devolve "Escolha a prioridade do caso".
+    prioridade: formData.get("prioridade") ?? "",
   };
 
   const parsed = casoSchema.safeParse(raw);
@@ -191,6 +195,7 @@ export async function criarCaso(_prevState: CriarCasoState, formData: FormData):
       data_cancelamento: "dataCancelamento" in dados ? dados.dataCancelamento : null,
       contrato_origem: "contratoOrigem" in dados ? (dados.contratoOrigem ?? null) : null,
       subtipo_recadastro: "subtipoRecadastro" in dados ? dados.subtipoRecadastro : null,
+      prioridade: dados.prioridade,
     })
     .select("id, protocolo")
     .single();

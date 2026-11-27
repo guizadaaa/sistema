@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { buscarDetalheCaso } from "@/lib/casos/detalhe";
-import { podeAvancarStatus, podeConduzirFluxo } from "@/lib/casos/permissoes";
+import { podeAvancarStatus, podeConduzirFluxo, podeGerenciarCaso } from "@/lib/casos/permissoes";
 
 import { CasoDetalhe } from "./caso-detalhe";
 
@@ -27,6 +27,8 @@ export default async function CasoDetalhePage({ params }: { params: Promise<{ id
       podeAvancarStatus={podeAvancar}
       ehAdmin={ehAdmin}
       ehAdmMaster={ehAdmMaster}
+      usuarioId={usuario.id}
+      podeGerenciarCaso={podeGerenciarCaso(usuario, detalhe.caso)}
     />
   );
 }

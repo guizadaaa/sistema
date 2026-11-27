@@ -2,6 +2,7 @@
 // testes verificam.
 
 import { STATUS_ORDEM } from "@/lib/casos/status";
+import type { PrioridadeFiltro } from "@/lib/casos/prioridade";
 import type { FilialCvc, StatusCaso, TipoCaso } from "@/lib/supabase/types";
 
 export type FiltrosTelaCasos = {
@@ -17,9 +18,17 @@ export type FiltrosTelaCasos = {
   prazo?: PrazoFiltro;
   /** Só não resolvidos (aberto=1). */
   aberto?: boolean;
-  /** "parado": mais tempo na etapa atual primeiro. */
-  ordem?: "parado";
+  /** Grau de prioridade (prioridade=urgente|alta|media|baixa|sem). */
+  prioridade?: PrioridadeFiltro;
+  /** "parado": mais tempo na etapa atual primeiro; "prioridade": Urgente → Sem grau, depois o mais parado. */
+  ordem?: OrdemFiltro;
 };
+
+export type OrdemFiltro = "parado" | "prioridade";
+
+export function lerOrdemFiltro(valor: unknown): OrdemFiltro | undefined {
+  return valor === "parado" || valor === "prioridade" ? valor : undefined;
+}
 
 export type PrazoFiltro = "vencido" | "vence5";
 
@@ -40,6 +49,7 @@ export function urlCasos(filtros: FiltrosTelaCasos, mudanca: Partial<FiltrosTela
   if (f.dataFim) q.set("dataFim", f.dataFim);
   if (f.mostrarTeste) q.set("mostrarTeste", "1");
   if (f.prazo) q.set("prazo", f.prazo);
+  if (f.prioridade) q.set("prioridade", f.prioridade);
   if (f.aberto) q.set("aberto", "1");
   if (f.ordem) q.set("ordem", f.ordem);
   const s = q.toString();

@@ -45,3 +45,14 @@ export async function podeAvancarStatus(usuario: CurrentUser, caso: CasoParaPerm
   if (usuario.perfil === "gerente") return usuario.filial === caso.filial;
   return usuario.perfil === "vendedor" && caso.vendedor_dono === usuario.id;
 }
+
+/**
+ * Espelha auth_gerencia_caso (20261130000002): admin, ou gerente da filial
+ * do caso. Decide se a tela mostra o select de prioridade e o lápis do
+ * comentário em anexo de outra pessoa — alterar_prioridade_caso e a policy
+ * anexos_update_comentario impõem no banco.
+ */
+export function podeGerenciarCaso(usuario: CurrentUser, caso: Pick<CasoParaPermissao, "filial">): boolean {
+  if (usuario.perfil === "adm" || usuario.perfil === "adm_master") return true;
+  return usuario.perfil === "gerente" && usuario.filial === caso.filial;
+}

@@ -6,7 +6,8 @@ import { carregarResolvidoEm } from "@/lib/casos/resolucao";
 import { STATUS_ORDEM } from "@/lib/casos/status";
 import { createClient } from "@/lib/supabase/server";
 import { somenteDigitos } from "@/lib/validation/cpf";
-import type { FilialCvc, StatusCaso, SubtipoRecadastro, TipoCaso } from "@/lib/supabase/types";
+import { compararPrioridade, grauDoFiltro, type PrioridadeFiltro } from "@/lib/casos/prioridade";
+import type { FilialCvc, GrauPrioridade, StatusCaso, SubtipoRecadastro, TipoCaso } from "@/lib/supabase/types";
 
 export type FiltrosCasos = {
   status?: StatusCaso;
@@ -34,9 +35,16 @@ export type FiltrosCasos = {
   prazo?: "vencido" | "vence5";
   /** Só não resolvidos (aberto=1). */
   aberto?: boolean;
-  /** "parado": ordena pelo tempo na etapa atual (mais parado primeiro). */
-  ordem?: "parado";
+  /** Grau de prioridade (ou "sem": casos sem grau). */
+  prioridade?: PrioridadeFiltro;
+  /**
+   * "parado": tempo na etapa atual (mais parado primeiro);
+   * "prioridade": Urgente → Sem grau, mais parado primeiro dentro do grau.
+   */
+  ordem?: OrdemCasos;
 };
+
+export type OrdemCasos = "parado" | "prioridade";
 
 export type CasoListado = {
   id: string;
@@ -52,6 +60,7 @@ export type CasoListado = {
   caso_teste: boolean;
   contrato_origem: string | null;
   subtipo_recadastro: SubtipoRecadastro | null;
+  prioridade: GrauPrioridade | null;
   /** Só preenchido para status Resolvido — data em que entrou em Resolvido (ver carregarResolvidoEm). */
   resolvidoEm: string | null;
 };
@@ -167,12 +176,25 @@ function somarDiasLocal(iso: string, n: number): string {
   return new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** Mais tempo na etapa atual primeiro (casos_tempo_etapa: última entrada em status_historico). */
-async function ordenarPorTempoNaEtapa(supabase: SupabaseClient, casos: { id: string; protocolo: number }[]): Promise<void> {
+/**
+ * Mais tempo na etapa atual primeiro (casos_tempo_etapa: última entrada em
+ * status_historico). Com `porGrau`, antes o grau (Urgente → Sem grau) —
+ * a mesma ordem do card "Casos em aberto" da página inicial.
+ */
+async function ordenarPorTempoNaEtapa(
+  supabase: SupabaseClient,
+  casos: { id: string; protocolo: number; prioridade: GrauPrioridade | null }[],
+  porGrau = false
+): Promise<void> {
   const { data, error } = await supabase.rpc("casos_tempo_etapa", { p_ids: casos.map((c) => c.id) });
   if (error) throw error;
   const desde = new Map((data ?? []).map((d) => [d.id, d.entrou_em]));
-  casos.sort((a, b) => (desde.get(a.id) ?? "9").localeCompare(desde.get(b.id) ?? "9") || a.protocolo - b.protocolo);
+  casos.sort(
+    (a, b) =>
+      (porGrau ? compararPrioridade(a.prioridade, b.prioridade) : 0) ||
+      (desde.get(a.id) ?? "9").localeCompare(desde.get(b.id) ?? "9") ||
+      a.protocolo - b.protocolo
+  );
 }
 
 /**
@@ -186,7 +208,7 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   let query = supabase
     .from("casos")
     .select(
-      "id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero, contrato_origem, subtipo_recadastro, caso_teste"
+      "id, protocolo, tipo_caso, cliente_nome, status_atual, prazo_vigencia, filial, criado_em, vendedor_dono, contrato_numero, contrato_origem, subtipo_recadastro, caso_teste, prioridade"
     )
     .order("criado_em", { ascending: false });
 
@@ -212,6 +234,10 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
     query = query.neq("status_atual", "resolvido").gte("prazo_vigencia", hoje).lte("prazo_vigencia", somarDiasLocal(hoje, 5));
   }
   if (filtros.aberto) query = query.neq("status_atual", "resolvido");
+  if (filtros.prioridade) {
+    const grau = grauDoFiltro(filtros.prioridade);
+    query = grau === null ? query.is("prioridade", null) : query.eq("prioridade", grau);
+  }
 
   if (filtros.busca?.trim()) {
     const idsPermitidos = await idsCasosPorBusca(supabase, filtros.busca);
@@ -223,7 +249,7 @@ export async function listarCasos(filtros: FiltrosCasos): Promise<CasoListado[]>
   if (error) throw error;
   if (!casos || casos.length === 0) return [];
 
-  if (filtros.ordem === "parado") await ordenarPorTempoNaEtapa(supabase, casos);
+  if (filtros.ordem) await ordenarPorTempoNaEtapa(supabase, casos, filtros.ordem === "prioridade");
 
   const nomesPorId = await carregarNomesUsuariosCasos(supabase, casos.map((c) => c.id));
   const resolvidoEm = await carregarResolvidoEm(
@@ -248,8 +274,8 @@ export type ContagemStatus = {
 };
 
 /**
- * Barra "Casos por status": count por status no banco (casos_contagem_status,
- * SECURITY INVOKER — mesma RLS da lista) com os filtros da lista MENOS o
+ * Barra "Casos por status": count por status no banco (casos_contagem_barra,
+ * mesma visibilidade da lista) com os filtros da lista MENOS o
  * Status, que a barra ignora de propósito (escolher "Inicial" não zera os
  * outros). A busca usa a mesma resolução de ids da lista.
  */
@@ -268,7 +294,8 @@ export async function contarCasosPorStatus(filtros: FiltrosCasos): Promise<Conta
     if (ids.length === 0) return vazio;
   }
 
-  const { data, error } = await supabase.rpc("casos_contagem_status", {
+  const prioridade = filtros.prioridade ? (grauDoFiltro(filtros.prioridade) ?? 0) : null;
+  const { data, error } = await supabase.rpc("casos_contagem_barra", {
     p_tipo: filtros.tipo ?? null,
     p_filial: filtros.filial ?? null,
     p_vendedor: filtros.vendedor ?? null,
@@ -278,6 +305,7 @@ export async function contarCasosPorStatus(filtros: FiltrosCasos): Promise<Conta
     p_ids: ids,
     p_prazo: filtros.prazo ?? (filtros.aberto ? "aberto" : null),
     p_hoje: hojeLocalIso(),
+    p_prioridade: prioridade,
   });
   if (error) throw error;
 
